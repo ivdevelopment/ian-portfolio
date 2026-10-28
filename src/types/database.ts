@@ -105,24 +105,158 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"review_invitations": {
+                  Row: {
+                    "client_name": string | null,"created_at": string,"created_by": string,"email": string | null,"expires_at": string,"id": string,"project_id": string | null,"review_id": string | null,"revoked_at": string | null,"token_hash": string,"used_at": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "client_name"?: string | null,"created_at"?: string,"created_by": string,"email"?: string | null,"expires_at": string,"id"?: string,"project_id"?: string | null,"review_id"?: string | null,"revoked_at"?: string | null,"token_hash": string,"used_at"?: string | null
+                  }
+                  Update: {
+                    "client_name"?: string | null,"created_at"?: string,"created_by"?: string,"email"?: string | null,"expires_at"?: string,"id"?: string,"project_id"?: string | null,"review_id"?: string | null,"revoked_at"?: string | null,"token_hash"?: string,"used_at"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "review_invitations_project_id_fkey"
+      columns: ["project_id"]
+isOneToOne: false
+      referencedRelation: "projects"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "review_invitations_review_id_fkey"
+      columns: ["review_id"]
+isOneToOne: false
+      referencedRelation: "reviews"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"review_private": {
+                  Row: {
+                    "created_at": string,"ip_hash": string | null,"original_review_text": string,"review_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"ip_hash"?: string | null,"original_review_text": string,"review_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"ip_hash"?: string | null,"original_review_text"?: string,"review_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "review_private_review_id_fkey"
+      columns: ["review_id"]
+isOneToOne: true
+      referencedRelation: "reviews"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"reviews": {
+                  Row: {
+                    "avatar_path": string | null,"company": string | null,"created_at": string,"featured": boolean,"id": string,"name": string,"project_id": string | null,"published_at": string | null,"rating": number,"review_text": string,"role": string | null,"sort_order": number,"source": Database["public"]['Enums']["review_source"],"status": Database["public"]['Enums']["review_status"],"submitted_at": string | null,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "avatar_path"?: string | null,"company"?: string | null,"created_at"?: string,"featured"?: boolean,"id"?: string,"name": string,"project_id"?: string | null,"published_at"?: string | null,"rating": number,"review_text": string,"role"?: string | null,"sort_order"?: number,"source": Database["public"]['Enums']["review_source"],"status"?: Database["public"]['Enums']["review_status"],"submitted_at"?: string | null,"updated_at"?: string
+                  }
+                  Update: {
+                    "avatar_path"?: string | null,"company"?: string | null,"created_at"?: string,"featured"?: boolean,"id"?: string,"name"?: string,"project_id"?: string | null,"published_at"?: string | null,"rating"?: number,"review_text"?: string,"role"?: string | null,"sort_order"?: number,"source"?: Database["public"]['Enums']["review_source"],"status"?: Database["public"]['Enums']["review_status"],"submitted_at"?: string | null,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "reviews_project_id_fkey"
+      columns: ["project_id"]
+isOneToOne: false
+      referencedRelation: "projects"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"services": {
+                  Row: {
+                    "created_at": string,"description": string,"enabled": boolean,"icon": string,"id": string,"includes": (string)[],"slug": string,"sort_order": number,"title": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"description": string,"enabled"?: boolean,"icon"?: string,"id"?: string,"includes"?: (string)[],"slug": string,"sort_order"?: number,"title": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"description"?: string,"enabled"?: boolean,"icon"?: string,"id"?: string,"includes"?: (string)[],"slug"?: string,"sort_order"?: number,"title"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"site_content": {
+                  Row: {
+                    "content": NonNullable<Json>,"key": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "content": NonNullable<Json>,"key": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "content"?: NonNullable<Json>,"key"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"site_settings": {
+                  Row: {
+                    "contact_email": string | null,"display_name": string,"github_url": string | null,"id": boolean,"instagram_url": string | null,"linkedin_url": string | null,"location": string | null,"seo_default_description": string,"seo_default_title": string,"seo_og_title": string | null,"seo_title_template": string,"site_name": string,"updated_at": string,"x_url": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "contact_email"?: string | null,"display_name": string,"github_url"?: string | null,"id"?: boolean,"instagram_url"?: string | null,"linkedin_url"?: string | null,"location"?: string | null,"seo_default_description": string,"seo_default_title": string,"seo_og_title"?: string | null,"seo_title_template": string,"site_name": string,"updated_at"?: string,"x_url"?: string | null
+                  }
+                  Update: {
+                    "contact_email"?: string | null,"display_name"?: string,"github_url"?: string | null,"id"?: boolean,"instagram_url"?: string | null,"linkedin_url"?: string | null,"location"?: string | null,"seo_default_description"?: string,"seo_default_title"?: string,"seo_og_title"?: string | null,"seo_title_template"?: string,"site_name"?: string,"updated_at"?: string,"x_url"?: string | null
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"skills": {
+                  Row: {
+                    "created_at": string,"enabled": boolean,"icon": string | null,"id": string,"name": string,"sort_order": number,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"enabled"?: boolean,"icon"?: string | null,"id"?: string,"name": string,"sort_order"?: number,"updated_at"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"enabled"?: boolean,"icon"?: string | null,"id"?: string,"name"?: string,"sort_order"?: number,"updated_at"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 }
           }
           Views: {
             [_ in never]: never
           }
           Functions: {
-            "is_admin":
+            "get_review_invitation":
+{ Args: { "p_token_hash": string }; Returns: Json
+                           },
+"is_admin":
 { Args: Record<PropertyKey, never>; Returns: boolean
                            },
 "save_project":
 { Args: { "p_features": Json,"p_id": string,"p_media": Json,"p_project": Json }; Returns: string
                            },
+"save_services":
+{ Args: { "p_services": Json }; Returns: undefined
+                           },
+"save_skills":
+{ Args: { "p_skills": Json }; Returns: undefined
+                           },
 "submit_inquiry":
 { Args: { "p_budget": string,"p_email": string,"p_ip_hash"?: string,"p_message": string,"p_name": string,"p_project_type": string }; Returns: string
+                           },
+"submit_review":
+{ Args: { "p_company": string,"p_ip_hash"?: string,"p_name": string,"p_rating": number,"p_role": string,"p_text": string,"p_token_hash": string }; Returns: string
                            }
           }
           Enums: {
-            "inquiry_status": "new"|"contacted"|"qualified"|"won"|"lost"|"archived","media_type": "image"|"gif"|"video","preview_mode": "embed"|"media"|"external","project_kind": "website"|"web-app"|"redesign"|"concept","project_type": "client"|"personal"|"concept"
+            "inquiry_status": "new"|"contacted"|"qualified"|"won"|"lost"|"archived","media_type": "image"|"gif"|"video","preview_mode": "embed"|"media"|"external","project_kind": "website"|"web-app"|"redesign"|"concept","project_type": "client"|"personal"|"concept","review_source": "admin"|"invitation","review_status": "pending"|"approved"|"rejected"|"archived"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -242,7 +376,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "inquiry_status": ["new", "contacted", "qualified", "won", "lost", "archived"],"media_type": ["image", "gif", "video"],"preview_mode": ["embed", "media", "external"],"project_kind": ["website", "web-app", "redesign", "concept"],"project_type": ["client", "personal", "concept"]
+            "inquiry_status": ["new", "contacted", "qualified", "won", "lost", "archived"],"media_type": ["image", "gif", "video"],"preview_mode": ["embed", "media", "external"],"project_kind": ["website", "web-app", "redesign", "concept"],"project_type": ["client", "personal", "concept"],"review_source": ["admin", "invitation"],"review_status": ["pending", "approved", "rejected", "archived"]
           }
         }
 } as const
