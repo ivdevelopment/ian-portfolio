@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" width="1600" height="1000" role="img"><defs>
+  <linearGradient id="rh3bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0a0a10"/><stop offset="1" stop-color="#1b0a0e"/></linearGradient>
+  <radialGradient id="rh3glow" cx=".72" cy=".5" r=".5"><stop offset="0" stop-color="#e5322d" stop-opacity=".30"/><stop offset="1" stop-color="#e5322d" stop-opacity="0"/></radialGradient>
+  <radialGradient id="rh3glow2" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#e5322d" stop-opacity=".28"/><stop offset="1" stop-color="#e5322d" stop-opacity="0"/></radialGradient>
+  <linearGradient id="rh3cup" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#34343f"/><stop offset="1" stop-color="#0d0d12"/></linearGradient>
+  <linearGradient id="rh3band" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#454552"/><stop offset="1" stop-color="#15151b"/></linearGradient>
+</defs><rect width="1600" height="1000" fill="url(#rh3bg)"/><rect width="1600" height="1000" fill="url(#rh3glow)"/><circle cx="84" cy="66" r="15" fill="none" stroke="#e5322d" stroke-width="4"/><circle cx="84" cy="66" r="5" fill="#e5322d"/>
+  <text x="112" y="74" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="21" font-weight="600" fill="#ffffff" letter-spacing="4">RED HARBOR</text>
+  <text x="600" y="73" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="21" font-weight="400" fill="#a9a9b6" >Products</text><text x="750" y="73" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="21" font-weight="400" fill="#a9a9b6" >Software</text><text x="900" y="73" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="21" font-weight="600" fill="#ffffff" >Blog</text><text x="1050" y="73" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="21" font-weight="400" fill="#a9a9b6" >Support</text>
+  <rect x="1376" y="40" width="150" height="52" rx="26" fill="#e5322d" /><text x="1451" y="73" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="20" font-weight="600" fill="#ffffff" text-anchor="middle">Get started</text>
+    <text x="110" y="230" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="76" font-weight="600" fill="#ffffff" letter-spacing="-2">News &amp; journal</text>
+    <rect x="110" y="320" width="1380" height="190" rx="18" fill="#13131a" stroke="#ffffff" stroke-opacity=".08"/>
+        <rect x="134" y="342" width="280" height="146" rx="12" fill="#2a0f14" />
+        <circle cx="274" cy="415" r="38" fill="none" stroke="#e5322d" stroke-width="5"/>
+        <text x="450" y="390" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="34" font-weight="600" fill="#ffffff" >Version 2.0 is here</text>
+        <rect x="450" y="420" width="820" height="12" rx="6" fill="#ffffff" fill-opacity=".14" /><rect x="450" y="448" width="640" height="12" rx="6" fill="#ffffff" fill-opacity=".14" />
+        <text x="1360" y="390" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="20" font-weight="600" fill="#e5322d" text-anchor="middle">Release</text><rect x="110" y="540" width="1380" height="190" rx="18" fill="#13131a" stroke="#ffffff" stroke-opacity=".08"/>
+        <rect x="134" y="562" width="280" height="146" rx="12" fill="#1b1b26" />
+        <circle cx="274" cy="635" r="38" fill="none" stroke="#e5322d" stroke-width="5"/>
+        <text x="450" y="610" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="34" font-weight="600" fill="#ffffff" >Behind the sound design</text>
+        <rect x="450" y="640" width="820" height="12" rx="6" fill="#ffffff" fill-opacity=".14" /><rect x="450" y="668" width="640" height="12" rx="6" fill="#ffffff" fill-opacity=".14" />
+        <text x="1360" y="610" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="20" font-weight="600" fill="#e5322d" text-anchor="middle">Journal</text><rect x="110" y="760" width="1380" height="190" rx="18" fill="#13131a" stroke="#ffffff" stroke-opacity=".08"/>
+        <rect x="134" y="782" width="280" height="146" rx="12" fill="#241418" />
+        <circle cx="274" cy="855" r="38" fill="none" stroke="#e5322d" stroke-width="5"/>
+        <text x="450" y="830" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="34" font-weight="600" fill="#ffffff" >Studio session notes</text>
+        <rect x="450" y="860" width="820" height="12" rx="6" fill="#ffffff" fill-opacity=".14" /><rect x="450" y="888" width="640" height="12" rx="6" fill="#ffffff" fill-opacity=".14" />
+        <text x="1360" y="830" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="20" font-weight="600" fill="#e5322d" text-anchor="middle">Studio</text></svg>

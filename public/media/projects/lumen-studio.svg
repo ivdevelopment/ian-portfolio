@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" width="1600" height="1000" role="img"><defs>
+  <linearGradient id="lm1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e8c9a6"/><stop offset="1" stop-color="#b98a62"/></linearGradient>
+  <linearGradient id="lm2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9d4cf"/><stop offset="1" stop-color="#8ea39a"/></linearGradient>
+  <linearGradient id="lm3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f2dccb"/><stop offset="1" stop-color="#d9a98a"/></linearGradient>
+</defs>
+<rect width="1600" height="1000" fill="#f1ebe1"/>
+<text x="90" y="80" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="28" font-weight="700" fill="#1f1b16" letter-spacing="8">LUMEN</text>
+<text x="1080" y="80" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="21" font-weight="400" fill="#6a6054" >Work</text><text x="1200" y="80" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="21" font-weight="400" fill="#6a6054" >Studio</text><text x="1320" y="80" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="21" font-weight="400" fill="#6a6054" >Journal</text><text x="1440" y="80" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="21" font-weight="400" fill="#6a6054" >Contact</text>
+<text x="90" y="300" font-family="Georgia, 'Times New Roman', serif" font-size="104" fill="#1f1b16" letter-spacing="-3">Light, space</text>
+<text x="90" y="410" font-family="Georgia, 'Times New Roman', serif" font-size="104" font-style="italic" fill="#8a5a36" letter-spacing="-3">&amp; considered craft.</text>
+<text x="94" y="490" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="25" font-weight="400" fill="#6a6054" >A creative studio designing interiors, brands and</text>
+<text x="94" y="526" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="25" font-weight="400" fill="#6a6054" >experiences with a quiet sense of warmth.</text>
+<rect x="94" y="580" width="220" height="62" rx="31" fill="#1f1b16" /><text x="204" y="620" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="21" font-weight="600" fill="#f1ebe1" text-anchor="middle">View projects</text>
+<rect x="94" y="700" width="460" height="230" rx="14" fill="url(#lm1)" /><rect x="574" y="700" width="300" height="230" rx="14" fill="url(#lm2)" />
+<rect x="920" y="150" width="280" height="780" rx="14" fill="url(#lm3)" /><rect x="1220" y="150" width="290" height="380" rx="14" fill="url(#lm2)" /><rect x="1220" y="550" width="290" height="380" rx="14" fill="url(#lm1)" />
+<circle cx="1060" cy="420" r="70" fill="#fff" fill-opacity=".35"/><rect x="1030" y="520" width="60" height="300" rx="30" fill="#fff" fill-opacity=".25"/>
+<text x="94" y="976" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="19" font-weight="400" fill="#8a7e6e" >Selected projects — 2024–2026</text></svg>

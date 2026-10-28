@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1100" width="1600" height="1100" role="img"><defs>
+  <linearGradient id="hsbg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0a0a10"/><stop offset="1" stop-color="#1b0a0e"/></linearGradient>
+  <radialGradient id="hsglow" cx=".72" cy=".5" r=".5"><stop offset="0" stop-color="#e5322d" stop-opacity=".30"/><stop offset="1" stop-color="#e5322d" stop-opacity="0"/></radialGradient>
+  <radialGradient id="hsglow2" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#e5322d" stop-opacity=".28"/><stop offset="1" stop-color="#e5322d" stop-opacity="0"/></radialGradient>
+  <linearGradient id="hscup" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#34343f"/><stop offset="1" stop-color="#0d0d12"/></linearGradient>
+  <linearGradient id="hsband" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#454552"/><stop offset="1" stop-color="#15151b"/></linearGradient>
+</defs><defs>
+  <filter id="blur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="14"/></filter>
+  <filter id="blur2" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="40"/></filter>
+  <linearGradient id="room" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0a0e1b"/><stop offset=".55" stop-color="#2a1a14"/><stop offset="1" stop-color="#3a2216"/></linearGradient>
+  <radialGradient id="lampglow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffbe6b" stop-opacity=".75"/><stop offset="1" stop-color="#ffbe6b" stop-opacity="0"/></radialGradient>
+  <linearGradient id="desk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4a2f1d"/><stop offset=".12" stop-color="#2d1c11"/><stop offset="1" stop-color="#120a06"/></linearGradient>
+  <linearGradient id="alu" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9ccd4"/><stop offset="1" stop-color="#6d7079"/></linearGradient>
+  <linearGradient id="vig" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0a0e1b" stop-opacity=".55"/><stop offset=".4" stop-color="#0a0e1b" stop-opacity="0"/></linearGradient>
+</defs>
+<rect width="1600" height="1100" fill="url(#room)"/>
+<circle cx="1290" cy="330" r="420" fill="url(#lampglow)"/>
+<circle cx="760" cy="150" r="60" fill="#ffcf8a" fill-opacity="0.35" filter="url(#blur)"/><circle cx="900" cy="90" r="36" fill="#ffb35c" fill-opacity="0.4" filter="url(#blur)"/><circle cx="1010" cy="230" r="78" fill="#ffd9a0" fill-opacity="0.28" filter="url(#blur)"/><circle cx="1180" cy="110" r="48" fill="#ff9f4a" fill-opacity="0.35" filter="url(#blur)"/><circle cx="1500" cy="160" r="70" fill="#ffcf8a" fill-opacity="0.3" filter="url(#blur)"/><circle cx="1420" cy="520" r="54" fill="#ffb35c" fill-opacity="0.3" filter="url(#blur)"/><circle cx="650" cy="330" r="44" fill="#ffd9a0" fill-opacity="0.22" filter="url(#blur)"/><circle cx="1560" cy="400" r="60" fill="#ff9f4a" fill-opacity="0.28" filter="url(#blur)"/>
+<!-- shelf silhouette -->
+<rect x="1030" y="440" width="560" height="10" fill="#1a0f09" fill-opacity=".8"/>
+<rect x="1060" y="392" width="34" height="58" rx="3" fill="#24150d" fill-opacity=".9"/><rect x="1112" y="378" width="44" height="72" rx="3" fill="#24150d" fill-opacity=".9"/><rect x="1164" y="364" width="34" height="86" rx="3" fill="#24150d" fill-opacity=".9"/><rect x="1216" y="392" width="44" height="58" rx="3" fill="#24150d" fill-opacity=".9"/><rect x="1268" y="378" width="34" height="72" rx="3" fill="#24150d" fill-opacity=".9"/>
+<!-- lamp -->
+<g transform="translate(1290 250)">
+  <polygon points="-70,0 70,0 100,110 -100,110" fill="#f6c27f"/>
+  <polygon points="-70,0 70,0 100,110 -100,110" fill="url(#lampglow)"/>
+  <rect x="-5" y="110" width="10" height="470" fill="#1a0f09"/>
+  <ellipse cx="0" cy="580" rx="80" ry="12" fill="#1a0f09"/>
+</g>
+<!-- desk -->
+<rect x="0" y="830" width="1600" height="270" fill="url(#desk)"/>
+<rect x="0" y="830" width="1600" height="3" fill="#ffcf8a" fill-opacity=".25"/>
+<!-- laptop -->
+<ellipse cx="860" cy="880" rx="520" ry="40" fill="#000" fill-opacity=".45" filter="url(#blur)"/>
+<ellipse cx="860" cy="860" rx="500" ry="120" fill="#e5322d" fill-opacity=".12" filter="url(#blur2)"/>
+<g transform="translate(450 270)">
+  <rect x="0" y="0" width="820" height="540" rx="20" fill="#0a0a0d" stroke="#30303a" stroke-width="2"/>
+  <svg x="16" y="16" width="788" height="492.5" viewBox="0 0 1600 1000"><defs>
+  <linearGradient id="hsbg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0a0a10"/><stop offset="1" stop-color="#1b0a0e"/></linearGradient>
+  <radialGradient id="hsglow" cx=".72" cy=".5" r=".5"><stop offset="0" stop-color="#e5322d" stop-opacity=".30"/><stop offset="1" stop-color="#e5322d" stop-opacity="0"/></radialGradient>
+  <radialGradient id="hsglow2" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#e5322d" stop-opacity=".28"/><stop offset="1" stop-color="#e5322d" stop-opacity="0"/></radialGradient>
+  <linearGradient id="hscup" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#34343f"/><stop offset="1" stop-color="#0d0d12"/></linearGradient>
+  <linearGradient id="hsband" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#454552"/><stop offset="1" stop-color="#15151b"/></linearGradient>
+</defs><rect width="1600" height="1000" fill="url(#hsbg)"/><rect width="1600" height="1000" fill="url(#hsglow)"/><circle cx="84" cy="66" r="15" fill="none" stroke="#e5322d" stroke-width="4"/><circle cx="84" cy="66" r="5" fill="#e5322d"/>
+  <text x="112" y="74" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="21" font-weight="600" fill="#ffffff" letter-spacing="4">RED HARBOR</text>
+  <text x="600" y="73" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="21" font-weight="400" fill="#a9a9b6" >Products</text><text x="750" y="73" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="21" font-weight="400" fill="#a9a9b6" >Software</text><text x="900" y="73" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="21" font-weight="400" fill="#a9a9b6" >Blog</text><text x="1050" y="73" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="21" font-weight="400" fill="#a9a9b6" >Support</text>
+  <rect x="1376" y="40" width="150" height="52" rx="26" fill="#e5322d" /><text x="1451" y="73" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="20" font-weight="600" fill="#ffffff" text-anchor="middle">Get started</text>
+    <text x="110" y="330" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="19" font-weight="600" fill="#e5322d" letter-spacing="5">CREATIVE AUDIO SOFTWARE</text>
+    <text x="106" y="440" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="104" font-weight="600" fill="#ffffff" letter-spacing="-3">Creative</text>
+    <text x="106" y="548" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="104" font-weight="600" fill="#ffffff" letter-spacing="-3">Audio Software</text>
+    <text x="110" y="626" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="26" font-weight="400" fill="#a9a9b6" >Plugins, instruments and tools built for</text>
+    <text x="110" y="662" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="26" font-weight="400" fill="#a9a9b6" >producers who care about every detail.</text>
+    <rect x="110" y="730" width="230" height="66" rx="33" fill="#e5322d" /><text x="225" y="772" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="22" font-weight="600" fill="#ffffff" text-anchor="middle">Explore products</text>
+    <rect x="362" y="730" width="190" height="66" rx="33" fill="none" stroke="#ffffff" stroke-opacity=".3" stroke-width="2"/><text x="457" y="772" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="22" font-weight="500" fill="#ffffff" text-anchor="middle">Watch demo</text>
+    <g transform="translate(1160 470) scale(1.35)">
+  <ellipse cx="0" cy="40" rx="260" ry="320" fill="url(#hsglow2)"/>
+  <path d="M -215 90 C -215 -230 215 -230 215 90" fill="none" stroke="url(#hsband)" stroke-width="46" stroke-linecap="round"/>
+  <path d="M -200 70 C -200 -205 200 -205 200 70" fill="none" stroke="#ffffff" stroke-opacity=".16" stroke-width="3" stroke-linecap="round"/>
+  <path d="M -150 -112 C -90 -150 90 -150 150 -112" fill="none" stroke="#e5322d" stroke-width="7" stroke-linecap="round"/>
+  <g transform="translate(-215 120)">
+    <rect x="-70" y="-120" width="140" height="250" rx="64" fill="url(#hscup)" stroke="#ffffff" stroke-opacity=".1"/>
+    <rect x="-52" y="-96" width="104" height="202" rx="48" fill="#0c0c11" stroke="#e5322d" stroke-width="6"/>
+    <ellipse cx="0" cy="5" rx="30" ry="62" fill="none" stroke="#e5322d" stroke-opacity=".45" stroke-width="3"/>
+    <ellipse cx="0" cy="5" rx="12" ry="26" fill="#e5322d" fill-opacity=".85"/>
+    <rect x="-70" y="-120" width="140" height="250" rx="64" fill="none" stroke="#ffffff" stroke-opacity=".08"/>
+  </g><g transform="translate(215 120)">
+    <rect x="-70" y="-120" width="140" height="250" rx="64" fill="url(#hscup)" stroke="#ffffff" stroke-opacity=".1"/>
+    <rect x="-52" y="-96" width="104" height="202" rx="48" fill="#0c0c11" stroke="#e5322d" stroke-width="6"/>
+    <ellipse cx="0" cy="5" rx="30" ry="62" fill="none" stroke="#e5322d" stroke-opacity=".45" stroke-width="3"/>
+    <ellipse cx="0" cy="5" rx="12" ry="26" fill="#e5322d" fill-opacity=".85"/>
+    <rect x="-70" y="-120" width="140" height="250" rx="64" fill="none" stroke="#ffffff" stroke-opacity=".08"/>
+  </g>
+</g>
+    <text x="110" y="905" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="22" font-weight="500" fill="#6f6f7c" >48+ plugins</text><text x="370" y="905" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="22" font-weight="500" fill="#6f6f7c" >120k producers</text><text x="630" y="905" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif" font-size="22" font-weight="500" fill="#6f6f7c" >4.9 rating</text></svg>
+  <rect x="16" y="16" width="788" height="492.5" fill="none" stroke="#ffffff" stroke-opacity=".06"/>
+  <circle cx="410" cy="527" r="3" fill="#2a2a32"/>
+  <path d="M -50 540 H 870 L 850 572 Q 846 580 836 580 H -16 Q -26 580 -30 572 Z" fill="url(#alu)"/>
+  <rect x="340" y="540" width="140" height="10" rx="5" fill="#8e919b"/>
+</g>
+<!-- mug -->
+<g transform="translate(1210 760)">
+  <ellipse cx="45" cy="118" rx="62" ry="12" fill="#000" fill-opacity=".4"/>
+  <rect x="0" y="10" width="90" height="106" rx="12" fill="#e8dccb"/>
+  <rect x="0" y="10" width="90" height="106" rx="12" fill="#000" fill-opacity=".18"/>
+  <ellipse cx="45" cy="12" rx="45" ry="10" fill="#3a2315"/>
+  <path d="M 88 34 q 38 6 0 56" fill="none" stroke="#e8dccb" stroke-width="12" stroke-linecap="round"/>
+</g>
+<rect width="1600" height="1100" fill="url(#vig)"/></svg>
