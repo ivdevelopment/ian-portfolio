@@ -58,5 +58,8 @@ export type Project = {
 
   featured: boolean;
   published: boolean;
+  /** Sample / placeholder content that the public site labels as such. */
+  isExample: boolean;
   sortOrder: number;
+  updatedAt?: string;
 };

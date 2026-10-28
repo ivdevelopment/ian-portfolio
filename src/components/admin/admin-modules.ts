@@ -1,11 +1,11 @@
 import {
   FileText,
+  FolderKanban,
   Image as ImageIcon,
   Inbox,
   LayoutDashboard,
   MessageSquareQuote,
   Settings,
-  FolderKanban,
   type LucideIcon,
 } from "lucide-react";
 
@@ -14,58 +14,60 @@ export type AdminModule = {
   label: string;
   description: string;
   icon: LucideIcon;
-  /** Milestone in which the module ships. */
-  milestone: "P1" | "P2";
+  /** Present for functional modules; placeholders have no href. */
+  href?: string;
+  /** Short note shown on placeholder modules. */
+  note?: string;
 };
 
 export const adminModules: AdminModule[] = [
   {
     id: "dashboard",
     label: "Dashboard",
-    description: "Overview of projects, reviews and new inquiries.",
+    description: "Overview of projects and new inquiries.",
     icon: LayoutDashboard,
-    milestone: "P1",
+    href: "/admin",
   },
   {
     id: "projects",
     label: "Projects",
-    description: "Create, edit, reorder, publish and feature projects; upload media; choose the preview type.",
+    description: "Create, edit, publish, feature and delete projects, and manage their media.",
     icon: FolderKanban,
-    milestone: "P1",
+    href: "/admin/projects",
   },
   {
     id: "reviews",
     label: "Reviews",
-    description: "Add reviews, receive submissions, approve or reject, publish.",
+    description: "Collect, approve and publish client reviews.",
     icon: MessageSquareQuote,
-    milestone: "P2",
+    note: "Coming in P2",
   },
   {
     id: "inquiries",
     label: "Inquiries",
-    description: "Receive project requests and manage their status.",
+    description: "Project requests from the contact form.",
     icon: Inbox,
-    milestone: "P2",
+    href: "/admin/inquiries",
   },
   {
     id: "media",
     label: "Media",
-    description: "Screenshots, GIFs and videos stored in Supabase Storage.",
+    description: "Screenshots, GIFs and videos are managed inside each project.",
     icon: ImageIcon,
-    milestone: "P1",
+    note: "In each project",
   },
   {
     id: "pages",
     label: "Pages",
     description: "Hero text, statistics, services and about content.",
     icon: FileText,
-    milestone: "P2",
+    note: "Coming in P2",
   },
   {
     id: "settings",
     label: "Settings",
     description: "Site details and contact information.",
     icon: Settings,
-    milestone: "P2",
+    note: "Coming in P2",
   },
 ];

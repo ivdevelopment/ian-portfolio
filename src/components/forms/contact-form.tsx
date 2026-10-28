@@ -1,11 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Info, TriangleAlert } from "lucide-react";
+import { CheckCircle2, TriangleAlert } from "lucide-react";
 import { BUDGETS, PROJECT_TYPES } from "@/data/inquiry-options";
-import { siteConfig } from "@/config/site";
 import { submitInquiry } from "@/app/(site)/contact/actions";
 import { inquirySchema, type InquiryResult, type InquiryValues } from "@/lib/schemas/inquiry";
 import { cn } from "@/lib/utils";
@@ -66,10 +65,17 @@ function ChoiceGroup({
 
 export function ContactForm() {
   const [result, setResult] = useState<InquiryResult | null>(null);
+  const openedAt = useRef(0);
+
+  // Measured on the client (in an effect, so prerendering never reads the clock).
+  useEffect(() => {
+    openedAt.current = Date.now();
+  }, []);
 
   const {
     register,
     handleSubmit,
+    reset,
     setError,
     formState: { errors, isSubmitting },
   } = useForm<InquiryValues>({
@@ -78,16 +84,17 @@ export function ContactForm() {
     defaultValues: { name: "", email: "", message: "", company: "" },
   });
 
-  const onSubmit = async (values: InquiryValues) => {
+  const send = async (values: InquiryValues, elapsedMs: number) => {
     setResult(null);
     try {
-      const response = await submitInquiry(values);
+      const response = await submitInquiry(values, elapsedMs);
       if (response.status === "invalid") {
         for (const [field, messages] of Object.entries(response.fieldErrors)) {
           const message = messages?.[0];
           if (message) setError(field as keyof InquiryValues, { message });
         }
       }
+      if (response.status === "sent") reset();
       setResult(response);
     } catch {
       setResult({
@@ -99,7 +106,11 @@ export function ContactForm() {
 
   return (
     <form
-      onSubmit={handleSubmit(onSubmit)}
+      onSubmit={(event) => {
+        // Read the clock in the event handler, not during render.
+        const elapsedMs = Date.now() - openedAt.current;
+        void handleSubmit((values) => send(values, elapsedMs))(event);
+      }}
       // Never fall back to a GET (which would put personal data in the URL) if JS hasn't hydrated yet.
       method="post"
       noValidate
@@ -188,35 +199,19 @@ export function ContactForm() {
             disabled={isSubmitting}
             className="mt-6 w-full sm:ml-auto sm:w-auto"
           >
-            {isSubmitting ? "Checking…" : "Send project request"}
+            {isSubmitting ? "Sending…" : "Send project request"}
           </Button>
         </div>
       </div>
 
-      {result?.status === "not_configured" && (
+      {result?.status === "sent" && (
         <div
           role="status"
           className="mt-6 flex gap-3 rounded-md border border-accent/40 bg-accent-soft p-4 text-sm"
         >
-          <Info aria-hidden className="mt-0.5 size-4 shrink-0 text-accent" />
-          <p>
-            <strong className="font-medium">Development mode — not sent.</strong> Your
-            request passed validation, but the contact backend isn&apos;t connected yet, so
-            nothing was delivered. In the meantime, email me at{" "}
-            <a
-              className="underline underline-offset-4"
-              href={`mailto:${siteConfig.email}`}
-            >
-              {siteConfig.email}
-            </a>
-            .
-          </p>
+          <CheckCircle2 aria-hidden className="mt-0.5 size-4 shrink-0 text-accent" />
+          <p>Thanks — your project request has been received. I&apos;ll get back to you soon.</p>
         </div>
-      )}
-      {result?.status === "sent" && (
-        <p role="status" className="mt-6 rounded-md border border-line p-4 text-sm">
-          Thanks — your request has been sent. I&apos;ll get back to you soon.
-        </p>
       )}
       {(result?.status === "error" || result?.status === "invalid") && (
         <div

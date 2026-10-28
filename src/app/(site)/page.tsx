@@ -12,12 +12,14 @@ export const metadata: Metadata = {
   alternates: { canonical: "/" },
 };
 
-export default function HomePage() {
+export default async function HomePage() {
+  const featured = await getFeaturedProjects();
+
   return (
     <>
       <Hero />
       <StatsStrip />
-      <FeaturedProject projects={getFeaturedProjects()} />
+      <FeaturedProject projects={featured} />
       <ServicesSection />
       <SelectedWork />
       <ReviewsSection />

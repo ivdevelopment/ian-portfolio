@@ -4,8 +4,9 @@ import { getPublishedProjects, projectFilters } from "@/lib/projects";
 import { Reveal } from "@/components/ui/reveal";
 import { ProjectGrid } from "./project-grid";
 
-export function SelectedWork() {
-  const projects = getPublishedProjects();
+export async function SelectedWork() {
+  const projects = await getPublishedProjects();
+  if (projects.length === 0) return null;
 
   return (
     <section aria-labelledby="selected-work-title" className="section-y pt-0">

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
-import { AnimatePresence, motion } from "motion/react";
-import { ExternalLink, Play } from "lucide-react";
+import { motion } from "motion/react";
+import { ExternalLink, Loader2, Play } from "lucide-react";
+import { ButtonLink } from "@/components/ui/button";
 import type { Project, ProjectMedia } from "@/types/project";
 import { cn } from "@/lib/utils";
 import { DeviceFrame } from "@/components/ui/device-frame";
@@ -31,9 +32,23 @@ export function ProjectPreview({ project }: { project: Project }) {
 
   const embedUrl = project.previewUrl ?? project.liveUrl;
   const canEmbed = project.previewMode === "embed" && Boolean(embedUrl);
+  const externalUrl = project.previewMode === "external" ? project.liveUrl : undefined;
   const [view, setView] = useState<View>(canEmbed ? "live" : "media");
   const [index, setIndex] = useState(0);
+  const [frameState, setFrameState] = useState<"loading" | "loaded" | "slow">("loading");
   const current = items[index];
+  const showingFrame = view === "live" && canEmbed;
+
+  // Many sites refuse to be framed, and the browser gives us no reliable
+  // signal. If nothing has loaded after a while, say so instead of spinning.
+  useEffect(() => {
+    if (!showingFrame) return;
+    const timer = window.setTimeout(
+      () => setFrameState((s) => (s === "loading" ? "slow" : s)),
+      8000,
+    );
+    return () => window.clearTimeout(timer);
+  }, [showingFrame, embedUrl]);
 
   return (
     <div id="live-preview" className="scroll-mt-28">
@@ -61,36 +76,68 @@ export function ProjectPreview({ project }: { project: Project }) {
       )}
 
       <DeviceFrame>
-        {view === "live" && canEmbed ? (
-          <iframe
-            src={embedUrl}
-            title={`${project.title} live preview`}
-            loading="lazy"
-            sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-            referrerPolicy="no-referrer"
-            className="absolute inset-0 size-full bg-white"
-          />
+        {showingFrame ? (
+          <>
+            <iframe
+              src={embedUrl}
+              title={`${project.title} live preview`}
+              loading="lazy"
+              // No top navigation or downloads; scripts and forms only so the site is usable.
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+              referrerPolicy="no-referrer"
+              onLoad={() => setFrameState("loaded")}
+              className="absolute inset-0 size-full bg-white"
+            />
+            {frameState !== "loaded" && (
+              <div
+                role="status"
+                className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-surface p-6 text-center"
+              >
+                {frameState === "loading" ? (
+                  <>
+                    <Loader2 aria-hidden className="size-6 animate-spin text-accent" />
+                    <p className="text-sm text-muted">Loading live site…</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-muted">
+                      This site is taking a while, or doesn&apos;t allow embedding.
+                    </p>
+                    <ButtonLink href={embedUrl!} external size="sm" variant="secondary">
+                      Open in a new tab
+                    </ButtonLink>
+                  </>
+                )}
+              </div>
+            )}
+          </>
         ) : (
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.div
-              key={`${index}-${current.src}`}
-              className="absolute inset-0"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <ProjectMediaView
-                media={current}
-                sizes="(min-width: 1024px) 50vw, 100vw"
-                priority={index === 0}
-              />
-            </motion.div>
-          </AnimatePresence>
+          <motion.div
+            key={`${index}-${current.src}`}
+            className="absolute inset-0"
+            initial={index === 0 ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
+          >
+            <ProjectMediaView
+              media={current}
+              sizes="(min-width: 1024px) 50vw, 100vw"
+              priority={index === 0}
+            />
+          </motion.div>
         )}
       </DeviceFrame>
 
-      {view === "live" && canEmbed && (
+      {externalUrl && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-glass p-4">
+          <p className="text-sm text-muted">This project is best experienced on its own website.</p>
+          <ButtonLink href={externalUrl} external size="sm">
+            Visit live site
+          </ButtonLink>
+        </div>
+      )}
+
+      {showingFrame && (
         <p className="mt-3 flex flex-wrap items-center gap-x-3 text-sm text-subtle">
           Some websites block embedding.
           <a

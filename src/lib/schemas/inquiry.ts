@@ -12,7 +12,7 @@ export const inquirySchema = z.object({
     .string()
     .trim()
     .min(1, "Please enter your email.")
-    .max(200)
+    .max(200, "That email address is too long.")
     .pipe(z.email("Please enter a valid email address.")),
   projectType: z.enum(PROJECT_TYPES, { error: "Choose what you need." }),
   budget: z.enum(BUDGETS, { error: "Choose a budget range." }),
@@ -29,7 +29,18 @@ export type InquiryValues = z.infer<typeof inquirySchema>;
 
 export type InquiryResult =
   | { status: "invalid"; fieldErrors: Record<string, string[] | undefined> }
-  /** Validation passed but no backend is attached yet (P0). Nothing was sent. */
-  | { status: "not_configured" }
   | { status: "sent" }
   | { status: "error"; message: string };
+
+/** Inquiry statuses managed in the admin. */
+export const INQUIRY_STATUSES = [
+  "new",
+  "contacted",
+  "qualified",
+  "won",
+  "lost",
+  "archived",
+] as const;
+
+export const inquiryStatusSchema = z.enum(INQUIRY_STATUSES);
+export type InquiryStatus = z.infer<typeof inquiryStatusSchema>;
