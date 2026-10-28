@@ -7,13 +7,28 @@
  * Needs NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY. The service-role
  * key is used here, on your machine, and nowhere in the running application.
  * The password is read from the ADMIN_PASSWORD env var or prompted for (hidden).
+ *
+ * SAFETY: this refuses to run against anything but a local Supabase stack unless
+ * you pass --remote. For the hosted project, run it deliberately with a strong,
+ * unique password — never reuse a development password.
  */
 import { createInterface } from "node:readline";
 import { createClient } from "@supabase/supabase-js";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const email = process.argv[2]?.trim().toLowerCase();
+const args = process.argv.slice(2);
+const allowRemote = args.includes("--remote");
+const email = args.find((a) => !a.startsWith("--"))?.trim().toLowerCase();
+const isLocal = /^https?:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(url ?? "");
+
+if (url && !isLocal && !allowRemote) {
+  console.error(
+    `Refusing to run: ${new URL(url).host} is not a local Supabase stack.\n` +
+      "Use --remote only if you really mean to create an admin on that project.",
+  );
+  process.exit(1);
+}
 
 if (!url || !serviceKey || !email) {
   console.error(
