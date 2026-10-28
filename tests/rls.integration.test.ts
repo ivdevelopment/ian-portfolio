@@ -6,9 +6,12 @@
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { assertLocalSupabase } from "./local-only";
 
 const enabled = process.env.RLS_TEST === "1" || process.env.npm_lifecycle_event === "test:rls";
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+if (enabled) assertLocalSupabase();
+
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
 const ADMIN_EMAIL = process.env.TEST_ADMIN_EMAIL ?? "admin@portfolio.test";

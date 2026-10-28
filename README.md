@@ -10,12 +10,25 @@ Requirements: Node 22+, Docker (for the local Supabase stack).
 
 ```bash
 npm install
-cp .env.example .env.local        # then fill in the values printed by the next command
 npm run db:start                  # starts local Supabase, applies migrations + seed
-                                  # (prints API URL and keys -> .env.local)
-npm run admin:create -- you@example.com   # creates the owner account (prompts for a password)
-npm run dev                       # http://localhost:3000  ·  admin: /admin
+npx supabase status -o env        # prints the LOCAL url + keys
+
+# Local env: keep local and hosted credentials in SEPARATE files (see below)
+#   .env.supabase-local  -> the local Docker stack (used by dev:local / test:rls / admin:create)
+#   .env.local           -> whatever Next.js should use by default (e.g. your hosted project)
+
+npm run admin:create -- you@example.com   # LOCAL owner account (prompts for a password)
+npm run dev:local                 # http://localhost:3000 against the LOCAL stack  ·  admin: /admin
 ```
+
+### Local vs hosted: never mix them
+
+`.env.local` may point at your **hosted** project. To make that safe:
+
+- `npm run dev:local`, `build:local`, `start:local` run Next with `.env.supabase-local` (process env wins over `.env.local`) and refuse any non-loopback URL.
+- `npm run test:rls` loads `.env.supabase-local` and the tests refuse to run against a non-local URL — they create and delete users and rows.
+- `npm run admin:create` refuses non-local URLs unless you add `--remote`. **Never reuse a development password on a hosted project.**
+- `npm run dev` / `npm run build` use `.env.local` (hosted, if that's what it contains).
 
 | Command | What it does |
 | --- | --- |
@@ -23,8 +36,9 @@ npm run dev                       # http://localhost:3000  ·  admin: /admin
 | `npm run db:reset` | Re-apply migrations and `supabase/seed.sql` (wipes local data) |
 | `npm run db:types` | Regenerate `src/types/database.ts` from the local database |
 | `npm run admin:create -- <email>` | Create or promote the admin (uses the service-role key, locally) |
-| `npm test` | Unit tests (slugs, validation, media rules, mappers, route guards) |
-| `npm run test:rls` | RLS / authorisation tests against the **local** Supabase stack |
+| `npm test` | Unit tests (slugs, validation, media rules, mappers, route guards, review tokens, content schemas) |
+| `npm run test:rls` | RLS / authorisation tests (P1 + P2) against the **local** Supabase stack |
+| `npm run dev:local` / `build:local` / `start:local` | Run Next against the local stack only |
 | `npm run typecheck`, `npm run lint`, `npm run build` | Quality gates |
 
 ## Environment variables
@@ -50,10 +64,24 @@ There is no public registration, and sign-ups are disabled. Access requires **bo
 
 To revoke access: `delete from public.admin_users where user_id = '…';`
 
+## Reviews and invitations (P2)
+
+- **Invite a client:** Admin → Reviews → Invitations → *Request a review*. Choose the client, an optional project and 7/14/30 days. The link is shown **once** (copy it, then *Done*); it cannot be recovered.
+- **Token security:** 256-bit random token (`crypto.randomBytes(32)`, base64url). Only its SHA-256 hash is stored (`review_invitations.token_hash`); the raw token is never persisted or logged. Single use, enforced atomically in the database (`submit_review()`), so two simultaneous submissions cannot both succeed.
+- **One generic failure:** unknown, expired, revoked and used links all show *"This review link is no longer valid."* — nothing reveals which.
+- **Moderation:** submissions arrive as **Pending** (never public). Approve / Reject / Archive / Feature / Edit / Delete in Admin → Reviews. The client's **original text** is kept in the admin-only `review_private` table; edit the *published text* freely.
+- **Manual reviews:** *+ Add review* records a genuine review received elsewhere (`source = admin`).
+- **Public:** approved reviews only — homepage (hidden when there are none), `/reviews`, and "Client feedback" on a linked project page. No review is ever seeded.
+- Avatars go to the public `site-media` bucket (PNG/JPG/WebP, 2 MB for avatars, 10 MB for site images).
+
+## Site content (P2)
+
+Structured content, not a page builder: Admin → **Pages** (Home, About, Contact, Services) and **Settings** (site name, location, public email, social links, SEO defaults). Skills live under Pages → About. Defaults (the accepted wording) are seeded by the migration; the code only keeps structural fallbacks. Edits expire exactly the affected cache tags (`site-content`, `site-settings`, `services`, `skills`, `reviews`, `projects`).
+
 ## Setting up a hosted Supabase project
 
 1. Create a project, then link it: `npx supabase link --project-ref <ref>`.
-2. Apply the schema: `npx supabase db push` (creates tables, RLS, functions and the `project-media` bucket).
+2. Apply the schema: `npx supabase db push` (applies **every** migration: P1 tables, then P2 reviews / invitations / site content, and creates the `project-media` and `site-media` buckets). Re-run it whenever a new migration is added.
 3. Optional demo content: run `supabase/seed.sql` in the SQL editor (or `db push --include-seed`). Delete those sample rows once you have real projects.
 4. Dashboard → Authentication → Sign In / Providers: keep **Email** enabled and turn **"Allow new users to sign up" OFF**. Set a minimum password length of 10+.
 5. Dashboard → Authentication → URL Configuration: set the Site URL to your production domain.
