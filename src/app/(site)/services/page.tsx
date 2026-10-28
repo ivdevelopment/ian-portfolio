@@ -4,7 +4,7 @@ import { CtaSection } from "@/components/cta/cta-section";
 import { ServiceIconBadge } from "@/components/services/service-icon";
 import { PageHeader } from "@/components/ui/page-header";
 import { Reveal } from "@/components/ui/reveal";
-import { services } from "@/data/services";
+import { getHomeContent, getServices } from "@/lib/site-content";
 
 export const metadata: Metadata = {
   title: "Services",
@@ -14,43 +14,53 @@ export const metadata: Metadata = {
   openGraph: { url: "/services", title: "Services" },
 };
 
-export default function ServicesPage() {
+export default async function ServicesPage() {
+  const [services, { services: copy }] = await Promise.all([getServices(), getHomeContent()]);
+
   return (
     <>
       <PageHeader
-        eyebrow="Services"
-        title="Websites, web applications and everything in between."
-        description="From clean landing pages to complex web applications, I focus on modern design, strong performance and a smooth user experience."
+        eyebrow={copy.eyebrow || undefined}
+        title={copy.statement || copy.heading}
+        description={copy.body || undefined}
       />
 
       <section aria-label="Services" className="container-page pb-(--section-y)">
-        <ul className="grid gap-4 md:grid-cols-2">
-          {services.map((service, i) => (
-            <Reveal as="li" key={service.id} delay={(i % 2) * 0.07}>
-              <article
-                id={service.slug}
-                className="glass h-full scroll-mt-28 rounded-panel p-6 sm:p-9"
-              >
-                <ServiceIconBadge icon={service.icon} />
-                <h2 className="text-title mt-6">{service.title}</h2>
-                <p className="mt-2 text-muted">{service.description}</p>
-                <ul className="mt-6 space-y-3 border-t border-line pt-6">
-                  {service.includes.map((item) => (
-                    <li key={item} className="flex items-center gap-3 text-[0.95rem]">
-                      <span
-                        aria-hidden
-                        className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent"
-                      >
-                        <Check className="size-3" strokeWidth={3} />
-                      </span>
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </article>
-            </Reveal>
-          ))}
-        </ul>
+        {services.length === 0 ? (
+          <p className="rounded-card border border-line p-8 text-muted">
+            Services will be listed here soon.
+          </p>
+        ) : (
+          <ul className="grid gap-4 md:grid-cols-2">
+            {services.map((service, i) => (
+              <Reveal as="li" key={service.id} delay={(i % 2) * 0.07}>
+                <article
+                  id={service.slug}
+                  className="glass h-full scroll-mt-28 rounded-panel p-6 sm:p-9"
+                >
+                  <ServiceIconBadge icon={service.icon} />
+                  <h2 className="text-title mt-6">{service.title}</h2>
+                  <p className="mt-2 text-muted">{service.description}</p>
+                  {service.includes.length > 0 && (
+                    <ul className="mt-6 space-y-3 border-t border-line pt-6">
+                      {service.includes.map((item) => (
+                        <li key={item.label} className="flex items-center gap-3 text-[0.95rem]">
+                          <span
+                            aria-hidden
+                            className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent"
+                          >
+                            <Check className="size-3" strokeWidth={3} />
+                          </span>
+                          {item.label}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </article>
+              </Reveal>
+            ))}
+          </ul>
+        )}
       </section>
 
       <CtaSection />

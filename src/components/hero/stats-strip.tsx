@@ -1,16 +1,21 @@
-import { stats } from "@/data/content";
+import { visibleStats } from "@/lib/schemas/site-content";
+import { getHomeContent } from "@/lib/site-content";
 import { cn } from "@/lib/utils";
 import { Reveal } from "@/components/ui/reveal";
 
-export function StatsStrip() {
+export async function StatsStrip() {
+  const { stats: all } = await getHomeContent();
+  const stats = visibleStats(all);
+  if (stats.length === 0) return null;
+
   return (
     <section aria-label="Highlights">
       <div className="container-page">
         <Reveal>
-          <dl className="grid grid-cols-2 border-y border-line lg:grid-cols-4">
+          <dl className="grid grid-cols-2 border-y border-line lg:grid-cols-[repeat(auto-fit,minmax(0,1fr))]">
             {stats.map((stat, i) => (
               <div
-                key={stat.id}
+                key={`${i}-${stat.label}`}
                 className={cn(
                   "flex flex-col-reverse justify-end border-line py-7 sm:py-9",
                   "lg:border-l lg:px-8 lg:first:border-l-0 lg:first:pl-0",

@@ -13,7 +13,7 @@ const FOCUSABLE = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1
 /** Full-screen mobile navigation. Rendered in a portal so the header's backdrop-filter can't clip it. */
 const subscribeNoop = () => () => {};
 
-export function MobileMenu() {
+export function MobileMenu({ email }: { email?: string }) {
   const [open, setOpen] = useState(false);
   // False during SSR and hydration, true afterwards: portals need `document`.
   const canPortal = useSyncExternalStore(subscribeNoop, () => true, () => false);
@@ -139,9 +139,7 @@ export function MobileMenu() {
                   >
                     {siteConfig.cta.label}
                   </ButtonLink>
-                  <p className="mt-4 text-center text-sm text-muted">
-                    {siteConfig.email}
-                  </p>
+                  {email && <p className="mt-4 text-center text-sm text-muted">{email}</p>}
                 </div>
               </motion.div>
             )}

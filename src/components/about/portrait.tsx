@@ -1,20 +1,23 @@
 import Image from "next/image";
 import { siteConfig } from "@/config/site";
-import { aboutContent } from "@/data/content";
+
+type PortraitProps = {
+  /** Resolved image URL; when absent a neutral placeholder is shown. */
+  src?: string;
+  alt?: string;
+};
 
 /**
- * Personal photo. Set `aboutContent.photo` to a real image to replace the
- * placeholder — no identity or avatar is generated here.
+ * Personal photo, managed in /admin/pages/about. No identity or avatar is
+ * generated here — without an upload it's a tasteful placeholder.
  */
-export function Portrait() {
-  const { photo } = aboutContent;
-
+export function Portrait({ src, alt }: PortraitProps) {
   return (
     <div className="relative aspect-[4/5] w-full overflow-hidden rounded-panel border border-line bg-surface shadow-card">
-      {photo ? (
+      {src ? (
         <Image
-          src={photo.src}
-          alt={photo.alt}
+          src={src}
+          alt={alt ?? ""}
           fill
           priority
           sizes="(min-width: 1024px) 40vw, 100vw"

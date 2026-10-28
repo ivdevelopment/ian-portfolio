@@ -40,7 +40,7 @@ export const adminModules: AdminModule[] = [
     label: "Reviews",
     description: "Collect, approve and publish client reviews.",
     icon: MessageSquareQuote,
-    note: "Coming in P2",
+    href: "/admin/reviews",
   },
   {
     id: "inquiries",
@@ -52,22 +52,22 @@ export const adminModules: AdminModule[] = [
   {
     id: "media",
     label: "Media",
-    description: "Screenshots, GIFs and videos are managed inside each project.",
+    description: "Browse uploaded files and see where each one is used.",
     icon: ImageIcon,
-    note: "In each project",
+    href: "/admin/media",
   },
   {
     id: "pages",
     label: "Pages",
     description: "Hero text, statistics, services and about content.",
     icon: FileText,
-    note: "Coming in P2",
+    href: "/admin/pages",
   },
   {
     id: "settings",
     label: "Settings",
-    description: "Site details and contact information.",
+    description: "Site details, social links and SEO defaults.",
     icon: Settings,
-    note: "Coming in P2",
+    href: "/admin/settings",
   },
 ];

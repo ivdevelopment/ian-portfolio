@@ -10,7 +10,9 @@ import { ProjectMediaView } from "@/components/ui/project-media";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-export function FeaturedProject({ projects }: { projects: Project[] }) {
+type FeaturedIntro = { eyebrow: string; heading: string; body: string };
+
+export function FeaturedProject({ projects, intro }: { projects: Project[]; intro: FeaturedIntro }) {
   const [index, setIndex] = useState(0);
   const total = projects.length;
   if (total === 0) return null;
@@ -27,9 +29,17 @@ export function FeaturedProject({ projects }: { projects: Project[] }) {
     <section aria-labelledby="featured-title" className="section-y pb-0">
       <div className="container-page">
         <div className="mb-6 flex items-center justify-between gap-4">
-          <h2 id="featured-title" className="text-title">
-            Featured project
-          </h2>
+          <div>
+            {intro.eyebrow && (
+              <p className="mb-2 text-xs font-medium tracking-[0.18em] text-muted uppercase">
+                {intro.eyebrow}
+              </p>
+            )}
+            <h2 id="featured-title" className="text-title">
+              {intro.heading}
+            </h2>
+            {intro.body && <p className="mt-2 max-w-xl text-muted">{intro.body}</p>}
+          </div>
 
           {total > 1 && (
             <div className="flex items-center gap-3">

@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
-import { siteConfig } from "@/config/site";
 
 export const metadata: Metadata = {
-  title: { absolute: `Admin — ${siteConfig.name}` },
+  title: { absolute: "Admin" },
   robots: { index: false, follow: false },
 };
 

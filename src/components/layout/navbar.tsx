@@ -1,19 +1,21 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { siteConfig } from "@/config/site";
+import { getSiteSettings } from "@/lib/site-content";
 import { ButtonLink } from "@/components/ui/button";
 import { ActiveNavLinks } from "@/components/navigation/active-nav-links";
 import { MobileMenu } from "@/components/navigation/mobile-menu";
 import { NavLinkList } from "@/components/navigation/nav-link-list";
 import { NavbarShell } from "@/components/navigation/navbar-shell";
 
-export function Navbar() {
+export async function Navbar() {
+  const settings = await getSiteSettings();
   return (
     <NavbarShell>
       <div className="container-page flex h-(--nav-h) items-center justify-between gap-6">
         <Link
           href="/"
-          aria-label={`${siteConfig.name} — home`}
+          aria-label={`${settings.displayName} — home`}
           className="text-xl font-medium tracking-tight text-ink"
         >
           {siteConfig.initials}
@@ -28,7 +30,7 @@ export function Navbar() {
           </ButtonLink>
         </nav>
 
-        <MobileMenu />
+        <MobileMenu email={settings.contactEmail} />
       </div>
     </NavbarShell>
   );

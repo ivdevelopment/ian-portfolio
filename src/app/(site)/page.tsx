@@ -7,19 +7,23 @@ import { ServicesSection } from "@/components/services/services-section";
 import { FeaturedProject } from "@/components/work/featured-project";
 import { SelectedWork } from "@/components/work/selected-work";
 import { getFeaturedProjects } from "@/lib/projects";
+import { getHomeContent } from "@/lib/site-content";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
 };
 
 export default async function HomePage() {
-  const featured = await getFeaturedProjects();
+  const [featured, { featured: featuredIntro }] = await Promise.all([
+    getFeaturedProjects(),
+    getHomeContent(),
+  ]);
 
   return (
     <>
       <Hero />
       <StatsStrip />
-      <FeaturedProject projects={featured} />
+      <FeaturedProject projects={featured} intro={featuredIntro} />
       <ServicesSection />
       <SelectedWork />
       <ReviewsSection />

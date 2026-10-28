@@ -1,30 +1,30 @@
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
-import { services } from "@/data/services";
-import { homeContent } from "@/data/content";
+import { getHomeContent, getServices } from "@/lib/site-content";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { Reveal } from "@/components/ui/reveal";
 import { ServiceIconBadge } from "./service-icon";
 
-export function ServicesSection() {
-  const { services: copy } = homeContent;
+export async function ServicesSection() {
+  const [{ services: copy }, services] = await Promise.all([getHomeContent(), getServices()]);
+  if (services.length === 0) return null;
 
   return (
     <section aria-labelledby="services-title" className="section-y">
       <div className="container-page">
         <Reveal className="grid gap-6 lg:grid-cols-[1fr_1fr] lg:gap-16">
           <div>
-            <Eyebrow>{copy.eyebrow}</Eyebrow>
+            {copy.eyebrow && <Eyebrow>{copy.eyebrow}</Eyebrow>}
             <h2 id="services-title" className="text-headline mt-4">
-              {copy.title}
+              {copy.heading}
             </h2>
-            <p className="text-title mt-3 max-w-xl text-balance text-muted">
-              {copy.statement}
-            </p>
+            {copy.statement && (
+              <p className="text-title mt-3 max-w-xl text-balance text-muted">{copy.statement}</p>
+            )}
           </div>
-          <p className="max-w-md self-end text-muted lg:justify-self-end">
-            {copy.body}
-          </p>
+          {copy.body && (
+            <p className="max-w-md self-end text-muted lg:justify-self-end">{copy.body}</p>
+          )}
         </Reveal>
 
         <ul className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -35,9 +35,7 @@ export function ServicesSection() {
                 className="glass group flex h-full min-h-56 flex-col rounded-card p-6 transition-[transform,border-color,background-color] duration-500 ease-out-soft hover:-translate-y-1 hover:border-line-strong hover:bg-glass-strong"
               >
                 <ServiceIconBadge icon={service.icon} />
-                <h3 className="mt-8 text-lg font-medium tracking-tight">
-                  {service.title}
-                </h3>
+                <h3 className="mt-8 text-lg font-medium tracking-tight">{service.title}</h3>
                 <p className="mt-2 text-[0.95rem] text-muted">{service.description}</p>
                 <ArrowUpRight
                   aria-hidden

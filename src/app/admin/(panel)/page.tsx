@@ -7,7 +7,8 @@ import { ButtonLink } from "@/components/ui/button";
 export default async function AdminDashboardPage() {
   const { supabase } = await requireAdmin();
 
-  const [total, published, newInquiries, recentProjects, recentInquiries] = await Promise.all([
+  const [total, published, newInquiries, recentProjects, recentInquiries, pendingReviews, publishedReviews, recentReviews] =
+    await Promise.all([
     supabase.from("projects").select("id", { count: "exact", head: true }),
     supabase.from("projects").select("id", { count: "exact", head: true }).eq("published", true),
     supabase.from("inquiries").select("id", { count: "exact", head: true }).eq("status", "new"),
@@ -21,9 +22,25 @@ export default async function AdminDashboardPage() {
       .select("id, name, project_type, status, created_at")
       .order("created_at", { ascending: false })
       .limit(5),
+    supabase.from("reviews").select("id", { count: "exact", head: true }).eq("status", "pending"),
+    supabase.from("reviews").select("id", { count: "exact", head: true }).eq("status", "approved"),
+    supabase
+      .from("reviews")
+      .select("id, name, rating, status, created_at")
+      .order("created_at", { ascending: false })
+      .limit(3),
   ]);
 
-  const failed = [total, published, newInquiries, recentProjects, recentInquiries].find(
+  const failed = [
+    total,
+    published,
+    newInquiries,
+    recentProjects,
+    recentInquiries,
+    pendingReviews,
+    publishedReviews,
+    recentReviews,
+  ].find(
     (r) => r.error,
   );
   if (failed?.error) {
@@ -38,6 +55,8 @@ export default async function AdminDashboardPage() {
     { label: "Published", value: publishedCount },
     { label: "Drafts", value: totalCount - publishedCount },
     { label: "New inquiries", value: newInquiries.count ?? 0 },
+    { label: "Pending reviews", value: pendingReviews.count ?? 0 },
+    { label: "Published reviews", value: publishedReviews.count ?? 0 },
   ];
 
   return (
@@ -52,7 +71,7 @@ export default async function AdminDashboardPage() {
         }
       />
 
-      <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <dl className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         {stats.map((s) => (
           <div key={s.label} className="flex flex-col-reverse rounded-card border border-line bg-glass p-4">
             <dt className="mt-0.5 text-xs text-muted">{s.label}</dt>
@@ -126,6 +145,38 @@ export default async function AdminDashboardPage() {
           )}
         </Panel>
       </div>
+
+      <Panel
+        className="mt-4"
+        title="Latest reviews"
+        actions={
+          <Link href="/admin/reviews" className="text-xs text-muted hover:text-ink">
+            View all
+          </Link>
+        }
+      >
+        {(recentReviews.data ?? []).length === 0 ? (
+          <EmptyState>No reviews yet.</EmptyState>
+        ) : (
+          <ul className="divide-y divide-line">
+            {recentReviews.data!.map((r) => (
+              <li key={r.id} className="flex items-center justify-between gap-3 py-2.5">
+                <div className="min-w-0">
+                  <Link href={`/admin/reviews/${r.id}/edit`} className="block truncate text-sm font-medium hover:text-accent">
+                    {r.name}
+                  </Link>
+                  <p className="text-xs text-subtle">
+                    {r.rating}/5 · {formatDate(r.created_at)}
+                  </p>
+                </div>
+                <Badge tone={r.status === "approved" ? "success" : r.status === "pending" ? "accent" : "neutral"}>
+                  {r.status === "approved" ? "Published" : r.status[0].toUpperCase() + r.status.slice(1)}
+                </Badge>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
     </>
   );
 }

@@ -3,8 +3,7 @@ import { Mail, MapPin } from "lucide-react";
 import { ContactForm } from "@/components/forms/contact-form";
 import { PageHeader } from "@/components/ui/page-header";
 import { Reveal } from "@/components/ui/reveal";
-import { siteConfig } from "@/config/site";
-import { contactContent } from "@/data/content";
+import { getContactContent, getSiteSettings } from "@/lib/site-content";
 
 export const metadata: Metadata = {
   title: "Contact",
@@ -14,13 +13,16 @@ export const metadata: Metadata = {
   openGraph: { url: "/contact", title: "Contact" },
 };
 
-export default function ContactPage() {
+export default async function ContactPage() {
+  const [content, settings] = await Promise.all([getContactContent(), getSiteSettings()]);
+  const email = content.email || settings.contactEmail;
+
   return (
     <>
       <PageHeader
-        eyebrow={contactContent.eyebrow}
-        title={contactContent.title}
-        description={contactContent.body}
+        eyebrow={content.eyebrow || undefined}
+        title={content.heading}
+        description={content.description || undefined}
       />
 
       <section aria-label="Project request" className="container-page pb-(--section-y)">
@@ -30,20 +32,22 @@ export default function ContactPage() {
 
         <Reveal delay={0.08}>
           <ul className="mt-8 flex flex-col gap-3 text-muted sm:flex-row sm:flex-wrap sm:gap-x-10">
-            <li className="flex items-center gap-2.5">
-              <Mail aria-hidden className="size-4 text-accent" />
-              <a
-                href={`mailto:${siteConfig.email}`}
-                className="transition-colors hover:text-ink"
-              >
-                {siteConfig.email}
-              </a>
-            </li>
-            <li className="flex items-center gap-2.5">
-              <MapPin aria-hidden className="size-4 text-accent" />
-              {siteConfig.location}
-            </li>
-            <li>{contactContent.responseTime}</li>
+            {email && (
+              <li className="flex items-center gap-2.5">
+                <Mail aria-hidden className="size-4 text-accent" />
+                <a href={`mailto:${email}`} className="transition-colors hover:text-ink">
+                  {email}
+                </a>
+              </li>
+            )}
+            {settings.location && (
+              <li className="flex items-center gap-2.5">
+                <MapPin aria-hidden className="size-4 text-accent" />
+                {settings.location}
+              </li>
+            )}
+            {content.responseTime && <li>{content.responseTime}</li>}
+            {content.availability && <li>{content.availability}</li>}
           </ul>
         </Reveal>
       </section>
