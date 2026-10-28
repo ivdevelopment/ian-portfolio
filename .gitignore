@@ -42,3 +42,8 @@ next-env.d.ts
 
 # keep the example env file (names only, no values)
 !.env.example
+
+# local tooling
+.claude/
+supabase/.temp/
+supabase/.branches/
