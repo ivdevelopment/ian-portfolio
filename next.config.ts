@@ -17,7 +17,7 @@ const nextConfig: NextConfig = {
     },
   },
   images: {
-    // Project media lives in the public `project-media` Storage bucket.
+    // Public Storage buckets: `project-media` and `site-media`.
     remotePatterns: supabaseUrl
       ? [
           {
@@ -25,6 +25,12 @@ const nextConfig: NextConfig = {
             hostname: supabaseUrl.hostname,
             port: supabaseUrl.port,
             pathname: "/storage/v1/object/public/project-media/**",
+          },
+          {
+            protocol: supabaseUrl.protocol.replace(":", "") as "http" | "https",
+            hostname: supabaseUrl.hostname,
+            port: supabaseUrl.port,
+            pathname: "/storage/v1/object/public/site-media/**",
           },
         ]
       : [],

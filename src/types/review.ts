@@ -1,14 +1,13 @@
-export type Review = {
+/** A review as shown on the public site (approved only; no private fields). */
+export type PublicReview = {
   id: string;
-  rating: 1 | 2 | 3 | 4 | 5;
-  body: string;
+  rating: number;
+  text: string;
   name: string;
   role?: string;
   company?: string;
-  /** Optional profile photo. Falls back to initials. */
+  /** Resolved public URL, when an avatar was uploaded. */
   avatar?: string;
-  projectSlug?: string;
-  published: boolean;
-  /** True while the entry is sample content rather than a real client review. */
-  placeholder?: boolean;
+  featured: boolean;
+  project?: { id: string; title: string; slug: string };
 };

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { loadProjectForAdmin } from "@/lib/cms/admin-queries";
 import { rowToProject } from "@/lib/cms/mappers";
 import { getRelatedProjects } from "@/lib/projects";
+import { getReviewsForProject } from "@/lib/reviews";
 import { ProjectDetail } from "@/components/work/project-detail";
 
 /** Renders the project exactly as the public page would — including drafts. Admin only. */
@@ -14,7 +15,10 @@ export default async function PreviewProjectPage({
   if (!row) notFound();
 
   const project = rowToProject(row);
-  const related = await getRelatedProjects(project.slug);
+  const [related, reviews] = await Promise.all([
+    getRelatedProjects(project.slug),
+    getReviewsForProject(project.id),
+  ]);
 
   return (
     <div className="-mx-4 -my-6 sm:-mx-8 md:-my-8">
@@ -33,6 +37,7 @@ export default async function PreviewProjectPage({
       <ProjectDetail
         project={project}
         related={related}
+        reviews={reviews}
         backHref={`/admin/projects/${project.id}/edit`}
         backLabel="Back to editor"
       />

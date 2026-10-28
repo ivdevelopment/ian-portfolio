@@ -31,7 +31,7 @@ export type FileCheck =
 /** Validates a file's declared MIME type and size. Pass `imagesOnly` for posters. */
 export function checkUpload(
   file: { type: string; size: number; name: string },
-  options: { imagesOnly?: boolean } = {},
+  options: { imagesOnly?: boolean; maxBytes?: number } = {},
 ): FileCheck {
   const rule = (MEDIA_RULES as Record<string, (typeof MEDIA_RULES)[AllowedMime]>)[file.type];
   if (!rule) {
@@ -44,10 +44,11 @@ export function checkUpload(
     return { ok: false, error: `${file.name}: posters must be PNG, JPG or WebP.` };
   }
   if (file.size <= 0) return { ok: false, error: `${file.name}: the file is empty.` };
-  if (file.size > rule.maxBytes) {
+  const limit = Math.min(rule.maxBytes, options.maxBytes ?? rule.maxBytes);
+  if (file.size > limit) {
     return {
       ok: false,
-      error: `${file.name}: too large (${formatBytes(file.size)}). The limit for this type is ${formatBytes(rule.maxBytes)}.`,
+      error: `${file.name}: too large (${formatBytes(file.size)}). The limit here is ${formatBytes(limit)}.`,
     };
   }
   return { ok: true, type: rule.type, ext: rule.ext };
@@ -64,4 +65,19 @@ export function isStoragePathForProject(path: string, projectId: string): boolea
     !path.includes("..") &&
     /^projects\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.(png|jpg|webp|gif|mp4)$/.test(path)
   );
+}
+
+/* ---- site-media bucket (review avatars + site content images): PNG/JPG/WebP only ---- */
+
+export const AVATAR_MAX_BYTES = 2 * MiB;
+export const SITE_IMAGE_MAX_BYTES = 10 * MiB;
+
+export function reviewAvatarPath(reviewId: string, ext: string, id: string): string {
+  return `reviews/${reviewId}/${id}.${ext}`;
+}
+
+export type SiteImageSlot = "hero" | "portrait" | "cta";
+
+export function siteImagePath(slot: SiteImageSlot, ext: string, id: string): string {
+  return `site/${slot}/${id}.${ext}`;
 }

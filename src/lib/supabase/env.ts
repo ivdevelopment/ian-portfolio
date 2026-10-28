@@ -13,3 +13,5 @@ export function getSupabaseEnv() {
 }
 
 export const MEDIA_BUCKET = "project-media";
+/** Review avatars and site-content images (hero, portrait, CTA). */
+export const SITE_BUCKET = "site-media";

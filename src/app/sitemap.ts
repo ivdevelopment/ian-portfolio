@@ -3,7 +3,7 @@ import { siteConfig } from "@/config/site";
 import { getPublishedProjects } from "@/lib/projects";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const staticRoutes = ["", "/work", "/services", "/about", "/contact"];
+  const staticRoutes = ["", "/work", "/services", "/about", "/reviews", "/contact"];
   const projects = await getPublishedProjects();
 
   return [

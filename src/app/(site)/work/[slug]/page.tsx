@@ -6,6 +6,7 @@ import {
   getPublishedProjects,
   getRelatedProjects,
 } from "@/lib/projects";
+import { getReviewsForProject } from "@/lib/reviews";
 
 /**
  * `params` is awaited at the top level on purpose (no <Suspense> around it):
@@ -45,6 +46,9 @@ export default async function ProjectPage({ params }: PageProps<"/work/[slug]">)
   const project = await getProjectBySlug(slug);
   if (!project) notFound();
 
-  const related = await getRelatedProjects(project.slug);
-  return <ProjectDetail project={project} related={related} />;
+  const [related, reviews] = await Promise.all([
+    getRelatedProjects(project.slug),
+    getReviewsForProject(project.id),
+  ]);
+  return <ProjectDetail project={project} related={related} reviews={reviews} />;
 }

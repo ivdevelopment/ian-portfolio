@@ -5,6 +5,8 @@ import { ButtonLink } from "@/components/ui/button";
 import { Reveal } from "@/components/ui/reveal";
 import { projectKindLabels } from "@/lib/projects";
 import type { Project } from "@/types/project";
+import { ReviewCard } from "@/components/reviews/review-card";
+import type { PublicReview } from "@/types/review";
 import { ProjectCard } from "./project-card";
 import { ProjectOverview } from "./project-overview";
 import { ProjectPreview } from "./project-preview";
@@ -12,6 +14,8 @@ import { ProjectPreview } from "./project-preview";
 type ProjectDetailProps = {
   project: Project;
   related: Project[];
+  /** Approved reviews linked to this project. */
+  reviews?: PublicReview[];
   /** Where the back link goes (the admin preview points back to the editor). */
   backHref?: string;
   backLabel?: string;
@@ -21,6 +25,7 @@ type ProjectDetailProps = {
 export function ProjectDetail({
   project,
   related,
+  reviews = [],
   backHref = "/work",
   backLabel = "Back to projects",
 }: ProjectDetailProps) {
@@ -84,6 +89,21 @@ export function ProjectDetail({
       </article>
 
       <ProjectOverview project={project} />
+
+      {reviews.length > 0 && (
+        <section aria-labelledby="client-feedback" className="container-page pb-(--section-y)">
+          <h2 id="client-feedback" className="text-title mb-8">
+            Client feedback
+          </h2>
+          <ul className="theme-light grid gap-4 rounded-panel p-4 sm:p-6 md:grid-cols-2">
+            {reviews.slice(0, 2).map((review) => (
+              <li key={review.id}>
+                <ReviewCard review={review} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {related.length > 0 && (
         <section aria-labelledby="more-projects" className="container-page pb-(--section-y)">

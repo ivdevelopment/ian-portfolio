@@ -14,8 +14,13 @@ export const PLACEHOLDER_THUMBNAIL = "/media/projects/placeholder.svg";
 /**
  * Turns a stored path into something an <img> can load.
  * - absolute http(s) URL or app-relative "/media/…" path: returned as is
- * - otherwise a key inside the public `project-media` bucket
+ * - otherwise a key inside a public bucket (`projects/…` -> project-media, `reviews/…` and `site/…` -> site-media)
  */
+/** Which public bucket holds a storage key, by its folder. */
+export function bucketForPath(path: string): "project-media" | "site-media" {
+  return path.startsWith("reviews/") || path.startsWith("site/") ? "site-media" : "project-media";
+}
+
 export function resolveMediaUrl(
   path: string | null | undefined,
   supabaseUrl: string | undefined = process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -23,7 +28,7 @@ export function resolveMediaUrl(
   if (!path) return undefined;
   if (/^https?:\/\//i.test(path) || path.startsWith("/")) return path;
   const base = (supabaseUrl ?? "").replace(/\/+$/, "");
-  return `${base}/storage/v1/object/public/project-media/${path.split("/").map(encodeURIComponent).join("/")}`;
+  return `${base}/storage/v1/object/public/${bucketForPath(path)}/${path.split("/").map(encodeURIComponent).join("/")}`;
 }
 
 export function mediaRowToMedia(row: MediaRow): ProjectMedia | null {
