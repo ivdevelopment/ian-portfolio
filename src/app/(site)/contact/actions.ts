@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { headers } from "next/headers";
 import { inquirySchema, type InquiryResult } from "@/lib/schemas/inquiry";
 import { createPublicClient } from "@/lib/supabase/public";
+import { verifyTurnstile } from "@/lib/turnstile";
 
 /** Faster than this and it's almost certainly a script, not a person typing. */
 const MIN_FILL_MS = 3000;
@@ -18,13 +19,15 @@ function hashIp(ip: string): string {
  * Receives the project request form.
  *
  * Protection layers: Zod validation (length limits), a hidden honeypot field,
- * a minimum fill time, and a database-side rate limit inside `submit_inquiry`.
+ * a minimum fill time, Cloudflare Turnstile (when configured) and a
+ * database-side rate limit inside `submit_inquiry`.
  * The anonymous role has no table access at all — the only thing it can do is
  * call that function. Nothing about the database is revealed to the visitor.
  */
 export async function submitInquiry(
   input: unknown,
   elapsedMs: number,
+  turnstileToken?: string | null,
 ): Promise<InquiryResult> {
   const parsed = inquirySchema.safeParse(input);
   if (!parsed.success) {
@@ -44,6 +47,17 @@ export async function submitInquiry(
     requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() ??
     requestHeaders.get("x-real-ip") ??
     "unknown";
+
+  const human = await verifyTurnstile(turnstileToken, ip);
+  if (human === "failed" || human === "unavailable") {
+    return {
+      status: "error",
+      message:
+        human === "failed"
+          ? "The security check didn't complete. Wait a moment and try sending again."
+          : "The security check is unavailable right now. Please try again shortly.",
+    };
+  }
 
   const supabase = createPublicClient();
   const { data, error } = await supabase.rpc("submit_inquiry", {

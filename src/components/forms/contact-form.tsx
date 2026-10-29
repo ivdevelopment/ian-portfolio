@@ -9,6 +9,7 @@ import { submitInquiry } from "@/app/(site)/contact/actions";
 import { inquirySchema, type InquiryResult, type InquiryValues } from "@/lib/schemas/inquiry";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { TurnstileWidget, turnstileEnabled, type TurnstileHandle } from "./turnstile-widget";
 
 const inputClass =
   "w-full rounded-md border border-line bg-glass px-4 text-ink placeholder:text-subtle transition-colors duration-300 " +
@@ -66,6 +67,8 @@ function ChoiceGroup({
 export function ContactForm() {
   const [result, setResult] = useState<InquiryResult | null>(null);
   const openedAt = useRef(0);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstile = useRef<TurnstileHandle | null>(null);
 
   // Measured on the client (in an effect, so prerendering never reads the clock).
   useEffect(() => {
@@ -86,8 +89,15 @@ export function ContactForm() {
 
   const send = async (values: InquiryValues, elapsedMs: number) => {
     setResult(null);
+    if (turnstileEnabled && !turnstileToken) {
+      setResult({
+        status: "error",
+        message: "Just a moment — the security check is still running. Try again in a few seconds.",
+      });
+      return;
+    }
     try {
-      const response = await submitInquiry(values, elapsedMs);
+      const response = await submitInquiry(values, elapsedMs, turnstileToken);
       if (response.status === "invalid") {
         for (const [field, messages] of Object.entries(response.fieldErrors)) {
           const message = messages?.[0];
@@ -101,6 +111,9 @@ export function ContactForm() {
         status: "error",
         message: "Something went wrong while sending. Please try again.",
       });
+    } finally {
+      // Turnstile tokens are single use.
+      turnstile.current?.reset();
     }
   };
 
@@ -191,6 +204,8 @@ export function ContactForm() {
               <input type="text" tabIndex={-1} autoComplete="off" {...register("company")} />
             </label>
           </div>
+
+          <TurnstileWidget onToken={setTurnstileToken} handleRef={turnstile} />
 
           <Button
             type="submit"
