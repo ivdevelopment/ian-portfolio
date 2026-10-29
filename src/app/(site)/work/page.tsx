@@ -21,7 +21,10 @@ export default async function WorkPage() {
         title="Projects I've designed and built."
         description="A selection of websites, web applications and redesigns. Open any project for the full story, screenshots and a live preview."
       />
-      <section aria-label="All projects" className="container-page pb-(--section-y)">
+      <section aria-labelledby="all-projects" className="container-page pb-(--section-y)">
+        <h2 id="all-projects" className="sr-only">
+          All projects
+        </h2>
         {projects.length > 0 ? (
           <ProjectGrid
             projects={projects}

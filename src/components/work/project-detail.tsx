@@ -57,7 +57,7 @@ export async function ProjectDetail({
           <Reveal delay={0.05} className="lg:pt-6">
             <h1 className="text-display text-balance">{project.title}</h1>
             <p className="mt-4 text-sm text-muted">
-              {[projectKindLabels[project.kind], ...project.tags].join(" · ")}
+              {[...new Set([projectKindLabels[project.kind], ...project.tags])].join(" · ")}
               {project.year ? ` · ${project.year}` : ""}
             </p>
             {disclosure && (
