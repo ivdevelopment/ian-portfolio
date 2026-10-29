@@ -18,7 +18,14 @@ type View = "live" | "media";
  * - embed:    iframe of the live site, with a switch back to the gallery
  * - external: gallery plus a prominent link that opens the live site in a new tab
  */
-export function ProjectPreview({ project }: { project: Project }) {
+export function ProjectPreview({
+  project,
+  embedBlocked = false,
+}: {
+  project: Project;
+  /** The live site refuses to be framed (checked server-side): show the gallery and a link instead. */
+  embedBlocked?: boolean;
+}) {
   const items: ProjectMedia[] =
     project.gallery.length > 0
       ? project.gallery
@@ -31,8 +38,13 @@ export function ProjectPreview({ project }: { project: Project }) {
         ];
 
   const embedUrl = project.previewUrl ?? project.liveUrl;
-  const canEmbed = project.previewMode === "embed" && Boolean(embedUrl);
-  const externalUrl = project.previewMode === "external" ? project.liveUrl : undefined;
+  const canEmbed = project.previewMode === "embed" && Boolean(embedUrl) && !embedBlocked;
+  const externalUrl =
+    project.previewMode === "external"
+      ? project.liveUrl
+      : project.previewMode === "embed" && embedBlocked
+        ? (project.liveUrl ?? embedUrl)
+        : undefined;
   const [view, setView] = useState<View>(canEmbed ? "live" : "media");
   const [index, setIndex] = useState(0);
   const [frameState, setFrameState] = useState<"loading" | "loaded" | "slow">("loading");
@@ -130,7 +142,11 @@ export function ProjectPreview({ project }: { project: Project }) {
 
       {externalUrl && (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-glass p-4">
-          <p className="text-sm text-muted">This project is best experienced on its own website.</p>
+          <p className="text-sm text-muted">
+            {embedBlocked
+              ? "This website doesn't allow itself to be previewed inside other pages. It's best experienced on its own site."
+              : "This project is best experienced on its own website."}
+          </p>
           <ButtonLink href={externalUrl} external size="sm">
             Visit live site
           </ButtonLink>

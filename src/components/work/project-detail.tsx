@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { CtaSection } from "@/components/cta/cta-section";
 import { ButtonLink } from "@/components/ui/button";
 import { Reveal } from "@/components/ui/reveal";
+import { isEmbeddable } from "@/lib/embed-check";
 import { projectDisclosure } from "@/lib/project-labels";
 import { projectKindLabels } from "@/lib/projects";
 import type { Project } from "@/types/project";
@@ -23,7 +24,7 @@ type ProjectDetailProps = {
 };
 
 /** Full case-study page body. Shared by the public route and the admin preview. */
-export function ProjectDetail({
+export async function ProjectDetail({
   project,
   related,
   reviews = [],
@@ -31,6 +32,9 @@ export function ProjectDetail({
   backLabel = "Back to projects",
 }: ProjectDetailProps) {
   const isExternalPreview = project.previewMode === "external" && project.liveUrl;
+  const embedUrl = project.previewUrl ?? project.liveUrl;
+  const embedBlocked =
+    project.previewMode === "embed" && embedUrl ? !(await isEmbeddable(embedUrl)) : false;
   const disclosure = projectDisclosure(project);
 
   return (
@@ -88,7 +92,7 @@ export function ProjectDetail({
           </Reveal>
 
           <Reveal delay={0.12}>
-            <ProjectPreview project={project} />
+            <ProjectPreview project={project} embedBlocked={embedBlocked} />
           </Reveal>
         </div>
       </article>

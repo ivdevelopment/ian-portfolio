@@ -43,15 +43,17 @@ npm run dev:local                 # http://localhost:3000 against the LOCAL stac
 
 ## Environment variables
 
-| Variable | Where | Notes |
-| --- | --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL` | app | Project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | app | anon / publishable key. Safe to expose — Row Level Security protects data |
-| `NEXT_PUBLIC_SITE_URL` | app | Canonical URL, sitemap |
-| `INQUIRY_HASH_SALT` | app (optional) | Secret salt for hashing IPs used by contact-form rate limiting |
-| `SUPABASE_SERVICE_ROLE_KEY` | **your machine only** | Used solely by `scripts/create-admin.mjs`. Never set it in hosting, never prefix with `NEXT_PUBLIC_` |
+| Variable | Where | Required | Notes |
+| --- | --- | --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | app | **yes** | Project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | app | **yes** | anon / publishable key. Safe to expose — Row Level Security protects data |
+| `NEXT_PUBLIC_SITE_URL` | app | **yes (production)** | The real origin, e.g. `https://www.example.com`. Canonical URLs, Open Graph, sitemap, robots, review-invitation and password-recovery links. A real Vercel production build fails rather than fall back to localhost |
+| `INQUIRY_HASH_SALT` | app | **yes (production)** | Long random secret for hashing visitor IPs (contact-form and review rate limiting). Without it a public default salt is used |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | app | optional | Cloudflare Turnstile site key (public) |
+| `TURNSTILE_SECRET_KEY` | app (server) | optional | Turnstile secret. When set, the contact form **requires** a verified token |
+| `SUPABASE_SERVICE_ROLE_KEY` | **your machine only** | no | Used solely by `scripts/create-admin.mjs` and `scripts/reset-admin-password.mjs`. **Never set it in hosting**, never prefix with `NEXT_PUBLIC_` |
 
-The running application never uses the service-role key.
+The running application never uses the service-role key. Vercel's own variables (`VERCEL`, `VERCEL_ENV`, `VERCEL_PROJECT_PRODUCTION_URL`) are read automatically.
 
 ## Creating the first admin
 
@@ -63,6 +65,13 @@ There is no public registration, and sign-ups are disabled. Access requires **bo
    - SQL editor: `insert into public.admin_users (user_id) select id from auth.users where email = 'you@example.com';`
 
 To revoke access: `delete from public.admin_users where user_id = '…';`
+
+### Password recovery and safe diagnostics
+
+- **Forgot your password:** `/admin/forgot-password` emails a recovery link (the response is always the same, so it never reveals whether an address has an account). The link returns to `/admin/reset-password`, where a new password (10+ characters) is set; every session is then ended and you sign in again.
+- **Locked out entirely** (no access to the email): `npm run admin:reset-password -- --remote you@example.com` updates the password of an *existing* user through the admin API. It never creates or deletes users and never touches `admin_users`. The password is typed at a hidden prompt.
+- **Sign-in misbehaving:** `npm run admin:diagnose -- --remote you@example.com [--app http://localhost:3000]` replays the sign-in step by step and prints only pass/fail, cookie names and sizes. It never prints a password, token, cookie value or key.
+- Both scripts refuse a non-local Supabase URL without `--remote`, need an interactive terminal, and read `.env.local`.
 
 ## Reviews and invitations (P2)
 
@@ -87,6 +96,43 @@ Structured content, not a page builder: Admin → **Pages** (Home, About, Contac
 5. Dashboard → Authentication → URL Configuration: set the Site URL to your production domain.
 6. Create the admin (above).
 7. Set the app environment variables (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL`). The build and ISR need the database to be reachable.
+
+## Deploying to Vercel
+
+1. Push the repository to GitHub and **Import** it in Vercel (framework preset: Next.js, production branch: `main`). No build or output overrides are needed; nothing depends on Docker, local files or a local database.
+2. Add the environment variables above under *Settings → Environment Variables* for **Production** (and Preview if you want previews to work): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL`, `INQUIRY_HASH_SALT`, and the two Turnstile keys. **Do not add the service-role key.**
+3. Deploy. The first production build needs the hosted database to be reachable (public pages are prerendered from it).
+4. Enable *Analytics* and *Speed Insights* on the Vercel project (Project → Analytics / Speed Insights → Enable). The code is already in place and only loads on Vercel; data appears after real traffic.
+5. **Custom domain** (when you have one): Project → Settings → Domains → add it and follow the DNS instructions, then set `NEXT_PUBLIC_SITE_URL` to `https://<your-domain>`, redeploy, and update the Supabase URLs below.
+
+### Supabase Auth — production URLs
+
+Dashboard → Authentication → URL Configuration:
+
+| Setting | Value |
+| --- | --- |
+| **Site URL** | the production origin, e.g. `https://www.example.com` |
+| **Redirect URLs** | `https://www.example.com/admin/reset-password` and `http://localhost:3000/admin/reset-password`. Add your `*.vercel.app` production URL's `/admin/reset-password` too while you use it. No wildcards are needed |
+
+Also: Authentication → Sign In / Providers → **Email enabled, "Allow new users to sign up" OFF**, minimum password length 10+. Recovery emails use Supabase's built-in sender (low hourly limit); add custom SMTP under Authentication → SMTP if you need more.
+
+## Spam protection (Cloudflare Turnstile)
+
+The contact form has validation, a honeypot field, a minimum fill time, a database-side rate limit and — when configured — Turnstile, verified **server-side** before anything is stored. The widget is `interaction-only`, so visitors normally never see it.
+
+1. Cloudflare dashboard → Turnstile → *Add widget*; hostname(s): your production domain (and `localhost` if you want to test with real keys); mode **Managed**.
+2. Set `NEXT_PUBLIC_TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` in Vercel and redeploy.
+3. Local development: leave both unset (not enforced), or use Cloudflare's always-pass test keys from `.env.example` to exercise the whole flow. Cloudflare also publishes always-fail test keys for the failure path.
+
+If Cloudflare can't be reached the form fails closed with a retry message. Review invitations are not behind Turnstile: they already need a secret single-use token, an expiry and a rate limit.
+
+## Security headers, SEO and analytics
+
+- **Headers** (`next.config.ts`): `X-Content-Type-Options`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy`, `Permissions-Policy`, COOP, and in production HSTS and a Content-Security-Policy. The CSP has no `unsafe-eval` and no wildcard script hosts. `unsafe-inline` remains for scripts/styles because Next's bootstrap is inline and a nonce would make every page dynamic. `frame-src https:` and `img-src/media-src https:` are deliberate (live-preview iframes, CMS media URLs). The policy is production-only because `next dev` needs eval and websockets.
+- **SEO:** canonical, Open Graph and Twitter cards on every public page; generated 1200×630 share cards (`/opengraph-image`, per project when no raster thumbnail exists); WebSite / Person / ProfessionalService JSON-LD from Admin → Settings only (no review or rating markup). `/admin`, `/review/*` and error pages are `noindex`; `robots.txt` blocks `/admin` and `/review/`; the sitemap lists public pages and published projects only.
+- **Analytics:** Vercel Web Analytics and Speed Insights — cookie-free, no session replay, public pages only (never `/admin`), and invitation tokens are stripped from reported URLs.
+- **Live previews:** the server reads a site's `X-Frame-Options` / `frame-ancestors` and, when it refuses framing, shows the gallery and an "open the site" button instead of the browser's error page.
+- **Project labelling:** *Concept* work is described as unofficial and not commissioned, *Personal* and *Sample* projects are tagged; the client row reads "Brand" for concepts.
 
 ## Architecture notes
 
@@ -118,4 +164,9 @@ Validated in the browser, again on the server (path ownership, type/extension ma
 
 ## Content to replace before launch
 
-Sample projects in the seed (flagged "Sample"), the placeholder reviews, `siteConfig.email`, the Red Harbor live URL, the About portrait (`aboutContent.photo`), and a raster Open Graph image.
+Do this in the admin before promoting the site:
+
+- **Settings:** replace the seeded contact email (`hello@ianverlinden.example` is hidden publicly until you do), location, social links and SEO text.
+- **Projects:** unpublish or delete the seeded samples (Afroton, Lumen Studio, Nova Dashboard — flagged *Sample*) and any test project; publish real ones with correct *type* (client / personal / concept).
+- **Reviews:** only real reviews — none are seeded. **About:** replace the portrait and wording.
+- **Production smoke test:** submit one contact inquiry and one review invitation end to end, then delete them (Admin → Inquiries / Reviews).

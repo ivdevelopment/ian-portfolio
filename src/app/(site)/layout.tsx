@@ -14,7 +14,8 @@ export default function SiteLayout({ children }: LayoutProps<"/">) {
       <Navbar />
       <main id="main">{children}</main>
       <Footer />
-      <SiteAnalytics />
+      {/* The /_vercel/* scripts only exist on Vercel deployments. */}
+      {process.env.VERCEL ? <SiteAnalytics /> : null}
     </>
   );
 }
