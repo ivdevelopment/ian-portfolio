@@ -5,7 +5,6 @@ import Image from "next/image";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CheckCircle2, Loader2, TriangleAlert } from "lucide-react";
-import { submitReviewAction } from "@/app/(site)/review/[token]/actions";
 import { publicReviewSchema, type PublicReviewValues, type ReviewSubmitResult } from "@/lib/schemas/review";
 import { INVALID_REVIEW_LINK_MESSAGE } from "@/lib/review-tokens";
 import { cn } from "@/lib/utils";
@@ -26,6 +25,7 @@ type ReviewFormProps = {
 export function ReviewForm({ token, clientName, projectTitle, projectThumbnail }: ReviewFormProps) {
   const [result, setResult] = useState<ReviewSubmitResult | null>(null);
   const openedAt = useRef(0);
+  const [stale, setStale] = useState(false);
 
   useEffect(() => {
     openedAt.current = Date.now();
@@ -48,8 +48,26 @@ export function ReviewForm({ token, clientName, projectTitle, projectThumbnail }
 
   const send = async (values: PublicReviewValues, elapsedMs: number) => {
     setResult(null);
+    setStale(false);
     try {
-      const response = await submitReviewAction(token, values, elapsedMs);
+      // The token goes in the body (never the URL) and is not kept anywhere else.
+      const http = await fetch("/api/reviews/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, values, elapsedMs }),
+        cache: "no-store",
+      });
+      const response = (await http.json().catch(() => null)) as ReviewSubmitResult | null;
+      // Anything that isn't our JSON contract (404/5xx page, proxy error) means this
+      // page is out of step with the server — typically an old deployment still open.
+      if (!response || typeof response.status !== "string") {
+        setStale(true);
+        setResult({
+          status: "error",
+          message: "This page may be out of date. Refresh the page and try again.",
+        });
+        return;
+      }
       if (response.status === "invalid-input") {
         for (const [field, messages] of Object.entries(response.fieldErrors)) {
           const message = messages?.[0];
@@ -58,7 +76,10 @@ export function ReviewForm({ token, clientName, projectTitle, projectThumbnail }
       }
       setResult(response);
     } catch {
-      setResult({ status: "error", message: "Something went wrong. Please try again." });
+      setResult({
+        status: "error",
+        message: "Couldn't reach the server. Check your connection and try again.",
+      });
     }
   };
 
@@ -205,7 +226,21 @@ export function ReviewForm({ token, clientName, projectTitle, projectThumbnail }
       {result?.status === "error" && (
         <div role="alert" className="mt-6 flex gap-3 rounded-md border border-danger/40 p-4 text-sm">
           <TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0 text-danger" />
-          <p>{result.message}</p>
+          <p>
+            {result.message}
+            {stale && (
+              <>
+                {" "}
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="text-accent underline underline-offset-4"
+                >
+                  Refresh page
+                </button>
+              </>
+            )}
+          </p>
         </div>
       )}
 
