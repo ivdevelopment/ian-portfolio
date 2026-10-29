@@ -1,7 +1,6 @@
-"use server";
+import "server-only";
 
 import { createHash } from "node:crypto";
-import { headers } from "next/headers";
 import { inquirySchema, type InquiryResult } from "@/lib/schemas/inquiry";
 import { createPublicClient } from "@/lib/supabase/public";
 import { verifyTurnstile } from "@/lib/turnstile";
@@ -16,18 +15,19 @@ function hashIp(ip: string): string {
 }
 
 /**
- * Receives the project request form.
+ * Handles the project request form (called by POST /api/contact).
  *
  * Protection layers: Zod validation (length limits), a hidden honeypot field,
  * a minimum fill time, Cloudflare Turnstile (when configured) and a
- * database-side rate limit inside `submit_inquiry`.
- * The anonymous role has no table access at all — the only thing it can do is
- * call that function. Nothing about the database is revealed to the visitor.
+ * database-side rate limit inside `submit_inquiry`. The anonymous role has no
+ * table access at all — the only thing it can do is call that function.
+ * Nothing about the database is revealed to the visitor.
  */
-export async function submitInquiry(
+export async function processInquiry(
   input: unknown,
-  elapsedMs: number,
-  turnstileToken?: string | null,
+  elapsedMs: unknown,
+  turnstileToken: unknown,
+  ip: string,
 ): Promise<InquiryResult> {
   const parsed = inquirySchema.safeParse(input);
   if (!parsed.success) {
@@ -41,12 +41,6 @@ export async function submitInquiry(
   if (typeof elapsedMs !== "number" || !Number.isFinite(elapsedMs) || elapsedMs < MIN_FILL_MS) {
     return { status: "error", message: "That was a little quick — please try sending again." };
   }
-
-  const requestHeaders = await headers();
-  const ip =
-    requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    requestHeaders.get("x-real-ip") ??
-    "unknown";
 
   const human = await verifyTurnstile(turnstileToken, ip);
   if (human === "failed" || human === "unavailable") {

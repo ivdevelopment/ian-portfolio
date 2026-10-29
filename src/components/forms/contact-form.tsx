@@ -5,7 +5,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CheckCircle2, TriangleAlert } from "lucide-react";
 import { BUDGETS, PROJECT_TYPES } from "@/data/inquiry-options";
-import { submitInquiry } from "@/app/(site)/contact/actions";
 import { inquirySchema, type InquiryResult, type InquiryValues } from "@/lib/schemas/inquiry";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -69,6 +68,7 @@ export function ContactForm() {
   const openedAt = useRef(0);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstile = useRef<TurnstileHandle | null>(null);
+  const [stale, setStale] = useState(false);
 
   // Measured on the client (in an effect, so prerendering never reads the clock).
   useEffect(() => {
@@ -96,8 +96,25 @@ export function ContactForm() {
       });
       return;
     }
+    setStale(false);
     try {
-      const response = await submitInquiry(values, elapsedMs, turnstileToken);
+      const http = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ values, elapsedMs, turnstileToken }),
+        cache: "no-store",
+      });
+      const response = (await http.json().catch(() => null)) as InquiryResult | null;
+      // Anything that isn't our JSON contract (404/5xx page, proxy error) means this
+      // page is out of step with the server — typically an old deployment still open.
+      if (!response || typeof response.status !== "string") {
+        setStale(true);
+        setResult({
+          status: "error",
+          message: "This page looks out of date. Refresh it and send your request again.",
+        });
+        return;
+      }
       if (response.status === "invalid") {
         for (const [field, messages] of Object.entries(response.fieldErrors)) {
           const message = messages?.[0];
@@ -109,7 +126,7 @@ export function ContactForm() {
     } catch {
       setResult({
         status: "error",
-        message: "Something went wrong while sending. Please try again.",
+        message: "Couldn't reach the server. Check your connection and try again.",
       });
     } finally {
       // Turnstile tokens are single use.
@@ -238,6 +255,18 @@ export function ContactForm() {
             {result.status === "error"
               ? result.message
               : "Please check the highlighted fields and try again."}
+            {stale && (
+              <>
+                {" "}
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="text-accent underline underline-offset-4"
+                >
+                  Refresh page
+                </button>
+              </>
+            )}
           </p>
         </div>
       )}
