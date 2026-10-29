@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { decideAdminRoute, isAdminPath, isLoginPath } from "@/lib/auth-routes";
+import {
+  decideAdminRoute,
+  isAdminPath,
+  isLoginPath,
+  isRecoveryPath,
+  isSupabaseAuthCookie,
+} from "@/lib/auth-routes";
 
 describe("admin route rules", () => {
   it("recognises admin and login paths (and not look-alikes)", () => {
@@ -28,6 +34,21 @@ describe("admin route rules", () => {
 
   it("allows signed-in users into the panel (membership is re-checked server-side)", () => {
     expect(decideAdminRoute("/admin/projects", true)).toBe("allow");
+  });
+
+  it("lets the recovery pages render with or without a session", () => {
+    for (const path of ["/admin/forgot-password", "/admin/reset-password"]) {
+      expect(decideAdminRoute(path, false)).toBe("allow");
+      expect(decideAdminRoute(path, true)).toBe("allow");
+    }
+    expect(isRecoveryPath("/admin/reset-passwordx")).toBe(false);
+  });
+
+  it("recognises session cookies but never the PKCE verifier", () => {
+    expect(isSupabaseAuthCookie("sb-abcd-auth-token")).toBe(true);
+    expect(isSupabaseAuthCookie("sb-abcd-auth-token.1")).toBe(true);
+    expect(isSupabaseAuthCookie("sb-abcd-auth-token-code-verifier")).toBe(false);
+    expect(isSupabaseAuthCookie("theme")).toBe(false);
   });
 
   it("ignores public routes", () => {

@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { signOutAction } from "./actions";
 import { LoginForm } from "./login-form";
 
-export default function LoginPage() {
+export default function LoginPage({ searchParams }: PageProps<"/admin/login">) {
   return (
     <main className="flex min-h-dvh items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm">
@@ -14,7 +14,7 @@ export default function LoginPage() {
 
         <div className="glass mt-8 rounded-panel p-6">
           <Suspense fallback={<LoginForm />}>
-            <LoginBody />
+            <LoginBody searchParams={searchParams} />
           </Suspense>
         </div>
       </div>
@@ -27,7 +27,8 @@ export default function LoginPage() {
  * If someone is signed in but NOT approved, say so (and offer to sign out)
  * rather than bouncing between /admin and /admin/login.
  */
-async function LoginBody() {
+async function LoginBody({ searchParams }: Pick<PageProps<"/admin/login">, "searchParams">) {
+  const justReset = (await searchParams).reset === "1";
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
   const signedInAs = data?.claims?.sub
@@ -38,6 +39,11 @@ async function LoginBody() {
 
   return (
     <>
+      {justReset && !signedInAs && (
+        <p role="status" className="mb-5 rounded-md border border-line p-3 text-sm text-muted">
+          Password updated. Sign in with your new password.
+        </p>
+      )}
       {signedInAs && (
         <div role="status" className="mb-5 rounded-md border border-line p-3 text-sm">
           <p className="text-muted">

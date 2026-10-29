@@ -1,7 +1,9 @@
 "use client";
 
 import { useActionState } from "react";
+import Link from "next/link";
 import { Loader2 } from "lucide-react";
+import { ADMIN_FORGOT_PASSWORD } from "@/lib/auth-routes";
 import { signInAction, type LoginState } from "./actions";
 import { adminInput } from "@/components/admin/ui";
 import { Button } from "@/components/ui/button";
@@ -57,6 +59,14 @@ export function LoginForm() {
           "Sign in"
         )}
       </Button>
+      <p className="text-center text-sm">
+        <Link
+          href={ADMIN_FORGOT_PASSWORD}
+          className="text-muted underline-offset-4 hover:text-ink hover:underline"
+        >
+          Forgot your password?
+        </Link>
+      </p>
     </form>
   );
 }
