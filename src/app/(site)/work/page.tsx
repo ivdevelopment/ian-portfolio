@@ -1,16 +1,15 @@
-import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/page-metadata";
 import { CtaSection } from "@/components/cta/cta-section";
 import { PageHeader } from "@/components/ui/page-header";
 import { ProjectGrid } from "@/components/work/project-grid";
 import { getPublishedProjects, projectFilters } from "@/lib/projects";
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: "Work",
   description:
     "Selected websites, web applications and redesigns — a look at projects I've designed and built.",
-  alternates: { canonical: "/work" },
-  openGraph: { url: "/work", title: "Work" },
-};
+  path: "/work",
+});
 
 export default async function WorkPage() {
   const projects = await getPublishedProjects();

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/page-metadata";
 import { MapPin } from "lucide-react";
 import { Portrait } from "@/components/about/portrait";
 import { CtaSection } from "@/components/cta/cta-section";
@@ -9,13 +9,12 @@ import { resolveMediaUrl } from "@/lib/cms/mappers";
 import { visibleStats } from "@/lib/schemas/site-content";
 import { getAboutContent, getSkills } from "@/lib/site-content";
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: "About",
   description:
     "A web developer based in Belgium who designs and builds modern websites and web applications.",
-  alternates: { canonical: "/about" },
-  openGraph: { url: "/about", title: "About" },
-};
+  path: "/about",
+});
 
 export default async function AboutPage() {
   const [about, skills] = await Promise.all([getAboutContent(), getSkills()]);

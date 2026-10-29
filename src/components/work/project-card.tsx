@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import type { Project } from "@/types/project";
 import { ProjectMediaView } from "@/components/ui/project-media";
+import { projectBadges } from "@/lib/project-labels";
 import { cn } from "@/lib/utils";
 
 type ProjectCardProps = {
@@ -21,6 +22,7 @@ export function ProjectCard({
   priority,
   className,
 }: ProjectCardProps) {
+  const badges = projectBadges(project);
   return (
     <article className={cn("group relative", className)}>
       <div className="relative aspect-[16/10] overflow-hidden rounded-card border border-line bg-surface shadow-card transition-[border-color,box-shadow,transform] duration-500 ease-out-soft group-hover:-translate-y-1 group-hover:border-line-strong group-hover:shadow-lift">
@@ -30,10 +32,17 @@ export function ProjectCard({
           priority={priority}
           className="transition-transform duration-700 ease-out-soft group-hover:scale-[1.04]"
         />
-        {highlightFeatured && project.featured && (
-          <span className="glass absolute top-3 left-3 rounded-full px-2.5 py-1 text-xs text-ink">
-            Featured
-          </span>
+        {(badges.length > 0 || (highlightFeatured && project.featured)) && (
+          <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
+            {highlightFeatured && project.featured && (
+              <span className="glass rounded-full px-2.5 py-1 text-xs text-ink">Featured</span>
+            )}
+            {badges.map((badge) => (
+              <span key={badge} className="glass rounded-full px-2.5 py-1 text-xs text-ink">
+                {badge}
+              </span>
+            ))}
+          </div>
         )}
         <span
           aria-hidden

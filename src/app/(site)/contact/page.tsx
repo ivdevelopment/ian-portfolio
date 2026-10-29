@@ -1,21 +1,21 @@
-import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/page-metadata";
+import { publicEmail } from "@/lib/placeholder-email";
 import { Mail, MapPin } from "lucide-react";
 import { ContactForm } from "@/components/forms/contact-form";
 import { PageHeader } from "@/components/ui/page-header";
 import { Reveal } from "@/components/ui/reveal";
 import { getContactContent, getSiteSettings } from "@/lib/site-content";
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: "Contact",
   description:
     "Have an idea or need a new website? Tell me about your project and let's talk about it.",
-  alternates: { canonical: "/contact" },
-  openGraph: { url: "/contact", title: "Contact" },
-};
+  path: "/contact",
+});
 
 export default async function ContactPage() {
   const [content, settings] = await Promise.all([getContactContent(), getSiteSettings()]);
-  const email = content.email || settings.contactEmail;
+  const email = publicEmail(content.email) || settings.contactEmail;
 
   return (
     <>

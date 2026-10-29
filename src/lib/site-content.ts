@@ -6,6 +6,7 @@ import {
   defaultHomeContent,
   defaultSiteSettings,
 } from "@/data/default-content";
+import { publicEmail } from "@/lib/placeholder-email";
 import { createPublicClient } from "@/lib/supabase/public";
 import {
   aboutContentSchema,
@@ -67,7 +68,7 @@ export async function getSiteSettings(): Promise<SiteSettings> {
   }
   if (!data) return defaultSiteSettings;
 
-  return parseOrDefault(
+  const settings = parseOrDefault(
     siteSettingsSchema,
     {
       siteName: data.site_name,
@@ -86,6 +87,8 @@ export async function getSiteSettings(): Promise<SiteSettings> {
     defaultSiteSettings,
     "site_settings",
   );
+  // Public pages never show a seeded placeholder address as contact information.
+  return { ...settings, contactEmail: publicEmail(settings.contactEmail) };
 }
 
 export async function getHomeContent(): Promise<HomeContent> {

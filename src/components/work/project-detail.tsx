@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { CtaSection } from "@/components/cta/cta-section";
 import { ButtonLink } from "@/components/ui/button";
 import { Reveal } from "@/components/ui/reveal";
+import { projectDisclosure } from "@/lib/project-labels";
 import { projectKindLabels } from "@/lib/projects";
 import type { Project } from "@/types/project";
 import { ReviewCard } from "@/components/reviews/review-card";
@@ -30,6 +31,7 @@ export function ProjectDetail({
   backLabel = "Back to projects",
 }: ProjectDetailProps) {
   const isExternalPreview = project.previewMode === "external" && project.liveUrl;
+  const disclosure = projectDisclosure(project);
 
   return (
     <>
@@ -54,9 +56,12 @@ export function ProjectDetail({
               {[projectKindLabels[project.kind], ...project.tags].join(" · ")}
               {project.year ? ` · ${project.year}` : ""}
             </p>
-            {project.isExample && (
-              <p className="mt-3 inline-flex rounded-full border border-line px-3 py-1 text-xs text-subtle">
-                Sample project — placeholder content
+            {disclosure && (
+              <p
+                role="note"
+                className="mt-4 rounded-md border border-line bg-glass px-4 py-3 text-sm text-muted"
+              >
+                {disclosure}
               </p>
             )}
             <p className="mt-6 text-lg text-muted">{project.shortDescription}</p>

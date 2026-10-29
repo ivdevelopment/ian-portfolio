@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/page-metadata";
 import { Check } from "lucide-react";
 import { CtaSection } from "@/components/cta/cta-section";
 import { ServiceIconBadge } from "@/components/services/service-icon";
@@ -6,13 +6,12 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Reveal } from "@/components/ui/reveal";
 import { getHomeContent, getServices } from "@/lib/site-content";
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: "Services",
   description:
     "Web design, web development, redesigns and ongoing maintenance for businesses that want a modern, fast website.",
-  alternates: { canonical: "/services" },
-  openGraph: { url: "/services", title: "Services" },
-};
+  path: "/services",
+});
 
 export default async function ServicesPage() {
   const [services, { services: copy }] = await Promise.all([getServices(), getHomeContent()]);

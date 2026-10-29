@@ -7,6 +7,7 @@ import {
   getRelatedProjects,
 } from "@/lib/projects";
 import { getReviewsForProject } from "@/lib/reviews";
+import { isShareableRaster } from "@/lib/og-image-url";
 
 /**
  * `params` is awaited at the top level on purpose (no <Suspense> around it):
@@ -27,6 +28,12 @@ export async function generateMetadata({
   const project = await getProjectBySlug(slug);
   if (!project) return { title: "Project not found", robots: { index: false } };
 
+  // Use the project's own screenshot when it is a raster image; otherwise the
+  // branded card from ./opengraph-image applies automatically.
+  const shareImage = isShareableRaster(project.thumbnail)
+    ? [{ url: project.thumbnail, alt: `${project.title} — ${project.category}` }]
+    : undefined;
+
   return {
     title: project.title,
     description: project.shortDescription,
@@ -36,7 +43,13 @@ export async function generateMetadata({
       url: `/work/${project.slug}`,
       title: project.title,
       description: project.shortDescription,
-      // TODO: add a raster (PNG/JPG) share image per project — SVG isn't supported by most platforms.
+      ...(shareImage && { images: shareImage }),
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: project.title,
+      description: project.shortDescription,
+      ...(shareImage && { images: shareImage }),
     },
   };
 }

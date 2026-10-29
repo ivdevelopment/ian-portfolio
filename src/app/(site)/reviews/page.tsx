@@ -1,16 +1,15 @@
-import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/page-metadata";
 import { CtaSection } from "@/components/cta/cta-section";
 import { ReviewCard } from "@/components/reviews/review-card";
 import { PageHeader } from "@/components/ui/page-header";
 import { Reveal } from "@/components/ui/reveal";
 import { getApprovedReviews } from "@/lib/reviews";
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: "Reviews",
   description: "What people say about working with me.",
-  alternates: { canonical: "/reviews" },
-  openGraph: { url: "/reviews", title: "Reviews" },
-};
+  path: "/reviews",
+});
 
 export default async function ReviewsPage() {
   const reviews = await getApprovedReviews();

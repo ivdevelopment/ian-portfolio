@@ -1,3 +1,5 @@
+import { resolveSiteUrl } from "@/lib/site-url";
+
 /**
  * Central site configuration. Replace placeholder values here — nothing
  * else in the codebase hard-codes the site name, URL or contact details.
@@ -5,8 +7,8 @@
 export const siteConfig = {
   name: "Ian Verlinden",
   initials: "IV",
-  // TODO(P1): set NEXT_PUBLIC_SITE_URL in the deployment environment.
-  url: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
+  /** Public origin. See `resolveSiteUrl` for the resolution order. */
+  url: resolveSiteUrl(process.env),
   locale: "en_BE",
   /** Static so prerendering never depends on the current time. */
   copyrightYear: 2026,

@@ -1,6 +1,7 @@
 import { Check } from "lucide-react";
 import type { Project } from "@/types/project";
 import { Reveal } from "@/components/ui/reveal";
+import { isConceptProject } from "@/lib/project-labels";
 
 const typeLabels: Record<NonNullable<Project["projectType"]>, string> = {
   client: "Client project",
@@ -10,7 +11,9 @@ const typeLabels: Record<NonNullable<Project["projectType"]>, string> = {
 
 export function ProjectOverview({ project }: { project: Project }) {
   const details: { label: string; value: React.ReactNode }[] = [];
-  if (project.client) details.push({ label: "Client", value: project.client });
+  // A concept isn't commissioned work: the named company is the subject, not a client.
+  if (project.client)
+    details.push({ label: isConceptProject(project) ? "Brand" : "Client", value: project.client });
   if (project.projectType)
     details.push({ label: "Type", value: typeLabels[project.projectType] });
   if (project.year) details.push({ label: "Year", value: project.year });
