@@ -1,7 +1,8 @@
 import { cacheLife, cacheTag } from "next/cache";
+import type { Locale } from "@/i18n/config";
 import { createPublicClient } from "@/lib/supabase/public";
 import { PROJECT_SELECT, rowToProject, type ProjectRow } from "@/lib/cms/mappers";
-import type { Project, ProjectKind } from "@/types/project";
+import type { Project } from "@/types/project";
 
 /**
  * Public project data access. Reads run as the anonymous role, so Row Level
@@ -14,25 +15,12 @@ import type { Project, ProjectKind } from "@/types/project";
 
 export const PROJECTS_TAG = "projects";
 export const projectTag = (slug: string) => `project:${slug}`;
+/** Per-language tag: editing Dutch text expires Dutch output only; publishing expires both. */
+export const projectsLocaleTag = (locale: Locale) => `${PROJECTS_TAG}:${locale}`;
 
-export const projectFilters: { label: string; kind: ProjectKind | "all" }[] = [
-  { label: "All", kind: "all" },
-  { label: "Websites", kind: "website" },
-  { label: "Web Apps", kind: "web-app" },
-  { label: "Redesigns", kind: "redesign" },
-  { label: "Concepts", kind: "concept" },
-];
-
-export const projectKindLabels: Record<ProjectKind, string> = {
-  website: "Website",
-  "web-app": "Web App",
-  redesign: "Redesign",
-  concept: "Concept",
-};
-
-export async function getPublishedProjects(): Promise<Project[]> {
+export async function getPublishedProjects(locale: Locale): Promise<Project[]> {
   "use cache";
-  cacheTag(PROJECTS_TAG);
+  cacheTag(PROJECTS_TAG, projectsLocaleTag(locale));
   cacheLife("hours");
 
   const supabase = createPublicClient();
@@ -49,29 +37,29 @@ export async function getPublishedProjects(): Promise<Project[]> {
     throw new Error("Projects are temporarily unavailable.");
   }
 
-  return (data as ProjectRow[]).map(rowToProject);
+  return (data as ProjectRow[]).map((row) => rowToProject(row, locale));
 }
 
-export async function getFeaturedProjects(): Promise<Project[]> {
+export async function getFeaturedProjects(locale: Locale): Promise<Project[]> {
   "use cache";
-  cacheTag(PROJECTS_TAG);
+  cacheTag(PROJECTS_TAG, projectsLocaleTag(locale));
   cacheLife("hours");
 
-  return (await getPublishedProjects()).filter((p) => p.featured);
+  return (await getPublishedProjects(locale)).filter((p) => p.featured);
 }
 
-export async function getProjectBySlug(slug: string): Promise<Project | undefined> {
+export async function getProjectBySlug(slug: string, locale: Locale): Promise<Project | undefined> {
   "use cache";
-  cacheTag(PROJECTS_TAG, projectTag(slug));
+  cacheTag(PROJECTS_TAG, projectTag(slug), projectsLocaleTag(locale));
   cacheLife("hours");
 
-  return (await getPublishedProjects()).find((p) => p.slug === slug);
+  return (await getPublishedProjects(locale)).find((p) => p.slug === slug);
 }
 
-export async function getRelatedProjects(slug: string, limit = 3): Promise<Project[]> {
+export async function getRelatedProjects(slug: string, locale: Locale, limit = 3): Promise<Project[]> {
   "use cache";
-  cacheTag(PROJECTS_TAG);
+  cacheTag(PROJECTS_TAG, projectsLocaleTag(locale));
   cacheLife("hours");
 
-  return (await getPublishedProjects()).filter((p) => p.slug !== slug).slice(0, limit);
+  return (await getPublishedProjects(locale)).filter((p) => p.slug !== slug).slice(0, limit);
 }

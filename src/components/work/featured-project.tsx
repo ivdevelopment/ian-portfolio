@@ -4,6 +4,8 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { Project } from "@/types/project";
+import { useDictionary } from "@/i18n/context";
+import { fmt } from "@/i18n/dictionaries";
 import { ButtonLink } from "@/components/ui/button";
 import { DeviceFrame } from "@/components/ui/device-frame";
 import { ProjectMediaView } from "@/components/ui/project-media";
@@ -13,6 +15,7 @@ const pad = (n: number) => String(n).padStart(2, "0");
 type FeaturedIntro = { eyebrow: string; heading: string; body: string };
 
 export function FeaturedProject({ projects, intro }: { projects: Project[]; intro: FeaturedIntro }) {
+  const dict = useDictionary();
   const [index, setIndex] = useState(0);
   const total = projects.length;
   if (total === 0) return null;
@@ -21,7 +24,7 @@ export function FeaturedProject({ projects, intro }: { projects: Project[]; intr
   const hero = project.heroMedia ?? {
     type: "image" as const,
     src: project.thumbnail,
-    alt: `${project.title} website preview`,
+    alt: fmt(dict.project.preview.mediaAlt, { title: project.title }),
   };
   const step = (dir: 1 | -1) => setIndex((i) => (i + dir + total) % total);
 
@@ -44,7 +47,7 @@ export function FeaturedProject({ projects, intro }: { projects: Project[]; intr
           {total > 1 && (
             <div className="flex items-center gap-3">
               <p className="text-sm text-muted tabular-nums" aria-live="polite">
-                <span className="sr-only">Project </span>
+                <span className="sr-only">{dict.project.projectN} </span>
                 {pad(index + 1)} / {pad(total)}
               </p>
               <div className="flex gap-2">
@@ -55,7 +58,7 @@ export function FeaturedProject({ projects, intro }: { projects: Project[]; intr
                       key={dir}
                       type="button"
                       onClick={() => step(dir)}
-                      aria-label={dir === -1 ? "Previous project" : "Next project"}
+                      aria-label={dir === -1 ? dict.project.previous : dict.project.next}
                       className="glass inline-flex size-10 items-center justify-center rounded-md text-ink transition-[background-color,transform] duration-300 hover:bg-glass-strong active:scale-95"
                     >
                       <Icon aria-hidden className="size-5" />
@@ -93,7 +96,7 @@ export function FeaturedProject({ projects, intro }: { projects: Project[]; intr
                 </p>
                 <p className="mt-5 text-muted">{project.shortDescription}</p>
 
-                <ul className="mt-6 flex flex-wrap gap-2" aria-label="Disciplines">
+                <ul className="mt-6 flex flex-wrap gap-2" aria-label={dict.project.disciplines}>
                   {project.tags.map((tag) => (
                     <li
                       key={tag}
@@ -105,13 +108,13 @@ export function FeaturedProject({ projects, intro }: { projects: Project[]; intr
                 </ul>
 
                 <div className="mt-8 flex flex-wrap gap-3">
-                  <ButtonLink href={`/work/${project.slug}`}>View project</ButtonLink>
+                  <ButtonLink href={`/work/${project.slug}`}>{dict.project.viewProject}</ButtonLink>
                   <ButtonLink
                     href={`/work/${project.slug}#live-preview`}
                     variant="secondary"
                     icon="none"
                   >
-                    Live preview
+                    {dict.project.livePreview}
                   </ButtonLink>
                 </div>
               </div>

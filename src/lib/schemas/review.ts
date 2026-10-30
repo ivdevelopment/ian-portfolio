@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { getDictionary, type Dictionary } from "@/i18n/dictionaries";
 import { EXPIRY_OPTIONS_DAYS } from "@/lib/review-tokens";
 
 export const REVIEW_STATUSES = ["pending", "approved", "rejected", "archived"] as const;
@@ -47,20 +48,23 @@ export const reviewEditorSchema = z.object({
 });
 export type ReviewEditorValues = z.infer<typeof reviewEditorSchema>;
 
-/** What a client submits through an invitation link. */
-export const publicReviewSchema = z.object({
-  name: z.string().trim().min(2, "Please enter your name.").max(120, "That name is a little long."),
-  company: z.string().trim().max(120, "Keep this under 120 characters."),
-  role: z.string().trim().max(120, "Keep this under 120 characters."),
-  rating,
-  review: z
-    .string()
-    .trim()
-    .min(20, "Please write at least a couple of sentences.")
-    .max(4000, "Please keep your review under 4000 characters."),
-  /** Honeypot: real visitors never see or fill this. */
-  website: z.string().max(0).optional(),
-});
+/** What a client submits through an invitation link. Messages come from the visitor's language. */
+export function createPublicReviewSchema(m: Dictionary["review"]["validation"]) {
+  return z.object({
+    name: z.string().trim().min(2, m.nameRequired).max(120, m.nameLong),
+    company: z.string().trim().max(120, m.fieldLong),
+    role: z.string().trim().max(120, m.fieldLong),
+    rating: z
+      .number({ error: m.ratingRequired })
+      .int()
+      .min(1, m.ratingRange)
+      .max(5, m.ratingRange),
+    review: z.string().trim().min(20, m.reviewShort).max(4000, m.reviewLong),
+    /** Honeypot: real visitors never see or fill this. */
+    website: z.string().max(0).optional(),
+  });
+}
+export const publicReviewSchema = createPublicReviewSchema(getDictionary("en").review.validation);
 export type PublicReviewValues = z.infer<typeof publicReviewSchema>;
 
 export type ReviewSubmitResult =

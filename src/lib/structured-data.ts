@@ -1,3 +1,5 @@
+import { htmlLang, type Locale } from "@/i18n/config";
+import { localizeHref } from "@/i18n/paths";
 import type { SiteSettings } from "@/lib/schemas/site-content";
 
 type Thing = Record<string, unknown>;
@@ -7,22 +9,24 @@ type Thing = Record<string, unknown>;
  * empty fields are omitted, and there is deliberately no rating, review or
  * aggregateRating markup (self-serving review markup is not eligible for rich results).
  */
-export function buildSiteStructuredData(settings: SiteSettings, origin: string): Thing {
+export function buildSiteStructuredData(settings: SiteSettings, origin: string, locale: Locale = "nl"): Thing {
   const sameAs = [settings.githubUrl, settings.linkedinUrl, settings.instagramUrl, settings.xUrl].filter(
     (url): url is string => Boolean(url),
   );
+  // Person/Service are one entity across languages; only the page-level WebSite is per language.
   const personId = `${origin}/#person`;
+  const pageUrl = `${origin}${localizeHref(locale, "/") === "/" ? "" : localizeHref(locale, "/")}`;
 
   return {
     "@context": "https://schema.org",
     "@graph": [
       {
         "@type": "WebSite",
-        "@id": `${origin}/#website`,
-        url: origin,
+        "@id": `${pageUrl}/#website`,
+        url: pageUrl || origin,
         name: settings.siteName,
         description: settings.seoDefaultDescription,
-        inLanguage: "en",
+        inLanguage: htmlLang[locale],
         publisher: { "@id": personId },
       },
       {
@@ -30,7 +34,7 @@ export function buildSiteStructuredData(settings: SiteSettings, origin: string):
         "@id": personId,
         name: settings.displayName,
         url: origin,
-        jobTitle: "Web designer and developer",
+        jobTitle: locale === "nl" ? "Webdesigner en developer" : "Web designer and developer",
         ...(sameAs.length > 0 && { sameAs }),
         ...(settings.contactEmail && { email: settings.contactEmail }),
       },

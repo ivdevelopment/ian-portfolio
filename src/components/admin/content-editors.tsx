@@ -12,9 +12,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   saveAboutContentAction,
   saveContactContentAction,
+  saveContentTranslationAction,
   saveHomeContentAction,
   saveSettingsAction,
-} from "@/app/admin/(panel)/pages/actions";
+  saveSettingsTranslationAction,
+} from "@/app/(admin)/admin/(panel)/pages/actions";
 import { SITE_IMAGE_MAX_BYTES, siteImagePath, type SiteImageSlot } from "@/lib/media-rules";
 import {
   aboutContentSchema,
@@ -26,7 +28,7 @@ import {
   type HomeContent,
   type SiteSettings,
 } from "@/lib/schemas/site-content";
-import { SaveBar, StatsFields, TextField, errorAt, useSaveForm } from "./form-bits";
+import { SaveBar, StatsFields, TextField, TranslatingProvider, errorAt, useSaveForm, useTranslating } from "./form-bits";
 import { ImageField } from "./image-field";
 import { Panel } from "./ui";
 
@@ -43,24 +45,27 @@ function ImageWithAlt({
   required?: boolean;
 }) {
   const { control, formState } = useFormContext();
+  const translating = useTranslating();
   return (
     <div className="space-y-3">
-      <Controller
-        control={control}
-        name={`${name}.src`}
-        render={({ field }) => (
-          <ImageField
-            label={label}
-            value={field.value}
-            onChange={(next) => field.onChange(next ?? "")}
-            buildPath={(ext, id) => siteImagePath(slot, ext, id)}
-            maxBytes={SITE_IMAGE_MAX_BYTES}
-            allowRemove={!required}
-            error={errorAt(formState.errors, `${name}.src`)}
-          />
-        )}
-      />
-      <TextField name={`${name}.alt`} label="Alt text" hint="Describe the image for screen readers (leave empty if purely decorative)." maxLength={300} />
+      {!translating && (
+        <Controller
+          control={control}
+          name={`${name}.src`}
+          render={({ field }) => (
+            <ImageField
+              label={label}
+              value={field.value}
+              onChange={(next) => field.onChange(next ?? "")}
+              buildPath={(ext, id) => siteImagePath(slot, ext, id)}
+              maxBytes={SITE_IMAGE_MAX_BYTES}
+              allowRemove={!required}
+              error={errorAt(formState.errors, `${name}.src`)}
+            />
+          )}
+        />
+      )}
+      <TextField name={`${name}.alt`} label={translating ? `${label} — alt text` : "Alt text"} hint="Describe the image for screen readers (leave empty if purely decorative)." maxLength={300} />
     </div>
   );
 }
@@ -69,7 +74,7 @@ function CtaFields({ prefix, label }: { prefix: string; label: string }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <TextField name={`${prefix}.label`} label={`${label} text`} maxLength={60} />
-      <TextField name={`${prefix}.href`} label={`${label} link`} hint="A path like /work, or a full https:// URL." maxLength={300} />
+      <TextField name={`${prefix}.href`} label={`${label} link`} hint="A path like /work, or a full https:// URL." maxLength={300} shared />
     </div>
   );
 }
@@ -92,7 +97,9 @@ function Shell({
   submit,
   children,
   saveLabel,
+  translating,
 }: {
+  translating?: boolean;
   form: AnyForm;
   status: Parameters<typeof SaveBar>[0]["status"];
   submit: () => void;
@@ -101,26 +108,31 @@ function Shell({
 }) {
   return (
     <FormProvider {...form}>
-      <form onSubmit={(e) => e.preventDefault()} noValidate className="space-y-4">
-        {children}
-        <SaveBar status={status} dirty={form.formState.isDirty} label={saveLabel} onSave={submit} />
-      </form>
+      <TranslatingProvider value={Boolean(translating)}>
+        <form onSubmit={(e) => e.preventDefault()} noValidate className="space-y-4">
+          {children}
+          <SaveBar status={status} dirty={form.formState.isDirty} label={saveLabel} onSave={submit} />
+        </form>
+      </TranslatingProvider>
     </FormProvider>
   );
 }
 
 /* ------------------------------------------------------------------ home */
 
-export function HomeContentEditor({ initial }: { initial: HomeContent }) {
+export function HomeContentEditor({ initial, translating }: { initial: HomeContent; translating?: boolean }) {
   const form = useForm<HomeContent>({
     resolver: zodResolver(homeContentSchema),
     defaultValues: initial,
     mode: "onTouched",
   });
-  const { status, submit } = useSaveForm(form, saveHomeContentAction);
+  const { status, submit } = useSaveForm(
+    form,
+    translating ? (v) => saveContentTranslationAction("home", v) : saveHomeContentAction,
+  );
 
   return (
-    <Shell form={form as unknown as AnyForm} status={status} submit={() => void submit()}>
+    <Shell form={form as unknown as AnyForm} status={status} submit={() => void submit()} translating={translating}>
       <Panel title="Hero" description="The first thing visitors see.">
         <div className="space-y-4">
           <TextField name="hero.badge" label="Availability label" hint="Leave empty to hide the badge." maxLength={80} />
@@ -177,16 +189,19 @@ export function HomeContentEditor({ initial }: { initial: HomeContent }) {
 
 /* ----------------------------------------------------------------- about */
 
-export function AboutContentEditor({ initial }: { initial: AboutContent }) {
+export function AboutContentEditor({ initial, translating }: { initial: AboutContent; translating?: boolean }) {
   const form = useForm<AboutContent>({
     resolver: zodResolver(aboutContentSchema),
     defaultValues: initial,
     mode: "onTouched",
   });
-  const { status, submit } = useSaveForm(form, saveAboutContentAction);
+  const { status, submit } = useSaveForm(
+    form,
+    translating ? (v) => saveContentTranslationAction("about", v) : saveAboutContentAction,
+  );
 
   return (
-    <Shell form={form as unknown as AnyForm} status={status} submit={() => void submit()}>
+    <Shell form={form as unknown as AnyForm} status={status} submit={() => void submit()} translating={translating}>
       <Panel title="Intro">
         <div className="space-y-4">
           <TextField name="eyebrow" label="Eyebrow" maxLength={60} />
@@ -202,14 +217,16 @@ export function AboutContentEditor({ initial }: { initial: AboutContent }) {
           name="portrait"
           render={({ field }) => (
             <div className="space-y-3">
-              <ImageField
-                label="Portrait"
-                value={field.value?.src}
-                onChange={(next) => field.onChange(next ? { src: next, alt: field.value?.alt ?? "" } : null)}
-                buildPath={(ext, id) => siteImagePath("portrait", ext, id)}
-                maxBytes={SITE_IMAGE_MAX_BYTES}
-                error={errorAt(form.formState.errors, "portrait.src")}
-              />
+              {!translating && (
+                <ImageField
+                  label="Portrait"
+                  value={field.value?.src}
+                  onChange={(next) => field.onChange(next ? { src: next, alt: field.value?.alt ?? "" } : null)}
+                  buildPath={(ext, id) => siteImagePath("portrait", ext, id)}
+                  maxBytes={SITE_IMAGE_MAX_BYTES}
+                  error={errorAt(form.formState.errors, "portrait.src")}
+                />
+              )}
               {field.value && (
                 <TextField name="portrait.alt" label="Alt text" maxLength={300} hint="Describe the photo for screen readers." />
               )}
@@ -234,16 +251,27 @@ export function AboutContentEditor({ initial }: { initial: AboutContent }) {
 
 /* --------------------------------------------------------------- contact */
 
-export function ContactContentEditor({ initial, settingsEmail }: { initial: ContactContent; settingsEmail: string }) {
+export function ContactContentEditor({
+  initial,
+  settingsEmail,
+  translating,
+}: {
+  initial: ContactContent;
+  settingsEmail: string;
+  translating?: boolean;
+}) {
   const form = useForm<ContactContent>({
     resolver: zodResolver(contactContentSchema),
     defaultValues: initial,
     mode: "onTouched",
   });
-  const { status, submit } = useSaveForm(form, saveContactContentAction);
+  const { status, submit } = useSaveForm(
+    form,
+    translating ? (v) => saveContentTranslationAction("contact", v) : saveContactContentAction,
+  );
 
   return (
-    <Shell form={form as unknown as AnyForm} status={status} submit={() => void submit()}>
+    <Shell form={form as unknown as AnyForm} status={status} submit={() => void submit()} translating={translating}>
       <Panel title="Header">
         <div className="space-y-4">
           <TextField name="eyebrow" label="Eyebrow" maxLength={60} />
@@ -258,6 +286,7 @@ export function ContactContentEditor({ initial, settingsEmail }: { initial: Cont
             label="Public email"
             type="email"
             maxLength={200}
+            shared
             hint={settingsEmail ? `Leave empty to use the site-wide email (${settingsEmail}).` : "Leave empty to use the site-wide email from Settings."}
           />
           <TextField name="responseTime" label="Response-time text" maxLength={200} />
@@ -270,30 +299,30 @@ export function ContactContentEditor({ initial, settingsEmail }: { initial: Cont
 
 /* -------------------------------------------------------------- settings */
 
-export function SettingsEditor({ initial }: { initial: SiteSettings }) {
+export function SettingsEditor({ initial, translating }: { initial: SiteSettings; translating?: boolean }) {
   const form = useForm<SiteSettings>({
     resolver: zodResolver(siteSettingsSchema),
     defaultValues: initial,
     mode: "onTouched",
   });
-  const { status, submit } = useSaveForm(form, saveSettingsAction);
+  const { status, submit } = useSaveForm(form, translating ? saveSettingsTranslationAction : saveSettingsAction);
 
   return (
-    <Shell form={form as unknown as AnyForm} status={status} submit={() => void submit()} saveLabel="Save settings">
+    <Shell form={form as unknown as AnyForm} status={status} submit={() => void submit()} saveLabel="Save settings" translating={translating}>
       <Panel title="General">
         <div className="grid gap-3 sm:grid-cols-2">
-          <TextField name="siteName" label="Site name" maxLength={80} />
-          <TextField name="displayName" label="Developer / display name" maxLength={80} />
+          <TextField name="siteName" label="Site name" maxLength={80} shared />
+          <TextField name="displayName" label="Developer / display name" maxLength={80} shared />
           <TextField name="location" label="Location" maxLength={120} />
-          <TextField name="contactEmail" label="Public contact email" type="email" maxLength={200} />
+          <TextField name="contactEmail" label="Public contact email" type="email" maxLength={200} shared />
         </div>
       </Panel>
       <Panel title="Social links" description="Shown in the footer. Leave empty to hide. https:// only.">
         <div className="grid gap-3 sm:grid-cols-2">
-          <TextField name="githubUrl" label="GitHub" placeholder="https://github.com/…" maxLength={300} />
-          <TextField name="linkedinUrl" label="LinkedIn" placeholder="https://www.linkedin.com/in/…" maxLength={300} />
-          <TextField name="instagramUrl" label="Instagram" placeholder="https://www.instagram.com/…" maxLength={300} />
-          <TextField name="xUrl" label="X" placeholder="https://x.com/…" maxLength={300} />
+          <TextField name="githubUrl" label="GitHub" placeholder="https://github.com/…" maxLength={300} shared />
+          <TextField name="linkedinUrl" label="LinkedIn" placeholder="https://www.linkedin.com/in/…" maxLength={300} shared />
+          <TextField name="instagramUrl" label="Instagram" placeholder="https://www.instagram.com/…" maxLength={300} shared />
+          <TextField name="xUrl" label="X" placeholder="https://x.com/…" maxLength={300} shared />
         </div>
       </Panel>
       <Panel title="SEO" description="Defaults used when a page doesn't set its own. Project pages keep their own titles and descriptions.">

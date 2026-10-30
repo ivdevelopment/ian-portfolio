@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import { hashReviewToken, isPlausibleToken } from "@/lib/review-tokens";
-import { publicReviewSchema, type ReviewSubmitResult } from "@/lib/schemas/review";
+import { defaultLocale, type Locale } from "@/i18n/config";
+import { getDictionary } from "@/i18n/dictionaries";
+import { createPublicReviewSchema, type ReviewSubmitResult } from "@/lib/schemas/review";
 import { createPublicClient } from "@/lib/supabase/public";
 
 const MIN_FILL_MS = 3000;
@@ -40,8 +42,10 @@ export async function processReviewSubmission(
   elapsedMs: unknown,
   ip: string,
   rpc: SubmitRpc = defaultRpc,
+  locale: Locale = defaultLocale,
 ): Promise<ReviewSubmitResult> {
-  const parsed = publicReviewSchema.safeParse(input);
+  const dict = getDictionary(locale).review;
+  const parsed = createPublicReviewSchema(dict.validation).safeParse(input);
   if (!parsed.success) {
     return { status: "invalid-input", fieldErrors: parsed.error.flatten().fieldErrors };
   }
@@ -53,7 +57,7 @@ export async function processReviewSubmission(
   if (values.website) return { status: "submitted" };
 
   if (typeof elapsedMs !== "number" || !Number.isFinite(elapsedMs) || elapsedMs < MIN_FILL_MS) {
-    return { status: "error", message: "That was a little quick — please try sending again." };
+    return { status: "error", message: dict.server.tooQuick };
   }
 
   const { data, error } = await rpc("submit_review", {
@@ -68,10 +72,10 @@ export async function processReviewSubmission(
 
   if (error) {
     console.error("[review] submission failed:", error.code);
-    return { status: "error", message: "Something went wrong while sending your review. Please try again." };
+    return { status: "error", message: dict.server.failed };
   }
   if (data === "rate_limited") {
-    return { status: "error", message: "You've sent several reviews recently. Please try again later." };
+    return { status: "error", message: dict.server.rateLimited };
   }
   if (data !== "ok") return { status: "invalid-link" };
 

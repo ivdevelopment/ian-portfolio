@@ -1,11 +1,14 @@
-import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { getPublishedProjects, projectFilters } from "@/lib/projects";
+import { getI18n } from "@/i18n/server";
+import { LocaleLink } from "@/i18n/locale-link";
+import { projectFilters } from "@/lib/project-labels";
+import { getPublishedProjects } from "@/lib/projects";
 import { Reveal } from "@/components/ui/reveal";
 import { ProjectGrid } from "./project-grid";
 
 export async function SelectedWork() {
-  const projects = await getPublishedProjects();
+  const { locale, dict } = await getI18n();
+  const projects = await getPublishedProjects(locale);
   if (projects.length === 0) return null;
 
   return (
@@ -13,24 +16,24 @@ export async function SelectedWork() {
       <div className="container-page">
         <Reveal className="mb-8 flex items-end justify-between gap-6">
           <h2 id="selected-work-title" className="text-title">
-            Selected work
+            {dict.work.selectedWork}
           </h2>
-          <Link
+          <LocaleLink
             href="/work"
             className="group inline-flex items-center gap-1.5 text-sm text-muted transition-colors hover:text-ink"
           >
-            View all projects
+            {dict.work.viewAll}
             <ArrowRight
               aria-hidden
               className="size-4 transition-transform duration-300 group-hover:translate-x-0.5"
             />
-          </Link>
+          </LocaleLink>
         </Reveal>
 
         <Reveal delay={0.08}>
           <ProjectGrid
             projects={projects}
-            filters={projectFilters}
+            filters={projectFilters(dict)}
             sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
           />
         </Reveal>

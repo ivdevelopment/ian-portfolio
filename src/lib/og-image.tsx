@@ -40,6 +40,8 @@ export type OgCard = {
   brand: string;
   /** Shown bottom-right. */
   footer?: string;
+  /** Discipline line, bottom-left (language-specific). */
+  discipline?: string;
 };
 
 export async function renderOgCard(card: OgCard): Promise<ImageResponse> {
@@ -127,7 +129,7 @@ export async function renderOgCard(card: OgCard): Promise<ImageResponse> {
             color: palette.subtle,
           }}
         >
-          <div>Web Design &amp; Development</div>
+          <div>{card.discipline ?? "Web Design & Development"}</div>
           <div>{card.footer ?? ""}</div>
         </div>
       </div>

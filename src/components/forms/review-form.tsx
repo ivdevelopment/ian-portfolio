@@ -5,8 +5,8 @@ import Image from "next/image";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CheckCircle2, Loader2, TriangleAlert } from "lucide-react";
-import { publicReviewSchema, type PublicReviewValues, type ReviewSubmitResult } from "@/lib/schemas/review";
-import { INVALID_REVIEW_LINK_MESSAGE } from "@/lib/review-tokens";
+import { useDictionary, useLocale } from "@/i18n/context";
+import { createPublicReviewSchema, type PublicReviewValues, type ReviewSubmitResult } from "@/lib/schemas/review";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { RatingInput } from "./rating-input";
@@ -23,6 +23,9 @@ type ReviewFormProps = {
 };
 
 export function ReviewForm({ token, clientName, projectTitle, projectThumbnail }: ReviewFormProps) {
+  const dict = useDictionary();
+  const locale = useLocale();
+  const r = dict.review;
   const [result, setResult] = useState<ReviewSubmitResult | null>(null);
   const openedAt = useRef(0);
   const [stale, setStale] = useState(false);
@@ -39,7 +42,7 @@ export function ReviewForm({ token, clientName, projectTitle, projectThumbnail }
  control,
     formState: { errors, isSubmitting },
   } = useForm<PublicReviewValues>({
-    resolver: zodResolver(publicReviewSchema),
+    resolver: zodResolver(createPublicReviewSchema(r.validation)),
     mode: "onTouched",
     defaultValues: { name: clientName ?? "", company: "", role: "", review: "", website: "" },
   });
@@ -54,7 +57,7 @@ export function ReviewForm({ token, clientName, projectTitle, projectThumbnail }
       const http = await fetch("/api/reviews/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, values, elapsedMs }),
+        body: JSON.stringify({ token, values, elapsedMs, locale }),
         cache: "no-store",
       });
       const response = (await http.json().catch(() => null)) as ReviewSubmitResult | null;
@@ -64,7 +67,7 @@ export function ReviewForm({ token, clientName, projectTitle, projectThumbnail }
         setStale(true);
         setResult({
           status: "error",
-          message: "This page may be out of date. Refresh the page and try again.",
+          message: r.stale,
         });
         return;
       }
@@ -78,7 +81,7 @@ export function ReviewForm({ token, clientName, projectTitle, projectThumbnail }
     } catch {
       setResult({
         status: "error",
-        message: "Couldn't reach the server. Check your connection and try again.",
+        message: r.network,
       });
     }
   };
@@ -87,9 +90,9 @@ export function ReviewForm({ token, clientName, projectTitle, projectThumbnail }
     return (
       <div role="status" className="glass rounded-panel p-8 text-center sm:p-12">
         <CheckCircle2 aria-hidden className="mx-auto size-10 text-accent" />
-        <h2 className="text-title mt-5">Thanks for your review.</h2>
+        <h2 className="text-title mt-5">{r.thanks}</h2>
         <p className="mx-auto mt-3 max-w-md text-muted">
-          It has been submitted and will appear on the website after approval.
+          {r.thanksBody}
         </p>
       </div>
     );
@@ -98,7 +101,7 @@ export function ReviewForm({ token, clientName, projectTitle, projectThumbnail }
   if (result?.status === "invalid-link") {
     return (
       <div role="alert" className="glass rounded-panel p-8 text-center sm:p-12">
-        <p className="text-lg">{INVALID_REVIEW_LINK_MESSAGE}</p>
+        <p className="text-lg">{r.invalidLink}</p>
       </div>
     );
   }
@@ -125,7 +128,7 @@ export function ReviewForm({ token, clientName, projectTitle, projectThumbnail }
             />
           )}
           <p className="text-sm">
-            <span className="block text-muted">Your project</span>
+            <span className="block text-muted">{r.yourProject}</span>
             <span className="font-medium">{projectTitle}</span>
           </p>
         </div>
@@ -134,7 +137,7 @@ export function ReviewForm({ token, clientName, projectTitle, projectThumbnail }
       <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
         <div>
           <label htmlFor="name" className="mb-2 block text-sm font-medium">
-            Name
+            {r.name}
           </label>
           <input
             id="name"
@@ -153,7 +156,7 @@ export function ReviewForm({ token, clientName, projectTitle, projectThumbnail }
         </div>
         <div>
           <label htmlFor="company" className="mb-2 block text-sm font-medium">
-            Company <span className="font-normal text-subtle">(optional)</span>
+            {r.company} <span className="font-normal text-subtle">{r.optional}</span>
           </label>
           <input
             id="company"
@@ -165,13 +168,13 @@ export function ReviewForm({ token, clientName, projectTitle, projectThumbnail }
         </div>
         <div className="sm:col-span-2">
           <label htmlFor="role" className="mb-2 block text-sm font-medium">
-            Role <span className="font-normal text-subtle">(optional)</span>
+            {r.role} <span className="font-normal text-subtle">{r.optional}</span>
           </label>
           <input
             id="role"
             type="text"
             autoComplete="organization-title"
-            placeholder="e.g. Founder"
+            placeholder={r.rolePlaceholder}
             className={cn(inputClass, "h-12")}
             {...register("role")}
           />
@@ -188,13 +191,13 @@ export function ReviewForm({ token, clientName, projectTitle, projectThumbnail }
 
         <div className="sm:col-span-2">
           <label htmlFor="review" className="mb-2 block text-sm font-medium">
-            Your review
+            {r.yourReview}
           </label>
           <textarea
             id="review"
             rows={7}
             maxLength={4000}
-            placeholder="How did the project go?"
+            placeholder={r.reviewPlaceholder}
             aria-invalid={Boolean(errors.review)}
             aria-describedby={errors.review ? "review-error" : "review-count"}
             className={cn(inputClass, "resize-y py-3.5")}
@@ -218,7 +221,7 @@ export function ReviewForm({ token, clientName, projectTitle, projectThumbnail }
       {/* Honeypot: hidden from people, tempting for bots. */}
       <div aria-hidden className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
         <label>
-          Website
+          {r.website}
           <input type="text" tabIndex={-1} autoComplete="off" {...register("website")} />
         </label>
       </div>
@@ -236,7 +239,7 @@ export function ReviewForm({ token, clientName, projectTitle, projectThumbnail }
                   onClick={() => window.location.reload()}
                   className="text-accent underline underline-offset-4"
                 >
-                  Refresh page
+                  {dict.common.refreshPage}
                 </button>
               </>
             )}
@@ -246,7 +249,7 @@ export function ReviewForm({ token, clientName, projectTitle, projectThumbnail }
 
       <Button type="submit" size="lg" icon="arrow" disabled={isSubmitting} className="mt-8 w-full sm:w-auto">
         {isSubmitting && <Loader2 aria-hidden className="size-4 animate-spin" />}
-        {isSubmitting ? "Sending…" : "Submit review"}
+        {isSubmitting ? r.sending : r.submit}
       </Button>
     </form>
   );

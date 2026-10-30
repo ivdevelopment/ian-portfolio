@@ -2,6 +2,8 @@
 
 import { useId, useRef } from "react";
 import { Star } from "lucide-react";
+import { useDictionary } from "@/i18n/context";
+import { fmt } from "@/i18n/dictionaries";
 import { cn } from "@/lib/utils";
 
 type RatingInputProps = {
@@ -17,7 +19,9 @@ type RatingInputProps = {
  * group, arrow keys change the value, and the current choice is also stated
  * in text ("4 of 5 stars"), so it never relies on colour alone.
  */
-export function RatingInput({ value, onChange, label = "Rating", error, errorId }: RatingInputProps) {
+export function RatingInput({ value, onChange, label, error, errorId }: RatingInputProps) {
+  const dict = useDictionary();
+  const heading = label ?? dict.review.rating;
   const labelId = useId();
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
 
@@ -30,7 +34,7 @@ export function RatingInput({ value, onChange, label = "Rating", error, errorId 
   return (
     <div>
       <p id={labelId} className="mb-2.5 text-sm font-medium">
-        {label}
+        {heading}
       </p>
       <div
         role="radiogroup"
@@ -51,7 +55,7 @@ export function RatingInput({ value, onChange, label = "Rating", error, errorId 
               type="button"
               role="radio"
               aria-checked={checked}
-              aria-label={`${n} ${n === 1 ? "star" : "stars"}`}
+              aria-label={n === 1 ? dict.review.starOne : fmt(dict.review.starMany, { n })}
               tabIndex={tabbable ? 0 : -1}
               onClick={() => select(n)}
               onKeyDown={(e) => {
@@ -82,7 +86,7 @@ export function RatingInput({ value, onChange, label = "Rating", error, errorId 
           );
         })}
         <span aria-live="polite" className="ml-3 text-sm text-muted tabular-nums">
-          {value ? `${value} of 5 stars` : "Not rated yet"}
+          {value ? fmt(dict.reviews.ofFive, { value }) : dict.reviews.notRated}
         </span>
       </div>
       {error && (

@@ -1,3 +1,6 @@
+import type { Locale } from "@/i18n/config";
+import { dutchDescriptor } from "@/i18n/known-dutch";
+import { translationFor } from "@/i18n/localize-content";
 import type { Database } from "@/types/database";
 import type { Project, ProjectMedia } from "@/types/project";
 
@@ -42,7 +45,14 @@ export function mediaRowToMedia(row: MediaRow): ProjectMedia | null {
   };
 }
 
-export function rowToProject(row: ProjectRow): Project {
+/**
+ * Maps a database row to a Project. The stored columns are the English copy;
+ * for another language the saved translation is applied on top, field by field
+ * (an empty field falls back to English). Brand and product names are kept as
+ * saved, descriptions are never machine-translated, and only short, known
+ * descriptors (category, subtitle, tags) get a built-in Dutch rendering.
+ */
+export function rowToProject(row: ProjectRow, locale: Locale = "en"): Project {
   const media = [...(row.project_media ?? [])].sort((a, b) => a.sort_order - b.sort_order);
   const gallery = media.map(mediaRowToMedia).filter((m): m is ProjectMedia => m !== null);
   const features = [...(row.project_features ?? [])].sort((a, b) => a.sort_order - b.sort_order);
@@ -51,18 +61,27 @@ export function rowToProject(row: ProjectRow): Project {
   const thumbnail = resolveMediaUrl(row.thumbnail_path) ?? firstStill?.src ?? PLACEHOLDER_THUMBNAIL;
   const heroSource = gallery.find((m) => m.src === thumbnail && m.type !== "video") ?? firstStill;
 
+  const nl = locale === "nl" ? (translationFor(row.translations, "nl") as Partial<Record<string, unknown>> | undefined) : undefined;
+  const pick = (value: unknown): string | undefined =>
+    typeof value === "string" && value.trim() !== "" ? value : undefined;
+  const baseFeatures = features.map((f) => f.label);
+  const nlFeatures = Array.isArray(nl?.features)
+    ? (nl.features as unknown[]).filter((f): f is string => typeof f === "string" && f.trim() !== "")
+    : [];
+
   return {
     id: row.id,
     slug: row.slug,
-    title: row.title,
-    subtitle: row.subtitle ?? undefined,
-    shortDescription: row.short_description,
-    description: row.description ?? undefined,
-    category: row.category,
+    title: pick(nl?.title) ?? row.title,
+    subtitle:
+      pick(nl?.subtitle) ?? (row.subtitle ? (locale === "nl" ? dutchDescriptor(row.subtitle) : row.subtitle) : undefined),
+    shortDescription: pick(nl?.shortDescription) ?? row.short_description,
+    description: pick(nl?.description) ?? row.description ?? undefined,
+    category: pick(nl?.category) ?? (locale === "nl" ? dutchDescriptor(row.category) : row.category),
     kind: row.kind,
-    tags: row.tags,
+    tags: locale === "nl" ? row.tags.map(dutchDescriptor) : row.tags,
     technologies: row.technologies,
-    keyFeatures: features.map((f) => f.label),
+    keyFeatures: nlFeatures.length > 0 ? nlFeatures : baseFeatures,
     year: row.year ?? undefined,
     client: row.client ?? undefined,
     projectType: row.project_type ?? undefined,

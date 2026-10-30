@@ -10,7 +10,7 @@ import {
   setFeaturedAction,
   setPublishedAction,
   type ActionResult,
-} from "@/app/admin/(panel)/projects/actions";
+} from "@/app/(admin)/admin/(panel)/projects/actions";
 import { cn } from "@/lib/utils";
 import { ConfirmDialog } from "./confirm-dialog";
 

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { saveReviewAction } from "@/app/admin/(panel)/reviews/actions";
+import { saveReviewAction } from "@/app/(admin)/admin/(panel)/reviews/actions";
 import { AVATAR_MAX_BYTES, reviewAvatarPath } from "@/lib/media-rules";
 import {
   REVIEW_STATUSES,

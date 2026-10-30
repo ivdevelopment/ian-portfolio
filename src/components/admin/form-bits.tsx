@@ -1,11 +1,22 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { createContext, useContext, useState } from "react";
 import type { FieldErrors, FieldPath, FieldValues, UseFormReturn } from "react-hook-form";
 import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+
+/**
+ * Set while editing a translation (e.g. Dutch). Text fields stay editable;
+ * "shared" fields (links, images, numbers, email) are shown read-only because
+ * they are taken from the English/base content for every language.
+ */
+const TranslatingContext = createContext(false);
+export const TranslatingProvider = TranslatingContext.Provider;
+export const useTranslating = () => useContext(TranslatingContext);
+
+export const SHARED_HINT = "Shared by every language — change it on the English tab.";
 
 export type SaveStatus =
   | { kind: "idle" }
@@ -152,7 +163,10 @@ export function TextField({
   className,
   type = "text",
   placeholder,
+  shared,
 }: {
+  /** Shared between languages: read-only while translating. */
+  shared?: boolean;
   name: string;
   label: string;
   hint?: string;
@@ -164,22 +178,26 @@ export function TextField({
   placeholder?: string;
 }) {
   const { register, formState } = useFormContext();
+  const translating = useTranslating();
+  const locked = Boolean(shared && translating);
   const id = name.replace(/\./g, "-");
   const error = errorAt(formState.errors, name);
   const common = {
     id,
     maxLength,
     placeholder,
+    readOnly: locked,
+    tabIndex: locked ? -1 : undefined,
     "aria-invalid": Boolean(error),
     "aria-describedby": error ? `${id}-error` : undefined,
     ...register(name),
   };
   return (
-    <Field id={id} label={label} hint={hint} error={error} className={className}>
+    <Field id={id} label={label} hint={locked ? SHARED_HINT : hint} error={error} className={className}>
       {multiline ? (
-        <textarea rows={rows} className={cn(adminInput, "py-2")} {...common} />
+        <textarea rows={rows} className={cn(adminInput, "py-2", locked && "opacity-60")} {...common} />
       ) : (
-        <input type={type} className={cn(adminInput, "h-10")} {...common} />
+        <input type={type} className={cn(adminInput, "h-10", locked && "opacity-60")} {...common} />
       )}
     </Field>
   );
@@ -188,6 +206,7 @@ export function TextField({
 /** Ordered list of {value, label, enabled} stats (array position = sort order). */
 export function StatsFields({ name }: { name: string }) {
   const { control, register, formState } = useFormContext();
+  const translating = useTranslating();
   const { fields, append, remove, move } = useFieldArray({ control, name });
 
   return (
@@ -202,7 +221,7 @@ export function StatsFields({ name }: { name: string }) {
               <div className="grid gap-3 sm:grid-cols-[8rem_1fr]">
                 <div>
                   <label htmlFor={`${name}-${i}-value`} className="mb-1.5 block text-xs font-medium text-muted">Value</label>
-                  <input id={`${name}-${i}-value`} maxLength={20} placeholder="12+" aria-invalid={Boolean(valueError)} className={cn(adminInput, "h-9")} {...register(`${name}.${i}.value`)} />
+                  <input id={`${name}-${i}-value`} maxLength={20} placeholder="12+" aria-invalid={Boolean(valueError)} readOnly={translating} className={cn(adminInput, "h-9", translating && "opacity-60")} {...register(`${name}.${i}.value`)} />
                   {valueError && <p role="alert" className="mt-1 text-xs text-danger">{valueError}</p>}
                 </div>
                 <div>
@@ -211,6 +230,7 @@ export function StatsFields({ name }: { name: string }) {
                   {labelError && <p role="alert" className="mt-1 text-xs text-danger">{labelError}</p>}
                 </div>
               </div>
+              {!translating && (
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <label className="mr-auto flex items-center gap-2 text-sm">
                   <input type="checkbox" className="size-4 accent-[var(--color-accent-strong)]" {...register(`${name}.${i}.enabled`)} />
@@ -226,13 +246,16 @@ export function StatsFields({ name }: { name: string }) {
                   <Trash2 aria-hidden className="size-3.5" />
                 </button>
               </div>
+              )}
             </li>
           );
         })}
       </ul>
-      <Button size="sm" variant="secondary" className="mt-3" disabled={fields.length >= 6} onClick={() => append({ value: "", label: "", enabled: true })}>
-        <Plus aria-hidden className="size-4" /> Add stat
-      </Button>
+      {!translating && (
+        <Button size="sm" variant="secondary" className="mt-3" disabled={fields.length >= 6} onClick={() => append({ value: "", label: "", enabled: true })}>
+          <Plus aria-hidden className="size-4" /> Add stat
+        </Button>
+      )}
     </div>
   );
 }

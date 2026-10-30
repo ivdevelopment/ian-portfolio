@@ -6,6 +6,8 @@ import { motion } from "motion/react";
 import { ExternalLink, Loader2, Play } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import type { Project, ProjectMedia } from "@/types/project";
+import { useDictionary } from "@/i18n/context";
+import { fmt } from "@/i18n/dictionaries";
 import { cn } from "@/lib/utils";
 import { DeviceFrame } from "@/components/ui/device-frame";
 import { ProjectMediaView } from "@/components/ui/project-media";
@@ -26,6 +28,8 @@ export function ProjectPreview({
   /** The live site refuses to be framed (checked server-side): show the gallery and a link instead. */
   embedBlocked?: boolean;
 }) {
+  const dict = useDictionary();
+  const t = dict.project.preview;
   const items: ProjectMedia[] =
     project.gallery.length > 0
       ? project.gallery
@@ -33,7 +37,7 @@ export function ProjectPreview({
           project.heroMedia ?? {
             type: "image",
             src: project.thumbnail,
-            alt: `${project.title} preview`,
+            alt: fmt(t.mediaAlt, { title: project.title }),
           },
         ];
 
@@ -67,7 +71,7 @@ export function ProjectPreview({
       {canEmbed && (
         <div
           role="group"
-          aria-label="Preview type"
+          aria-label={t.type}
           className="mb-4 inline-flex rounded-full border border-line p-1 text-sm"
         >
           {(["live", "media"] as const).map((v) => (
@@ -81,7 +85,7 @@ export function ProjectPreview({
                 view === v ? "bg-accent-soft text-ink" : "text-muted hover:text-ink",
               )}
             >
-              {v === "live" ? "Live site" : "Screenshots"}
+              {v === "live" ? t.live : t.screenshots}
             </button>
           ))}
         </div>
@@ -92,7 +96,7 @@ export function ProjectPreview({
           <>
             <iframe
               src={embedUrl}
-              title={`${project.title} live preview`}
+              title={fmt(t.iframeTitle, { title: project.title })}
               loading="lazy"
               // No top navigation or downloads; scripts and forms only so the site is usable.
               sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
@@ -108,15 +112,15 @@ export function ProjectPreview({
                 {frameState === "loading" ? (
                   <>
                     <Loader2 aria-hidden className="size-6 animate-spin text-accent" />
-                    <p className="text-sm text-muted">Loading live site…</p>
+                    <p className="text-sm text-muted">{t.loading}</p>
                   </>
                 ) : (
                   <>
                     <p className="text-sm text-muted">
-                      This site is taking a while, or doesn&apos;t allow embedding.
+                      {t.slow}
                     </p>
                     <ButtonLink href={embedUrl!} external size="sm" variant="secondary">
-                      Open in a new tab
+                      {t.openNewTab}
                     </ButtonLink>
                   </>
                 )}
@@ -144,31 +148,31 @@ export function ProjectPreview({
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-glass p-4">
           <p className="text-sm text-muted">
             {embedBlocked
-              ? "This website doesn't allow itself to be previewed inside other pages. It's best experienced on its own site."
-              : "This project is best experienced on its own website."}
+              ? t.blocked
+              : t.bestOwn}
           </p>
           <ButtonLink href={externalUrl} external size="sm">
-            Visit live site
+            {t.visitLive}
           </ButtonLink>
         </div>
       )}
 
       {showingFrame && (
         <p className="mt-3 flex flex-wrap items-center gap-x-3 text-sm text-subtle">
-          Some websites block embedding.
+          {t.someBlock}
           <a
             href={embedUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-muted underline-offset-4 hover:text-ink hover:underline"
           >
-            Open in a new tab <ExternalLink aria-hidden className="size-3.5" />
+            {t.openNewTab} <ExternalLink aria-hidden className="size-3.5" />
           </a>
         </p>
       )}
 
       {items.length > 1 && (
-        <ul className="mt-5 grid grid-cols-4 gap-2 sm:gap-3" aria-label="Gallery">
+        <ul className="mt-5 grid grid-cols-4 gap-2 sm:gap-3" aria-label={t.gallery}>
           {items.map((media, i) => (
             <li key={`${media.src}-${i}`}>
               <button
@@ -177,7 +181,7 @@ export function ProjectPreview({
                   setIndex(i);
                   setView("media");
                 }}
-                aria-label={`Show ${media.type} ${i + 1} of ${items.length}${media.alt ? `: ${media.alt}` : ""}`}
+                aria-label={`${fmt(t.showItem, { type: t.mediaTypes[media.type], n: i + 1, total: items.length })}${media.alt ? `: ${media.alt}` : ""}`}
                 aria-current={view === "media" && i === index}
                 className={cn(
                   "group relative block aspect-[16/10] w-full overflow-hidden rounded-md border bg-surface transition-[border-color,opacity] duration-300",

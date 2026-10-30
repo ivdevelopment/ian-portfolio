@@ -1,7 +1,10 @@
-import Link from "next/link";
+"use client";
+
 import { ArrowUpRight } from "lucide-react";
 import type { Project } from "@/types/project";
 import { ProjectMediaView } from "@/components/ui/project-media";
+import { useDictionary } from "@/i18n/context";
+import { LocaleLink } from "@/i18n/locale-link";
 import { projectBadges } from "@/lib/project-labels";
 import { cn } from "@/lib/utils";
 
@@ -22,7 +25,8 @@ export function ProjectCard({
   priority,
   className,
 }: ProjectCardProps) {
-  const badges = projectBadges(project);
+  const dict = useDictionary();
+  const badges = projectBadges(project, dict);
   return (
     <article className={cn("group relative", className)}>
       <div className="relative aspect-[16/10] overflow-hidden rounded-card border border-line bg-surface shadow-card transition-[border-color,box-shadow,transform] duration-500 ease-out-soft group-hover:-translate-y-1 group-hover:border-line-strong group-hover:shadow-lift">
@@ -35,7 +39,7 @@ export function ProjectCard({
         {(badges.length > 0 || (highlightFeatured && project.featured)) && (
           <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
             {highlightFeatured && project.featured && (
-              <span className="glass rounded-full px-2.5 py-1 text-xs text-ink">Featured</span>
+              <span className="glass rounded-full px-2.5 py-1 text-xs text-ink">{dict.project.badges.featured}</span>
             )}
             {badges.map((badge) => (
               <span key={badge} className="glass rounded-full px-2.5 py-1 text-xs text-ink">
@@ -54,12 +58,12 @@ export function ProjectCard({
 
       <div className="mt-4">
         <h3 className="text-lg font-medium tracking-tight">
-          <Link
+          <LocaleLink
             href={`/work/${project.slug}`}
             className="after:absolute after:inset-0 after:content-['']"
           >
             {project.title}
-          </Link>
+          </LocaleLink>
         </h3>
         <p className="mt-0.5 text-sm text-muted">{project.tags.join(" · ")}</p>
         <p className="mt-2 line-clamp-2 text-[0.95rem] text-subtle">

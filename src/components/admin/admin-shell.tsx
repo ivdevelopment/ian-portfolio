@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { LogOut } from "lucide-react";
 import { siteConfig } from "@/config/site";
-import { signOutAction } from "@/app/admin/login/actions";
+import { signOutAction } from "@/app/(admin)/admin/login/actions";
 import { AdminNav } from "./admin-nav";
 
 /** Chrome for the signed-in admin area: sidebar, account and sign-out. */

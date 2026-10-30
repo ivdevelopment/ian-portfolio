@@ -1,4 +1,6 @@
-import Link from "next/link";
+"use client";
+
+import { LocaleLink } from "@/i18n/locale-link";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -86,10 +88,10 @@ export function ButtonLink({
   }
 
   return (
-    <Link href={href} className={classes} onClick={onClick}>
+    <LocaleLink href={href} className={classes} onClick={onClick}>
       {children}
       <Icon kind={iconKind} />
-    </Link>
+    </LocaleLink>
   );
 }
 

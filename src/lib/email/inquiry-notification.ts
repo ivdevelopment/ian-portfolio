@@ -1,5 +1,8 @@
 import "server-only";
 
+import type { Locale } from "@/i18n/config";
+import { formatBudgetLabel } from "@/i18n/format";
+import { getDictionary } from "@/i18n/dictionaries";
 import { getMailer, type MailMessage, type MailTransport } from "./mailer";
 
 /** The already-validated inquiry (output of `inquirySchema`). */
@@ -9,6 +12,8 @@ export type NotifiableInquiry = {
   projectType: string;
   budget: string;
   message: string;
+  /** The language of the page the visitor used (informational). */
+  locale?: Locale;
 };
 
 const SENDER_NAME = "Ian Verlinden Website";
@@ -36,45 +41,53 @@ export function buildInquiryEmail(
   inquiry: NotifiableInquiry,
   opts: { from: string; to: string; siteUrl: string; submittedAt: Date },
 ): MailMessage {
-  const submitted = opts.submittedAt.toLocaleString("en-GB", {
+  // The mailbox is Dutch: the owner reads Dutch labels regardless of the visitor's language.
+  // Stored enum values (database) are unchanged; only their display is localized here.
+  const dict = getDictionary("nl").contact;
+  const projectType = dict.projectTypes[inquiry.projectType as keyof typeof dict.projectTypes] ?? inquiry.projectType;
+  const budget = formatBudgetLabel("nl", inquiry.budget);
+  const language = inquiry.locale === "en" ? "English" : "Nederlands";
+  const submitted = new Intl.DateTimeFormat("nl-BE", {
     dateStyle: "full",
     timeStyle: "short",
     timeZone: "Europe/Brussels",
-  });
+  }).format(opts.submittedAt);
   const adminUrl = adminInquiriesUrl(opts.siteUrl);
 
   const text = [
-    "New project request",
+    "Nieuwe projectaanvraag",
     "",
-    `Name: ${inquiry.name}`,
-    `Email: ${inquiry.email}`,
-    `Project type: ${inquiry.projectType}`,
-    `Budget: ${inquiry.budget}`,
+    `Naam: ${inquiry.name}`,
+    `E-mail: ${inquiry.email}`,
+    `Soort project: ${projectType}`,
+    `Budget: ${budget}`,
+    `Taal van de website: ${language}`,
     "",
-    "Message:",
+    "Bericht:",
     inquiry.message,
     "",
-    `Submitted: ${submitted} (Brussels time)`,
+    `Verstuurd: ${submitted}`,
     "",
-    `View in admin: ${adminUrl}`,
+    `Bekijk in de admin: ${adminUrl}`,
   ].join("\n");
 
   const row = (label: string, value: string) =>
     `<tr><td style="padding:4px 16px 4px 0;color:#666;vertical-align:top">${label}</td><td style="padding:4px 0">${escapeHtml(value)}</td></tr>`;
 
   const html = `<!doctype html><html><body style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#111;line-height:1.5">
-<h2 style="margin:0 0 16px">New project request</h2>
+<h2 style="margin:0 0 16px">Nieuwe projectaanvraag</h2>
 <table style="border-collapse:collapse">
-${row("Name", inquiry.name)}
-${row("Email", inquiry.email)}
-${row("Project type", inquiry.projectType)}
-${row("Budget", inquiry.budget)}
+${row("Naam", inquiry.name)}
+${row("E-mail", inquiry.email)}
+${row("Soort project", projectType)}
+${row("Budget", budget)}
+${row("Taal van de website", language)}
 </table>
-<p style="margin:20px 0 6px;color:#666">Message</p>
+<p style="margin:20px 0 6px;color:#666">Bericht</p>
 <div style="white-space:pre-wrap;border-left:3px solid #ddd;padding:2px 0 2px 12px">${escapeHtml(inquiry.message)}</div>
-<p style="margin:20px 0 6px;color:#666">Submitted</p>
-<p style="margin:0">${escapeHtml(submitted)} (Brussels time)</p>
-<p style="margin:20px 0 0"><a href="${escapeHtml(adminUrl)}">View in admin</a></p>
+<p style="margin:20px 0 6px;color:#666">Verstuurd</p>
+<p style="margin:0">${escapeHtml(submitted)}</p>
+<p style="margin:20px 0 0"><a href="${escapeHtml(adminUrl)}">Bekijk in de admin</a></p>
 </body></html>`;
 
   return {
@@ -82,7 +95,7 @@ ${row("Budget", inquiry.budget)}
     to: opts.to,
     // Replies go straight to the lead. The SMTP sender is never the visitor's address.
     replyTo: { name: headerSafe(inquiry.name, 80), address: inquiry.email },
-    subject: `New project request — ${headerSafe(inquiry.projectType, 60)}`,
+    subject: `Nieuwe projectaanvraag — ${headerSafe(projectType, 60)}`,
     text,
     html,
   };

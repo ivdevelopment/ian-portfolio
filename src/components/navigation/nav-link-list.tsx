@@ -1,23 +1,30 @@
-import Link from "next/link";
+import type { Locale } from "@/i18n/config";
+import { getDictionary } from "@/i18n/dictionaries";
+import { LocaleLink } from "@/i18n/locale-link";
+import { stripLocale } from "@/i18n/paths";
 import { siteConfig } from "@/config/site";
 import { cn } from "@/lib/utils";
 
 /**
  * Presentational list of primary links. Rendered on the server as the
  * Suspense fallback and by the client-side active-link wrapper.
+ * `pathname` is the visible URL path; the locale prefix is ignored when matching.
  */
-export function NavLinkList({ pathname }: { pathname?: string }) {
+export function NavLinkList({ pathname, locale }: { pathname?: string; locale: Locale }) {
+  const dict = getDictionary(locale);
+  const current = pathname === undefined ? undefined : stripLocale(pathname).path;
+
   return (
     <ul className="flex items-center gap-1">
       {siteConfig.nav.map((item) => {
         const active =
-          pathname !== undefined &&
+          current !== undefined &&
           (item.href === "/"
-            ? pathname === "/"
-            : pathname === item.href || pathname.startsWith(`${item.href}/`));
+            ? current === "/"
+            : current === item.href || current.startsWith(`${item.href}/`));
         return (
           <li key={item.href}>
-            <Link
+            <LocaleLink
               href={item.href}
               aria-current={active ? "page" : undefined}
               className={cn(
@@ -25,7 +32,7 @@ export function NavLinkList({ pathname }: { pathname?: string }) {
                 active ? "text-ink" : "text-muted hover:text-ink",
               )}
             >
-              {item.label}
+              {dict.nav[item.key]}
               <span
                 aria-hidden
                 className={cn(
@@ -33,7 +40,7 @@ export function NavLinkList({ pathname }: { pathname?: string }) {
                   active ? "scale-x-100" : "scale-x-0",
                 )}
               />
-            </Link>
+            </LocaleLink>
           </li>
         );
       })}

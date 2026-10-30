@@ -1,8 +1,8 @@
 import { Star } from "lucide-react";
 
-export function Stars({ rating, max = 5 }: { rating: number; max?: number }) {
+export function Stars({ rating, max = 5, label }: { rating: number; max?: number; label: string }) {
   return (
-    <div role="img" aria-label={`${rating} out of ${max} stars`} className="flex gap-0.5">
+    <div role="img" aria-label={label} className="flex gap-0.5">
       {Array.from({ length: max }, (_, i) => (
         <Star
           key={i}

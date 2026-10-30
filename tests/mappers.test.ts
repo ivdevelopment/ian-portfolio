@@ -27,6 +27,7 @@ function row(overrides: Partial<ProjectRow> = {}): ProjectRow {
     published: true,
     is_example: false,
     sort_order: 0,
+    translations: {},
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-02T00:00:00Z",
     published_at: "2026-01-01T00:00:00Z",
@@ -62,6 +63,7 @@ describe("rowToProject", () => {
     alt: null,
     poster_path: null,
     sort_order: sort,
+    translations: {},
     created_at: "2026-01-01T00:00:00Z",
     ...extra,
   });

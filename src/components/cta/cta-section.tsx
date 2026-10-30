@@ -1,12 +1,15 @@
 import Image from "next/image";
 import { resolveMediaUrl } from "@/lib/cms/mappers";
+import type { Locale } from "@/i18n/config";
+import { getLocale } from "@/i18n/server";
 import { getHomeContent } from "@/lib/site-content";
 import { ButtonLink } from "@/components/ui/button";
 import { Reveal } from "@/components/ui/reveal";
 
 /** Closing call to action, shared by several pages. Content: /admin/pages/home. */
-export async function CtaSection() {
-  const { cta } = await getHomeContent();
+export async function CtaSection({ locale: given }: { locale?: Locale } = {}) {
+  const locale = given ?? (await getLocale());
+  const { cta } = await getHomeContent(locale);
   const image = resolveMediaUrl(cta.image.src);
 
   return (

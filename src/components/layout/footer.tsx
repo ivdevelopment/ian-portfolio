@@ -1,9 +1,12 @@
-import Link from "next/link";
 import { siteConfig } from "@/config/site";
+import { fmt } from "@/i18n/dictionaries";
+import { LocaleLink } from "@/i18n/locale-link";
+import { getI18n } from "@/i18n/server";
 import { getSiteSettings } from "@/lib/site-content";
 
 export async function Footer() {
-  const s = await getSiteSettings();
+  const { locale, dict } = await getI18n();
+  const s = await getSiteSettings(locale);
   const socials = [
     { label: "GitHub", href: s.githubUrl },
     { label: "LinkedIn", href: s.linkedinUrl },
@@ -17,30 +20,30 @@ export async function Footer() {
         <div>
           <p className="text-xl font-medium tracking-tight">{s.displayName}</p>
           <p className="mt-3 max-w-sm text-muted">
-            Web design and development for ambitious brands{s.location ? `, from ${s.location}` : ""}.
+            {s.location ? fmt(dict.footer.taglineFrom, { location: s.location }) : dict.footer.tagline}
           </p>
         </div>
 
-        <nav aria-label="Footer">
-          <p className="text-xs font-medium tracking-[0.18em] text-subtle uppercase">Explore</p>
+        <nav aria-label={dict.nav.footer}>
+          <p className="text-xs font-medium tracking-[0.18em] text-subtle uppercase">{dict.footer.explore}</p>
           <ul className="mt-4 space-y-2.5">
             {siteConfig.nav.map((item) => (
               <li key={item.href}>
-                <Link href={item.href} className="text-muted transition-colors hover:text-ink">
-                  {item.label}
-                </Link>
+                <LocaleLink href={item.href} className="text-muted transition-colors hover:text-ink">
+                  {dict.nav[item.key]}
+                </LocaleLink>
               </li>
             ))}
             <li>
-              <Link href="/reviews" className="text-muted transition-colors hover:text-ink">
-                Reviews
-              </Link>
+              <LocaleLink href="/reviews" className="text-muted transition-colors hover:text-ink">
+                {dict.nav.reviews}
+              </LocaleLink>
             </li>
           </ul>
         </nav>
 
         <div>
-          <p className="text-xs font-medium tracking-[0.18em] text-subtle uppercase">Get in touch</p>
+          <p className="text-xs font-medium tracking-[0.18em] text-subtle uppercase">{dict.footer.getInTouch}</p>
           <ul className="mt-4 space-y-2.5 text-muted">
             {s.contactEmail && (
               <li>
@@ -68,10 +71,8 @@ export async function Footer() {
 
       <div className="border-t border-line">
         <div className="container-page flex flex-col gap-2 py-6 text-sm text-subtle sm:flex-row sm:justify-between">
-          <p>
-            © {siteConfig.copyrightYear} {s.displayName}. All rights reserved.
-          </p>
-          <p>Designed and built with Next.js.</p>
+          <p>{fmt(dict.footer.rights, { year: siteConfig.copyrightYear, name: s.displayName })}</p>
+          <p>{dict.footer.builtWith}</p>
         </div>
       </div>
     </footer>

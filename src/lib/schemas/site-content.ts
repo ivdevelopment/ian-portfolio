@@ -170,6 +170,17 @@ export const servicesListSchema = z
   });
 export type ServiceItem = z.infer<typeof serviceItemSchema>;
 
+/** Dutch text for one service. Shared fields (slug, icon, enabled) are never part of a translation. */
+export const serviceTranslationSchema = z.object({
+  id: z.uuid(),
+  title: short(80),
+  description: short(300),
+  /** One item per line; matched to the English list by position. */
+  includesText: z.string().max(2000),
+});
+export const servicesTranslationSchema = z.array(serviceTranslationSchema).max(12);
+export type ServiceTranslationDraft = z.infer<typeof serviceTranslationSchema>;
+
 export const skillItemSchema = z.object({
   id: z.uuid(),
   name: required(60),

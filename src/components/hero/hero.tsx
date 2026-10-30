@@ -1,11 +1,13 @@
 import Image from "next/image";
 import { resolveMediaUrl } from "@/lib/cms/mappers";
+import { getLocale } from "@/i18n/server";
 import { getHomeContent } from "@/lib/site-content";
 import { ButtonLink } from "@/components/ui/button";
 import { Reveal } from "@/components/ui/reveal";
 
 export async function Hero() {
-  const { hero } = await getHomeContent();
+  const locale = await getLocale();
+  const { hero } = await getHomeContent(locale);
   const imageSrc = resolveMediaUrl(hero.image.src);
 
   return (

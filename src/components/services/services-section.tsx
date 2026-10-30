@@ -1,12 +1,14 @@
-import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
+import { getLocale } from "@/i18n/server";
+import { LocaleLink } from "@/i18n/locale-link";
 import { getHomeContent, getServices } from "@/lib/site-content";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { Reveal } from "@/components/ui/reveal";
 import { ServiceIconBadge } from "./service-icon";
 
 export async function ServicesSection() {
-  const [{ services: copy }, services] = await Promise.all([getHomeContent(), getServices()]);
+  const locale = await getLocale();
+  const [{ services: copy }, services] = await Promise.all([getHomeContent(locale), getServices(locale)]);
   if (services.length === 0) return null;
 
   return (
@@ -30,7 +32,7 @@ export async function ServicesSection() {
         <ul className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {services.map((service, i) => (
             <Reveal as="li" key={service.id} delay={i * 0.07}>
-              <Link
+              <LocaleLink
                 href={`/services#${service.slug}`}
                 className="glass group flex h-full min-h-56 flex-col rounded-card p-6 transition-[transform,border-color,background-color] duration-500 ease-out-soft hover:-translate-y-1 hover:border-line-strong hover:bg-glass-strong"
               >
@@ -41,7 +43,7 @@ export async function ServicesSection() {
                   aria-hidden
                   className="mt-auto ml-auto size-5 pt-0 text-subtle transition-[transform,color] duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-accent"
                 />
-              </Link>
+              </LocaleLink>
             </Reveal>
           ))}
         </ul>

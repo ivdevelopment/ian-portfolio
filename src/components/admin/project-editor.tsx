@@ -18,7 +18,7 @@ import {
 import {
   deleteProjectAction,
   saveProjectAction,
-} from "@/app/admin/(panel)/projects/actions";
+} from "@/app/(admin)/admin/(panel)/projects/actions";
 import { MEDIA_BUCKET } from "@/lib/supabase/env";
 import { createBrowserSupabase } from "@/lib/supabase/browser";
 import { slugify } from "@/lib/slug";

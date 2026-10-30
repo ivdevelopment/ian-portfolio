@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Loader2 } from "lucide-react";
-import { updateInquiryStatusAction } from "@/app/admin/(panel)/inquiries/actions";
+import { updateInquiryStatusAction } from "@/app/(admin)/admin/(panel)/inquiries/actions";
 import { INQUIRY_STATUSES, type InquiryStatus } from "@/lib/schemas/inquiry";
 import { INQUIRY_STATUS_LABELS } from "./inquiry-status";
 import { adminInput } from "./ui";

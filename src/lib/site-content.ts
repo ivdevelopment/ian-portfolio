@@ -6,6 +6,8 @@ import {
   defaultHomeContent,
   defaultSiteSettings,
 } from "@/data/default-content";
+import type { Locale } from "@/i18n/config";
+import { localizeContent, localizeLocation, localizeText, translationFor } from "@/i18n/localize-content";
 import { publicEmail } from "@/lib/placeholder-email";
 import { createPublicClient } from "@/lib/supabase/public";
 import {
@@ -36,6 +38,9 @@ export const SITE_CONTENT_TAG = "site-content";
 export const SERVICES_TAG = "services";
 export const SKILLS_TAG = "skills";
 
+/** Every cached read carries its family tag AND a per-language tag, so Dutch and English expire independently. */
+export const localeTag = (tag: string, locale: Locale) => `${tag}:${locale}`;
+
 function parseOrDefault<S extends z.ZodType>(schema: S, value: unknown, fallback: z.infer<S>, label: string): z.infer<S> {
   const parsed = schema.safeParse(value);
   if (parsed.success) return parsed.data;
@@ -43,22 +48,24 @@ function parseOrDefault<S extends z.ZodType>(schema: S, value: unknown, fallback
   return fallback;
 }
 
-async function readContent(key: "home" | "about" | "contact"): Promise<unknown> {
+async function readContent(
+  key: "home" | "about" | "contact",
+): Promise<{ content: unknown; translations: unknown }> {
   const { data, error } = await createPublicClient()
     .from("site_content")
-    .select("content")
+    .select("*")
     .eq("key", key)
     .maybeSingle();
   if (error) {
     console.error(`[site-content] failed to load "${key}":`, error.message);
     throw new Error("Site content is temporarily unavailable.");
   }
-  return data?.content ?? null;
+  return { content: data?.content ?? null, translations: data?.translations ?? {} };
 }
 
-export async function getSiteSettings(): Promise<SiteSettings> {
+export async function getSiteSettings(locale: Locale): Promise<SiteSettings> {
   "use cache";
-  cacheTag(SITE_SETTINGS_TAG);
+  cacheTag(SITE_SETTINGS_TAG, localeTag(SITE_SETTINGS_TAG, locale));
   cacheLife("hours");
 
   const { data, error } = await createPublicClient().from("site_settings").select("*").maybeSingle();
@@ -66,7 +73,7 @@ export async function getSiteSettings(): Promise<SiteSettings> {
     console.error("[site-content] failed to load settings:", error.message);
     throw new Error("Site settings are temporarily unavailable.");
   }
-  if (!data) return defaultSiteSettings;
+  if (!data) return localizeContent(locale, defaultSiteSettings);
 
   const settings = parseOrDefault(
     siteSettingsSchema,
@@ -87,40 +94,56 @@ export async function getSiteSettings(): Promise<SiteSettings> {
     defaultSiteSettings,
     "site_settings",
   );
-  // Public pages never show a seeded placeholder address as contact information.
-  return { ...settings, contactEmail: publicEmail(settings.contactEmail) };
+  // Dutch: saved translation → known rendering → English. Names, links and email are never translated.
+  const nl = translationFor(data.translations, locale) as Record<string, unknown> | undefined;
+  return {
+    ...settings,
+    location: localizeLocation(locale, settings.location, nl?.location),
+    seoDefaultTitle: localizeText(locale, settings.seoDefaultTitle, nl?.seoDefaultTitle),
+    seoTitleTemplate: localizeText(locale, settings.seoTitleTemplate, nl?.seoTitleTemplate),
+    seoDefaultDescription: localizeText(locale, settings.seoDefaultDescription, nl?.seoDefaultDescription),
+    seoOgTitle: localizeText(locale, settings.seoOgTitle, nl?.seoOgTitle),
+    // Public pages never show a seeded placeholder address as contact information.
+    contactEmail: publicEmail(settings.contactEmail),
+  };
 }
 
-export async function getHomeContent(): Promise<HomeContent> {
+export async function getHomeContent(locale: Locale): Promise<HomeContent> {
   "use cache";
-  cacheTag(SITE_CONTENT_TAG);
+  cacheTag(SITE_CONTENT_TAG, localeTag(SITE_CONTENT_TAG, locale));
   cacheLife("hours");
-  return parseOrDefault(homeContentSchema, await readContent("home"), defaultHomeContent, "home");
+  const { content, translations } = await readContent("home");
+  const base = parseOrDefault(homeContentSchema, content, defaultHomeContent, "home");
+  return localizeContent(locale, base, translationFor(translations, locale));
 }
 
-export async function getAboutContent(): Promise<AboutContent> {
+export async function getAboutContent(locale: Locale): Promise<AboutContent> {
   "use cache";
-  cacheTag(SITE_CONTENT_TAG);
+  cacheTag(SITE_CONTENT_TAG, localeTag(SITE_CONTENT_TAG, locale));
   cacheLife("hours");
-  return parseOrDefault(aboutContentSchema, await readContent("about"), defaultAboutContent, "about");
+  const { content, translations } = await readContent("about");
+  const base = parseOrDefault(aboutContentSchema, content, defaultAboutContent, "about");
+  return localizeContent(locale, base, translationFor(translations, locale));
 }
 
-export async function getContactContent(): Promise<ContactContent> {
+export async function getContactContent(locale: Locale): Promise<ContactContent> {
   "use cache";
-  cacheTag(SITE_CONTENT_TAG);
+  cacheTag(SITE_CONTENT_TAG, localeTag(SITE_CONTENT_TAG, locale));
   cacheLife("hours");
-  return parseOrDefault(contactContentSchema, await readContent("contact"), defaultContactContent, "contact");
+  const { content, translations } = await readContent("contact");
+  const base = parseOrDefault(contactContentSchema, content, defaultContactContent, "contact");
+  return localizeContent(locale, base, translationFor(translations, locale));
 }
 
 /** Enabled services, in the admin's order (RLS already hides disabled ones from visitors). */
-export async function getServices(): Promise<ServiceItem[]> {
+export async function getServices(locale: Locale): Promise<ServiceItem[]> {
   "use cache";
-  cacheTag(SERVICES_TAG);
+  cacheTag(SERVICES_TAG, localeTag(SERVICES_TAG, locale));
   cacheLife("hours");
 
   const { data, error } = await createPublicClient()
     .from("services")
-    .select("id, slug, title, description, icon, includes, enabled")
+    .select("*")
     .eq("enabled", true)
     .order("sort_order", { ascending: true });
   if (error) {
@@ -128,15 +151,23 @@ export async function getServices(): Promise<ServiceItem[]> {
     throw new Error("Services are temporarily unavailable.");
   }
 
-  return data.map((s) => ({
-    id: s.id,
-    slug: s.slug,
-    title: s.title,
-    description: s.description,
-    icon: s.icon as ServiceItem["icon"],
-    includes: s.includes.map((label) => ({ label })),
-    enabled: s.enabled,
-  }));
+  return data.map((s) => {
+    const base: ServiceItem = {
+      id: s.id,
+      slug: s.slug,
+      title: s.title,
+      description: s.description,
+      icon: s.icon as ServiceItem["icon"],
+      includes: s.includes.map((label) => ({ label })),
+      enabled: s.enabled,
+    };
+    // translations.nl = { title, description, includes: ["…"] } (the includes list is matched by position).
+    const nl = translationFor(s.translations, locale) as
+      | { title?: unknown; description?: unknown; includes?: unknown }
+      | undefined;
+    const includesOverride = Array.isArray(nl?.includes) ? nl.includes.map((label) => ({ label })) : undefined;
+    return localizeContent(locale, base, { title: nl?.title, description: nl?.description, includes: includesOverride });
+  });
 }
 
 export async function getSkills(): Promise<SkillItem[]> {

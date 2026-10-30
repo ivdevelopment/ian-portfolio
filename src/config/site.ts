@@ -9,17 +9,17 @@ export const siteConfig = {
   initials: "IV",
   /** Public origin. See `resolveSiteUrl` for the resolution order. */
   url: resolveSiteUrl(process.env),
-  locale: "en_BE",
   /** Static so prerendering never depends on the current time. */
   copyrightYear: 2026,
+  /** Labels come from the dictionary (dict.nav[key]); hrefs are locale-neutral paths. */
   nav: [
-    { label: "Home", href: "/" },
-    { label: "Work", href: "/work" },
-    { label: "Services", href: "/services" },
-    { label: "About", href: "/about" },
-    { label: "Contact", href: "/contact" },
+    { key: "home", href: "/" },
+    { key: "work", href: "/work" },
+    { key: "services", href: "/services" },
+    { key: "about", href: "/about" },
+    { key: "contact", href: "/contact" },
   ],
-  cta: { label: "Start a project", href: "/contact" },
+  cta: { key: "cta", href: "/contact" },
 } as const;
 
 export type NavItem = (typeof siteConfig.nav)[number];

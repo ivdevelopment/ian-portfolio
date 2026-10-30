@@ -1,12 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { Menu, X } from "lucide-react";
 import { siteConfig } from "@/config/site";
 import { ButtonLink } from "@/components/ui/button";
+import { LanguageSwitcher } from "@/components/navigation/language-switcher";
+import { useDictionary } from "@/i18n/context";
+import { LocaleLink } from "@/i18n/locale-link";
 
 const FOCUSABLE = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -14,6 +16,7 @@ const FOCUSABLE = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1
 const subscribeNoop = () => () => {};
 
 export function MobileMenu({ email }: { email?: string }) {
+  const dict = useDictionary();
   const [open, setOpen] = useState(false);
   // False during SSR and hydration, true afterwards: portals need `document`.
   const canPortal = useSyncExternalStore(subscribeNoop, () => true, () => false);
@@ -63,7 +66,7 @@ export function MobileMenu({ email }: { email?: string }) {
       <button
         ref={triggerRef}
         type="button"
-        aria-label="Open menu"
+        aria-label={dict.nav.openMenu}
         aria-expanded={open}
         aria-haspopup="dialog"
         onClick={() => setOpen(true)}
@@ -80,7 +83,7 @@ export function MobileMenu({ email }: { email?: string }) {
                 ref={panelRef}
                 role="dialog"
                 aria-modal="true"
-                aria-label="Menu"
+                aria-label={dict.nav.menu}
                 className="fixed inset-0 z-[60] flex flex-col bg-bg/95 px-(--gutter) backdrop-blur-2xl md:hidden"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -93,7 +96,7 @@ export function MobileMenu({ email }: { email?: string }) {
                   </span>
                   <button
                     type="button"
-                    aria-label="Close menu"
+                    aria-label={dict.nav.closeMenu}
                     onClick={close}
                     className="glass inline-flex size-11 items-center justify-center rounded-full text-ink"
                   >
@@ -101,7 +104,7 @@ export function MobileMenu({ email }: { email?: string }) {
                   </button>
                 </div>
 
-                <nav aria-label="Primary" className="mt-8 flex-1">
+                <nav aria-label={dict.nav.primary} className="mt-8 flex-1">
                   <ul className="divide-y divide-line border-y border-line">
                     {siteConfig.nav.map((item, i) => (
                       <motion.li
@@ -114,16 +117,16 @@ export function MobileMenu({ email }: { email?: string }) {
                           ease: [0.22, 1, 0.36, 1],
                         }}
                       >
-                        <Link
+                        <LocaleLink
                           href={item.href}
                           onClick={() => setOpen(false)}
                           className="flex items-center justify-between py-5 text-3xl font-medium tracking-tight text-ink"
                         >
-                          {item.label}
+                          {dict.nav[item.key]}
                           <span aria-hidden className="text-sm text-subtle">
                             0{i + 1}
                           </span>
-                        </Link>
+                        </LocaleLink>
                       </motion.li>
                     ))}
                   </ul>
@@ -137,8 +140,11 @@ export function MobileMenu({ email }: { email?: string }) {
                     className="w-full"
                     onClick={() => setOpen(false)}
                   >
-                    {siteConfig.cta.label}
+                    {dict.nav.cta}
                   </ButtonLink>
+                  <div onClick={() => setOpen(false)} className="mt-5 flex justify-center">
+                    <LanguageSwitcher />
+                  </div>
                   {email && <p className="mt-4 text-center text-sm text-muted">{email}</p>}
                 </div>
               </motion.div>

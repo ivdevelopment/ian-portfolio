@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { Project, ProjectKind } from "@/types/project";
+import { useDictionary } from "@/i18n/context";
+import { fmt } from "@/i18n/dictionaries";
 import { cn } from "@/lib/utils";
 import { ProjectCard } from "./project-card";
 
@@ -24,6 +26,7 @@ export function ProjectGrid({
   sizes,
   highlightFeatured,
 }: ProjectGridProps) {
+  const dict = useDictionary();
   const [active, setActive] = useState<Filter["kind"]>("all");
 
   // Only offer filters that match at least one project (plus "All").
@@ -37,7 +40,7 @@ export function ProjectGrid({
     <div>
       <div
         role="group"
-        aria-label="Filter projects"
+        aria-label={dict.work.filterLabel}
         className="no-scrollbar -mx-(--gutter) flex gap-2 overflow-x-auto px-(--gutter) pb-1 sm:mx-0 sm:flex-wrap sm:px-0"
       >
         {available.map((filter) => {
@@ -62,7 +65,7 @@ export function ProjectGrid({
       </div>
 
       <p className="sr-only" role="status">
-        Showing {visible.length} {visible.length === 1 ? "project" : "projects"}
+        {fmt(visible.length === 1 ? dict.work.showingOne : dict.work.showingMany, { n: visible.length })}
       </p>
 
       <ul className={cn("mt-8 grid gap-x-6 gap-y-10", columnsClassName)}>
@@ -87,7 +90,7 @@ export function ProjectGrid({
       </ul>
 
       {visible.length === 0 && (
-        <p className="mt-10 text-muted">No projects in this category yet.</p>
+        <p className="mt-10 text-muted">{dict.work.noneInCategory}</p>
       )}
     </div>
   );

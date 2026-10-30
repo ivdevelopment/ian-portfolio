@@ -29,29 +29,29 @@ describe("notification flow in processInquiry", () => {
     const order: string[] = [];
     const rpc = vi.fn(async () => (order.push("db"), { data: "ok", error: null }));
     const notify = vi.fn(async () => void order.push("mail"));
-    expect(await processInquiry(valid, 9000, "t", "1.1.1.1", { rpc, verify: passes, notify })).toEqual({ status: "sent" });
+    expect(await processInquiry(valid, 9000, "t", "1.1.1.1", "nl", { rpc, verify: passes, notify })).toEqual({ status: "sent" });
     expect(order).toEqual(["db", "mail"]);
     expect(notify).toHaveBeenCalledWith(expect.objectContaining({ email: "john@example.com", projectType: "New website" }));
   });
 
   it("does not notify when validation fails", async () => {
     const notify = vi.fn();
-    const r = await processInquiry({ ...valid, email: "nope" }, 9000, "t", "ip", { rpc: ok(), verify: passes, notify });
+    const r = await processInquiry({ ...valid, email: "nope" }, 9000, "t", "ip", "nl", { rpc: ok(), verify: passes, notify });
     expect(r.status).toBe("invalid");
     expect(notify).not.toHaveBeenCalled();
   });
 
   it("does not notify when the security check fails", async () => {
     const notify = vi.fn();
-    const r = await processInquiry(valid, 9000, "t", "ip", { rpc: ok(), verify: async () => "failed", notify });
+    const r = await processInquiry(valid, 9000, "t", "ip", "nl", { rpc: ok(), verify: async () => "failed", notify });
     expect(r.status).toBe("error");
     expect(notify).not.toHaveBeenCalled();
   });
 
   it("does not notify when persistence fails or is rate limited", async () => {
     const notify = vi.fn();
-    const failed = await processInquiry(valid, 9000, "t", "ip", { rpc: async () => ({ data: null, error: { code: "XX" } }), verify: passes, notify });
-    const limited = await processInquiry(valid, 9000, "t", "ip", { rpc: async () => ({ data: "rate_limited", error: null }), verify: passes, notify });
+    const failed = await processInquiry(valid, 9000, "t", "ip", "nl", { rpc: async () => ({ data: null, error: { code: "XX" } }), verify: passes, notify });
+    const limited = await processInquiry(valid, 9000, "t", "ip", "nl", { rpc: async () => ({ data: "rate_limited", error: null }), verify: passes, notify });
     expect(failed.status).toBe("error");
     expect(limited.status).toBe("error");
     expect(notify).not.toHaveBeenCalled();
@@ -61,7 +61,7 @@ describe("notification flow in processInquiry", () => {
     const notify = vi.fn(async () => {
       throw new Error("smtp down");
     });
-    expect(await processInquiry(valid, 9000, "t", "ip", { rpc: ok(), verify: passes, notify })).toEqual({ status: "sent" });
+    expect(await processInquiry(valid, 9000, "t", "ip", "nl", { rpc: ok(), verify: passes, notify })).toEqual({ status: "sent" });
   });
 });
 
@@ -106,18 +106,18 @@ describe("email content", () => {
     expect(msg.from).toEqual({ name: "Ian Verlinden Website", address: "hello@ianverlinden.com" });
     expect(msg.replyTo?.address).toBe("john@example.com");
     expect(msg.from.address).not.toBe(valid.email);
-    expect(msg.subject).toBe("New project request — New website");
+    expect(msg.subject).toBe("Nieuwe projectaanvraag — Nieuwe website");
   });
 
   it("has readable text and HTML with every field and the admin link", () => {
     for (const body of [msg.text, msg.html]) {
       expect(body).toContain("John Doe");
       expect(body).toContain("john@example.com");
-      expect(body).toContain("New website");
-      expect(body).toContain("€1,000 – €2,500");
+      expect(body).toContain("Nieuwe website");
+      expect(body).toContain("€ 1.000 – € 2.500");
       expect(body).toContain("https://ianverlinden.com/admin/inquiries");
     }
-    expect(msg.text).toContain("Message:\nI'd like a website");
+    expect(msg.text).toContain("Bericht:\nI'd like a website");
   });
 
   it("escapes visitor HTML in the HTML body and keeps it literal in text", () => {
@@ -146,7 +146,7 @@ describe("secrets stay server-side", () => {
     const notify = vi.fn(async () => {
       throw new Error(env.ZOHO_SMTP_PASSWORD);
     });
-    const result = await processInquiry(valid, 9000, "t", "ip", { rpc: ok(), verify: passes, notify });
+    const result = await processInquiry(valid, 9000, "t", "ip", "nl", { rpc: ok(), verify: passes, notify });
     expect(JSON.stringify(result)).not.toContain(env.ZOHO_SMTP_PASSWORD);
   });
 

@@ -100,6 +100,25 @@ Structured content, not a page builder: Admin → **Pages** (Home, About, Contac
 6. Create the admin (above).
 7. Set the app environment variables (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL`). The build and ISR need the database to be reachable.
 
+## Languages (Dutch default, English secondary)
+
+The site is bilingual. **Dutch is the default and has no URL prefix**; English lives under `/en`:
+
+| Dutch | English |
+| --- | --- |
+| `/`, `/work`, `/work/<slug>`, `/about`, `/services`, `/reviews`, `/contact`, `/review/<token>` | `/en`, `/en/work`, `/en/work/<slug>`, `/en/about`, … |
+
+- **Routing** (`src/proxy.ts`, `src/i18n/routing.ts`): a Dutch URL is rewritten internally to `/nl/…`; `/en/…` passes through; an explicit `/nl/…` is permanently redirected to the bare path (there is no `/nl`). `/admin/*` and `/api/*` are never localized (the admin stays English). The pages live under `src/app/(public)/[locale]`; the admin has its own root layout.
+- **Language switch**: NL / EN in the header and the mobile menu, keeping the current page. An explicit choice is remembered in a `site-locale` cookie, used **only** for a bare `/` visit (never for explicit URLs, never from the browser's language). Supabase auth cookies are unrelated.
+- **UI text**: typed dictionaries in `src/i18n/dictionaries/{en,nl}.ts` (identical keys enforced by a test). Dutch is written for Flemish business readers, not translated word for word.
+- **Content (CMS)**: the existing columns keep the **English** copy that was live before bilingual support; Dutch is stored in a new `translations` JSONB column (`site_content`, `site_settings`, `services`, `projects`; migration `20261030000000_i18n_translations.sql`, additive only). Resolution order for Dutch: **saved Dutch** → built-in Dutch rendering of the known seed/production wording (`src/i18n/known-dutch.ts`, exact matches only) → English. English is unchanged. Links, images, ids, numbers and slugs are always shared.
+- **Admin**: Pages (Home, About, Contact, Services) and Settings have an **English | Nederlands** switch; Projects have a **Dutch translation** panel (saved separately, never blocking publishing). Missing Dutch fields are reported and fall back to English.
+- **Projects without a Dutch translation** still render at `/work/<slug>` (their English text fills the gaps) instead of returning a 404. Brand/product names and slugs are never translated. Reviews are shown exactly as submitted.
+- **SEO**: each language canonicalizes to itself; `hreflang` `nl-BE`, `en` and `x-default` (Dutch); the sitemap lists both languages with alternates; `html lang` is `nl-BE` / `en`; share images are generated per language (`/og/nl`, `/og/en`).
+- **Caching**: cached reads are tagged `<family>` and `<family>:<locale>`. Saving Dutch expires only `…:nl`; saving English (or publishing) expires both.
+- **Dates and currency**: `Europe/Brussels`; Dutch "29 oktober 2026" / "€ 1.000", English "October 29, 2026" / "€1,000". Stored enum values (project types, budgets) never change, only their labels.
+- **Order of deployment**: apply the migration (`npx supabase db push`) before saving Dutch translations in the admin. The public site works without it (known Dutch rendering + English fallback).
+
 ## Deploying to Vercel
 
 1. Push the repository to GitHub and **Import** it in Vercel (framework preset: Next.js, production branch: `main`). No build or output overrides are needed; nothing depends on Docker, local files or a local database.

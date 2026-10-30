@@ -1,7 +1,9 @@
 import "server-only";
 
 import { createHash } from "node:crypto";
-import { inquirySchema, type InquiryResult } from "@/lib/schemas/inquiry";
+import { defaultLocale, type Locale } from "@/i18n/config";
+import { getDictionary } from "@/i18n/dictionaries";
+import { createInquirySchema, type InquiryResult } from "@/lib/schemas/inquiry";
 import { createPublicClient } from "@/lib/supabase/public";
 import { sendInquiryNotification, type NotifiableInquiry } from "@/lib/email/inquiry-notification";
 import { verifyTurnstile } from "@/lib/turnstile";
@@ -44,16 +46,18 @@ export async function processInquiry(
   elapsedMs: unknown,
   turnstileToken: unknown,
   ip: string,
+  locale: Locale = defaultLocale,
   deps: {
     rpc?: InquiryRpc;
     verify?: typeof verifyTurnstile;
     notify?: (inquiry: NotifiableInquiry) => Promise<unknown>;
   } = {},
 ): Promise<InquiryResult> {
+  const dict = getDictionary(locale).contact;
   const rpc = deps.rpc ?? defaultRpc;
   const verify = deps.verify ?? verifyTurnstile;
   const notify = deps.notify ?? sendInquiryNotification;
-  const parsed = inquirySchema.safeParse(input);
+  const parsed = createInquirySchema(dict.validation).safeParse(input);
   if (!parsed.success) {
     return { status: "invalid", fieldErrors: parsed.error.flatten().fieldErrors };
   }
@@ -63,7 +67,7 @@ export async function processInquiry(
   if (values.company) return { status: "sent" };
 
   if (typeof elapsedMs !== "number" || !Number.isFinite(elapsedMs) || elapsedMs < MIN_FILL_MS) {
-    return { status: "error", message: "That was a little quick — please try sending again." };
+    return { status: "error", message: dict.server.tooQuick };
   }
 
   const human = await verify(turnstileToken, ip);
@@ -72,8 +76,8 @@ export async function processInquiry(
       status: "error",
       message:
         human === "failed"
-          ? "The security check didn't complete. Wait a moment and try sending again."
-          : "The security check is unavailable right now. Please try again shortly.",
+          ? dict.server.securityFailed
+          : dict.server.securityUnavailable,
     };
   }
 
@@ -90,14 +94,14 @@ export async function processInquiry(
     console.error("[inquiry] insert failed:", error.code, error.message);
     return {
       status: "error",
-      message: "Something went wrong while sending your request. Please try again in a moment.",
+      message: dict.server.failed,
     };
   }
 
   if (data === "rate_limited") {
     return {
       status: "error",
-      message: "You've sent several requests recently. Please try again later.",
+      message: dict.server.rateLimited,
     };
   }
 
@@ -108,6 +112,7 @@ export async function processInquiry(
     projectType: values.projectType,
     budget: values.budget,
     message: values.message,
+    locale,
   }).catch(() => undefined);
 
   return { status: "sent" };

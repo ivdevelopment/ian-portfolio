@@ -7,7 +7,7 @@ import {
   createInvitationAction,
   deleteInvitationAction,
   revokeInvitationAction,
-} from "@/app/admin/(panel)/reviews/actions";
+} from "@/app/(admin)/admin/(panel)/reviews/actions";
 import { EXPIRY_OPTIONS_DAYS } from "@/lib/review-tokens";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "./confirm-dialog";

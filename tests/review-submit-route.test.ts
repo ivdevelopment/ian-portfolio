@@ -102,3 +102,22 @@ describe("POST /api/reviews/submit", () => {
     expect(await res.json()).toEqual({ status: "invalid-link" });
   });
 });
+
+describe("localized server messages", () => {
+  it("answers in the visitor's language without changing token handling", async () => {
+    const rpc = rpcReturning("ok");
+    const quick = await processReviewSubmission(token, values, 100, "ip", rpc, "nl");
+    expect(quick).toEqual({ status: "error", message: "Dat ging wat snel — probeer het opnieuw." });
+    const quickEn = await processReviewSubmission(token, values, 100, "ip", rpc, "en");
+    expect(quickEn).toMatchObject({ status: "error", message: expect.stringContaining("little quick") });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("validation messages follow the language, and the token result stays generic in both", async () => {
+    const nl = await processReviewSubmission(token, { ...values, name: "" }, 9000, "ip", rpcReturning("ok"), "nl");
+    expect(nl).toMatchObject({ status: "invalid-input", fieldErrors: { name: ["Vul je naam in."] } });
+    for (const locale of ["nl", "en"] as const) {
+      expect(await processReviewSubmission(token, values, 9000, "ip", rpcReturning("used"), locale)).toEqual({ status: "invalid-link" });
+    }
+  });
+});

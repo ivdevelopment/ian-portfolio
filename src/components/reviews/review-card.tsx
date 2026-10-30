@@ -1,6 +1,8 @@
 import Image from "next/image";
-import Link from "next/link";
 import type { PublicReview } from "@/types/review";
+import type { Locale } from "@/i18n/config";
+import { fmt, getDictionary } from "@/i18n/dictionaries";
+import { LocaleLink } from "@/i18n/locale-link";
 import { initialsOf } from "@/lib/utils";
 import { Stars } from "@/components/ui/stars";
 
@@ -8,14 +10,16 @@ type ReviewCardProps = {
   review: PublicReview;
   /** Show a link to the related project (used on /reviews). */
   showProject?: boolean;
+  locale: Locale;
 };
 
-export function ReviewCard({ review, showProject }: ReviewCardProps) {
+export function ReviewCard({ review, showProject, locale }: ReviewCardProps) {
+  const dict = getDictionary(locale);
   const byline = [review.role, review.company].filter(Boolean).join(", ");
 
   return (
     <figure className="flex h-full flex-col rounded-card border border-line bg-glass p-6 shadow-card">
-      <Stars rating={review.rating} />
+      <Stars rating={review.rating} label={fmt(dict.reviews.stars, { rating: review.rating, max: 5 })} />
       {/* Plain text only: React escapes it. */}
       <blockquote className="mt-4 flex-1 text-[0.95rem] leading-relaxed whitespace-pre-line text-ink">
         “{review.text}”
@@ -45,12 +49,12 @@ export function ReviewCard({ review, showProject }: ReviewCardProps) {
           </span>
         </span>
         {showProject && review.project && (
-          <Link
+          <LocaleLink
             href={`/work/${review.project.slug}`}
             className="mt-4 inline-block text-sm text-accent underline-offset-4 hover:underline"
           >
-            About: {review.project.title}
-          </Link>
+            {fmt(dict.reviews.about, { project: review.project.title })}
+          </LocaleLink>
         )}
       </figcaption>
     </figure>

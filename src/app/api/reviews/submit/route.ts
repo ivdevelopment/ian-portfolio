@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { clientIp, readJsonBody } from "@/lib/api-json";
+import { defaultLocale, isLocale } from "@/i18n/config";
+import { getDictionary } from "@/i18n/dictionaries";
 import { processReviewSubmission } from "@/lib/review-submit";
 import { isSameOriginRequest } from "@/lib/same-origin";
 import type { ReviewSubmitResult } from "@/lib/schemas/review";
@@ -10,21 +12,30 @@ import type { ReviewSubmitResult } from "@/lib/schemas/review";
  * cached page or an open tab from an older deployment keeps working.
  *
  * The invitation token travels in the JSON body (never the URL), is hashed by
- * the shared logic, and is never logged or echoed back.
+ * the shared logic, and is never logged or echoed back. The visitor's language
+ * (body `locale`) only selects the message language; it never affects the token.
  */
 const json = (body: ReviewSubmitResult, status = 200) =>
   NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
 
 export async function POST(request: Request) {
+  const early = getDictionary(defaultLocale).review.server;
   if (!isSameOriginRequest(request.headers.get("origin"), request.headers.get("host"))) {
-    return json({ status: "error", message: "That request couldn't be verified. Please refresh and try again." }, 403);
+    return json({ status: "error", message: early.unverified }, 403);
   }
 
   const body = await readJsonBody(request);
-  if (!body.ok) {
-    return json({ status: "error", message: "That request couldn't be read. Please try again." }, 400);
-  }
+  if (!body.ok) return json({ status: "error", message: early.unreadable }, 400);
 
-  const { token, values, elapsedMs } = body.payload;
-  return json(await processReviewSubmission(token, values, elapsedMs, clientIp(request.headers)));
+  const { token, values, elapsedMs, locale } = body.payload;
+  return json(
+    await processReviewSubmission(
+      token,
+      values,
+      elapsedMs,
+      clientIp(request.headers),
+      undefined,
+      isLocale(locale) ? locale : defaultLocale,
+    ),
+  );
 }

@@ -92,6 +92,7 @@ export function Badge({
 
 export function formatDate(iso: string): string {
   return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Brussels",
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -100,6 +101,7 @@ export function formatDate(iso: string): string {
 
 export function formatDateTime(iso: string): string {
   return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Brussels",
     day: "numeric",
     month: "short",
     year: "numeric",

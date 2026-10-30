@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
-import { saveServicesAction, saveSkillsAction } from "@/app/admin/(panel)/pages/actions";
+import { saveServicesAction, saveSkillsAction } from "@/app/(admin)/admin/(panel)/pages/actions";
 import { slugify, uniqueSlug } from "@/lib/slug";
 import {
   SERVICE_ICONS,

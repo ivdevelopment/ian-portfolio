@@ -5,7 +5,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CheckCircle2, TriangleAlert } from "lucide-react";
 import { BUDGETS, PROJECT_TYPES } from "@/data/inquiry-options";
-import { inquirySchema, type InquiryResult, type InquiryValues } from "@/lib/schemas/inquiry";
+import { useDictionary, useLocale } from "@/i18n/context";
+import { formatBudgetLabel } from "@/i18n/format";
+import { createInquirySchema, type InquiryResult, type InquiryValues } from "@/lib/schemas/inquiry";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { TurnstileWidget, turnstileEnabled, type TurnstileHandle } from "./turnstile-widget";
@@ -31,7 +33,7 @@ function ChoiceGroup({
   register,
 }: {
   legend: string;
-  options: readonly string[];
+  options: readonly { value: string; label: string }[];
   error?: string;
   errorId: string;
   register: React.InputHTMLAttributes<HTMLInputElement> & {
@@ -43,8 +45,8 @@ function ChoiceGroup({
       <legend className="mb-2.5 text-sm font-medium">{legend}</legend>
       <div className="flex flex-wrap gap-2">
         {options.map((option) => (
-          <label key={option} className="cursor-pointer">
-            <input type="radio" value={option} className="peer sr-only" {...register} />
+          <label key={option.value} className="cursor-pointer">
+            <input type="radio" value={option.value} className="peer sr-only" {...register} />
             <span
               className={cn(
                 "block rounded-full border border-line px-4 py-2 text-sm text-muted transition-[background-color,border-color,color] duration-300",
@@ -53,7 +55,7 @@ function ChoiceGroup({
                 "peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent",
               )}
             >
-              {option}
+              {option.label}
             </span>
           </label>
         ))}
@@ -64,6 +66,9 @@ function ChoiceGroup({
 }
 
 export function ContactForm() {
+  const dict = useDictionary();
+  const locale = useLocale();
+  const f = dict.contact.form;
   const [result, setResult] = useState<InquiryResult | null>(null);
   const openedAt = useRef(0);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
@@ -82,7 +87,7 @@ export function ContactForm() {
     setError,
     formState: { errors, isSubmitting },
   } = useForm<InquiryValues>({
-    resolver: zodResolver(inquirySchema),
+    resolver: zodResolver(createInquirySchema(dict.contact.validation)),
     mode: "onTouched",
     defaultValues: { name: "", email: "", message: "", company: "" },
   });
@@ -92,7 +97,7 @@ export function ContactForm() {
     if (turnstileEnabled && !turnstileToken) {
       setResult({
         status: "error",
-        message: "Just a moment — the security check is still running. Try again in a few seconds.",
+        message: f.securityRunning,
       });
       return;
     }
@@ -101,7 +106,7 @@ export function ContactForm() {
       const http = await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ values, elapsedMs, turnstileToken }),
+        body: JSON.stringify({ values, elapsedMs, turnstileToken, locale }),
         cache: "no-store",
       });
       const response = (await http.json().catch(() => null)) as InquiryResult | null;
@@ -111,7 +116,7 @@ export function ContactForm() {
         setStale(true);
         setResult({
           status: "error",
-          message: "This page looks out of date. Refresh it and send your request again.",
+          message: f.stale,
         });
         return;
       }
@@ -126,7 +131,7 @@ export function ContactForm() {
     } catch {
       setResult({
         status: "error",
-        message: "Couldn't reach the server. Check your connection and try again.",
+        message: f.network,
       });
     } finally {
       // Turnstile tokens are single use.
@@ -150,13 +155,13 @@ export function ContactForm() {
         <div className="space-y-6">
           <div>
             <label htmlFor="name" className="mb-2 block text-sm font-medium">
-              Name
+              {f.name}
             </label>
             <input
               id="name"
               type="text"
               autoComplete="name"
-              placeholder="Your name"
+              placeholder={f.namePlaceholder}
               aria-invalid={Boolean(errors.name)}
               aria-describedby={errors.name ? "name-error" : undefined}
               className={cn(inputClass, "h-12")}
@@ -167,13 +172,13 @@ export function ContactForm() {
 
           <div>
             <label htmlFor="email" className="mb-2 block text-sm font-medium">
-              Email
+              {f.email}
             </label>
             <input
               id="email"
               type="email"
               autoComplete="email"
-              placeholder="you@gmail.com"
+              placeholder={f.emailPlaceholder}
               aria-invalid={Boolean(errors.email)}
               aria-describedby={errors.email ? "email-error" : undefined}
               className={cn(inputClass, "h-12")}
@@ -183,16 +188,16 @@ export function ContactForm() {
           </div>
 
           <ChoiceGroup
-            legend="What do you need?"
-            options={PROJECT_TYPES}
+            legend={f.projectType}
+            options={PROJECT_TYPES.map((value) => ({ value, label: dict.contact.projectTypes[value] }))}
             error={errors.projectType?.message}
             errorId="projectType-error"
             register={register("projectType")}
           />
 
           <ChoiceGroup
-            legend="Estimated budget"
-            options={BUDGETS}
+            legend={f.budget}
+            options={BUDGETS.map((value) => ({ value, label: formatBudgetLabel(locale, value) }))}
             error={errors.budget?.message}
             errorId="budget-error"
             register={register("budget")}
@@ -201,12 +206,12 @@ export function ContactForm() {
 
         <div className="flex flex-col">
           <label htmlFor="message" className="mb-2 block text-sm font-medium">
-            Tell me about your project
+            {f.message}
           </label>
           <textarea
             id="message"
             rows={9}
-            placeholder="Give me as much detail as possible."
+            placeholder={f.messagePlaceholder}
             aria-invalid={Boolean(errors.message)}
             aria-describedby={errors.message ? "message-error" : undefined}
             className={cn(inputClass, "min-h-56 flex-1 resize-y py-3.5")}
@@ -217,7 +222,7 @@ export function ContactForm() {
           {/* Honeypot: hidden from people, tempting for bots. */}
           <div aria-hidden className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
             <label>
-              Company
+              {f.honeypot}
               <input type="text" tabIndex={-1} autoComplete="off" {...register("company")} />
             </label>
           </div>
@@ -231,7 +236,7 @@ export function ContactForm() {
             disabled={isSubmitting}
             className="mt-6 w-full sm:ml-auto sm:w-auto"
           >
-            {isSubmitting ? "Sending…" : "Send project request"}
+            {isSubmitting ? f.sending : f.send}
           </Button>
         </div>
       </div>
@@ -242,7 +247,7 @@ export function ContactForm() {
           className="mt-6 flex gap-3 rounded-md border border-accent/40 bg-accent-soft p-4 text-sm"
         >
           <CheckCircle2 aria-hidden className="mt-0.5 size-4 shrink-0 text-accent" />
-          <p>Thanks — your project request has been received. I&apos;ll get back to you soon.</p>
+          <p>{f.success}</p>
         </div>
       )}
       {(result?.status === "error" || result?.status === "invalid") && (
@@ -254,7 +259,7 @@ export function ContactForm() {
           <p>
             {result.status === "error"
               ? result.message
-              : "Please check the highlighted fields and try again."}
+              : f.checkFields}
             {stale && (
               <>
                 {" "}
@@ -263,7 +268,7 @@ export function ContactForm() {
                   onClick={() => window.location.reload()}
                   className="text-accent underline underline-offset-4"
                 >
-                  Refresh page
+                  {dict.common.refreshPage}
                 </button>
               </>
             )}

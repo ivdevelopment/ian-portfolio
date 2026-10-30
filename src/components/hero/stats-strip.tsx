@@ -1,10 +1,12 @@
 import { visibleStats } from "@/lib/schemas/site-content";
+import { getLocale } from "@/i18n/server";
 import { getHomeContent } from "@/lib/site-content";
 import { cn } from "@/lib/utils";
 import { Reveal } from "@/components/ui/reveal";
 
 export async function StatsStrip() {
-  const { stats: all } = await getHomeContent();
+  const locale = await getLocale();
+  const { stats: all } = await getHomeContent(locale);
   const stats = visibleStats(all);
   if (stats.length === 0) return null;
 

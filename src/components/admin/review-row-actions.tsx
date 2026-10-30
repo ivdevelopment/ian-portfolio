@@ -8,7 +8,7 @@ import {
   setReviewFeaturedAction,
   setReviewStatusAction,
   type ReviewActionResult,
-} from "@/app/admin/(panel)/reviews/actions";
+} from "@/app/(admin)/admin/(panel)/reviews/actions";
 import type { ReviewStatus } from "@/lib/schemas/review";
 import { cn } from "@/lib/utils";
 import { ConfirmDialog } from "./confirm-dialog";
