@@ -51,6 +51,9 @@ npm run dev:local                 # http://localhost:3000 against the LOCAL stac
 | `INQUIRY_HASH_SALT` | app | **yes (production)** | Long random secret for hashing visitor IPs (contact-form and review rate limiting). Without it a public default salt is used |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | app | optional | Cloudflare Turnstile site key (public) |
 | `TURNSTILE_SECRET_KEY` | app (server) | optional | Turnstile secret. When set, the contact form **requires** a verified token |
+| `ZOHO_SMTP_HOST` / `ZOHO_SMTP_PORT` | app (server) | optional | Zoho SMTP, default `smtppro.zoho.eu` / `465` (implicit TLS; `587` uses STARTTLS) |
+| `ZOHO_SMTP_USER` / `ZOHO_SMTP_PASSWORD` | app (server) | optional | The Zoho mailbox and its (application-specific) password. Server-only; this mailbox is also the From address |
+| `CONTACT_NOTIFICATION_EMAIL` | app (server) | optional | Where new-inquiry emails go (defaults to `ZOHO_SMTP_USER`) |
 | `SUPABASE_SERVICE_ROLE_KEY` | **your machine only** | no | Used solely by `scripts/create-admin.mjs` and `scripts/reset-admin-password.mjs`. **Never set it in hosting**, never prefix with `NEXT_PUBLIC_` |
 
 The running application never uses the service-role key. Vercel's own variables (`VERCEL`, `VERCEL_ENV`, `VERCEL_PROJECT_PRODUCTION_URL`) are read automatically.
@@ -123,6 +126,10 @@ The contact form has validation, a honeypot field, a minimum fill time, a databa
 1. Cloudflare dashboard → Turnstile → *Add widget*; hostname(s): your production domain (and `localhost` if you want to test with real keys); mode **Managed**.
 2. Set `NEXT_PUBLIC_TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` in Vercel and redeploy.
 3. Local development: leave both unset (not enforced), or use Cloudflare's always-pass test keys from `.env.example` to exercise the whole flow. Cloudflare also publishes always-fail test keys for the failure path.
+
+### New-inquiry email
+
+After an inquiry is **saved**, `src/lib/email/` sends a notification through Zoho SMTP (From: `Ian Verlinden Website <ZOHO_SMTP_USER>`, Reply-To: the visitor, plain-text + escaped HTML). It is best-effort: if SMTP is unset or down the visitor still gets the normal success message, the inquiry stays in Admin → Inquiries, and only a short error code is logged. Without the `ZOHO_SMTP_*` variables (local development) notifications are simply disabled.
 
 If Cloudflare can't be reached the form fails closed with a retry message. Review invitations are not behind Turnstile: they already need a secret single-use token, an expiry and a rate limit.
 

@@ -3,7 +3,22 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { inquirySchema, type InquiryResult } from "@/lib/schemas/inquiry";
 import { createPublicClient } from "@/lib/supabase/public";
+import { sendInquiryNotification, type NotifiableInquiry } from "@/lib/email/inquiry-notification";
 import { verifyTurnstile } from "@/lib/turnstile";
+
+type InquiryRpc = (
+  fn: "submit_inquiry",
+  args: {
+    p_name: string;
+    p_email: string;
+    p_project_type: string;
+    p_budget: string;
+    p_message: string;
+    p_ip_hash: string;
+  },
+) => PromiseLike<{ data: unknown; error: { code?: string; message?: string } | null }>;
+
+const defaultRpc: InquiryRpc = (fn, args) => createPublicClient().rpc(fn, args);
 
 /** Faster than this and it's almost certainly a script, not a person typing. */
 const MIN_FILL_MS = 3000;
@@ -19,7 +34,8 @@ function hashIp(ip: string): string {
  *
  * Protection layers: Zod validation (length limits), a hidden honeypot field,
  * a minimum fill time, Cloudflare Turnstile (when configured) and a
- * database-side rate limit inside `submit_inquiry`. The anonymous role has no
+ * database-side rate limit inside `submit_inquiry`. Once the inquiry is stored,
+ * the owner is notified by email (best effort). The anonymous role has no
  * table access at all — the only thing it can do is call that function.
  * Nothing about the database is revealed to the visitor.
  */
@@ -28,7 +44,15 @@ export async function processInquiry(
   elapsedMs: unknown,
   turnstileToken: unknown,
   ip: string,
+  deps: {
+    rpc?: InquiryRpc;
+    verify?: typeof verifyTurnstile;
+    notify?: (inquiry: NotifiableInquiry) => Promise<unknown>;
+  } = {},
 ): Promise<InquiryResult> {
+  const rpc = deps.rpc ?? defaultRpc;
+  const verify = deps.verify ?? verifyTurnstile;
+  const notify = deps.notify ?? sendInquiryNotification;
   const parsed = inquirySchema.safeParse(input);
   if (!parsed.success) {
     return { status: "invalid", fieldErrors: parsed.error.flatten().fieldErrors };
@@ -42,7 +66,7 @@ export async function processInquiry(
     return { status: "error", message: "That was a little quick — please try sending again." };
   }
 
-  const human = await verifyTurnstile(turnstileToken, ip);
+  const human = await verify(turnstileToken, ip);
   if (human === "failed" || human === "unavailable") {
     return {
       status: "error",
@@ -53,8 +77,7 @@ export async function processInquiry(
     };
   }
 
-  const supabase = createPublicClient();
-  const { data, error } = await supabase.rpc("submit_inquiry", {
+  const { data, error } = await rpc("submit_inquiry", {
     p_name: values.name,
     p_email: values.email,
     p_project_type: values.projectType,
@@ -77,6 +100,15 @@ export async function processInquiry(
       message: "You've sent several requests recently. Please try again later.",
     };
   }
+
+  // Stored. Now tell the owner — best effort: a mail failure never fails or rolls back the lead.
+  await notify({
+    name: values.name,
+    email: values.email,
+    projectType: values.projectType,
+    budget: values.budget,
+    message: values.message,
+  }).catch(() => undefined);
 
   return { status: "sent" };
 }
