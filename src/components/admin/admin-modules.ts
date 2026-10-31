@@ -1,6 +1,7 @@
 import {
   FileText,
   FolderKanban,
+  Globe,
   Image as ImageIcon,
   Inbox,
   LayoutDashboard,
@@ -34,6 +35,13 @@ export const adminModules: AdminModule[] = [
     description: "Create, edit, publish, feature and delete projects, and manage their media.",
     icon: FolderKanban,
     href: "/admin/projects",
+  },
+  {
+    id: "previews",
+    label: "Client Previews",
+    description: "Private, access-code protected previews of client websites.",
+    icon: Globe,
+    href: "/admin/previews",
   },
   {
     id: "reviews",
