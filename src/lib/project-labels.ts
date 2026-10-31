@@ -22,6 +22,8 @@ export function projectBadges(p: LabelledProject, dict: Dictionary): string[] {
 export function projectDisclosure(p: LabelledProject, dict: Dictionary): string | null {
   const d = dict.project.disclosure;
   if (p.isExample) return d.sample;
+  // A concept with no named company is an invented business, not a real brand's unofficial redesign.
+  if (p.kind === "concept" && !p.client?.trim()) return d.fictional;
   if (isConceptProject(p)) {
     return fmt(d.concept, { subject: p.client?.trim() ? p.client.trim() : d.conceptSubject });
   }

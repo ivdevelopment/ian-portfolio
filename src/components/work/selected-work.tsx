@@ -6,9 +6,12 @@ import { getPublishedProjects } from "@/lib/projects";
 import { Reveal } from "@/components/ui/reveal";
 import { ProjectGrid } from "./project-grid";
 
+/** The homepage shows a selection in My Work order; "view all" leads to the rest. */
+const HOME_PROJECT_LIMIT = 8;
+
 export async function SelectedWork() {
   const { locale, dict } = await getI18n();
-  const projects = await getPublishedProjects(locale);
+  const projects = (await getPublishedProjects(locale)).slice(0, HOME_PROJECT_LIMIT);
   if (projects.length === 0) return null;
 
   return (

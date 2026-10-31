@@ -81,6 +81,8 @@ export const en = {
       concept:
         "Concept project — an independent, unofficial design exercise. It was not commissioned by, and is not affiliated with, {subject}.",
       conceptSubject: "the brand shown",
+      fictional:
+        "Concept project — a fictional business, designed and built as a portfolio piece. No client commissioned it and the business does not exist.",
       personal: "Personal project — built for myself, not for a client.",
     },
     back: "Back to projects",

@@ -94,6 +94,10 @@ const KNOWN: Record<string, string> = {
   "Music & Events": "Muziek & events",
   "Web Application": "Webapplicatie",
   "Creative Design Studio": "Creatieve designstudio",
+  Construction: "Bouw",
+  Architecture: "Architectuur",
+  Hospitality: "Horeca",
+  "Real Estate": "Vastgoed",
 };
 
 /** The Dutch text for a known English string, or undefined. */

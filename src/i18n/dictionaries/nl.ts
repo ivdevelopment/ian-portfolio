@@ -79,6 +79,8 @@ export const nl: Dictionary = {
       concept:
         "Conceptproject — een onafhankelijke, onofficiële ontwerpoefening. Het is niet in opdracht van {subject} gemaakt en staat los van {subject}.",
       conceptSubject: "het getoonde merk",
+      fictional:
+        "Conceptproject — een fictief bedrijf, ontworpen en gebouwd als portfoliostuk. Er is geen opdrachtgever en het bedrijf bestaat niet.",
       personal: "Persoonlijk project — gebouwd voor mezelf, niet voor een klant.",
     },
     back: "Terug naar projecten",

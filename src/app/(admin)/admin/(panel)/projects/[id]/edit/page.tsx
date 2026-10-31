@@ -39,6 +39,9 @@ export default async function EditProjectPage({
             description: row.description ?? "",
             category: row.category,
             features,
+            captions: [...(row.project_media ?? [])]
+              .sort((a, b) => a.sort_order - b.sort_order)
+              .map((m) => ({ id: m.id, alt: m.alt ?? "" })),
           }}
           initial={{
             title: text(saved.title),
@@ -48,6 +51,7 @@ export default async function EditProjectPage({
             shortDescription: text(saved.shortDescription),
             description: text(saved.description),
             features: Array.isArray(saved.features) ? saved.features.filter((f): f is string => typeof f === "string") : [],
+            captions: (saved.captions ?? {}) as Record<string, string>,
           }}
         />
       </div>

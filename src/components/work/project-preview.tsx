@@ -144,6 +144,10 @@ export function ProjectPreview({
         )}
       </DeviceFrame>
 
+      {!showingFrame && project.gallery.length > 0 && current.alt && (
+        <p className="mt-4 text-sm text-muted">{current.alt}</p>
+      )}
+
       {externalUrl && (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-glass p-4">
           <p className="text-sm text-muted">

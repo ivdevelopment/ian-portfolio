@@ -15,6 +15,8 @@ export const projectTranslationSchema = z.object({
   description: text(8000),
   category: text(80),
   features: z.array(text(120)).max(20, "Use at most 20 features."),
+  /** Dutch image captions, by project_media id. */
+  captions: z.record(z.string(), text(300)).optional(),
 });
 export type ProjectTranslation = z.infer<typeof projectTranslationSchema>;
 

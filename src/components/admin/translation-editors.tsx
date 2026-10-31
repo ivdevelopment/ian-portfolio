@@ -151,6 +151,8 @@ export type ProjectEnglish = {
   description: string;
   category: string;
   features: string[];
+  /** The project's images with their English alt text. */
+  captions: { id: string; alt: string }[];
 };
 
 /**
@@ -219,6 +221,17 @@ export function ProjectTranslationPanel({
         <TranslationField id="nl-short" label="Short description" value={value.shortDescription} onChange={(v) => set("shortDescription", v)} english={english.shortDescription} multiline maxLength={400} />
         <TranslationField id="nl-description" label="Description" value={value.description} onChange={(v) => set("description", v)} english={english.description} multiline rows={8} maxLength={8000} />
         <TranslationField id="nl-features" label="Key features" value={value.featuresText} onChange={(v) => set("featuresText", v)} english={english.features.join(" · ")} multiline rows={5} hint="One feature per line." />
+        {english.captions.map((image, i) => (
+          <TranslationField
+            key={image.id}
+            id={`nl-caption-${i}`}
+            label={`Image ${i + 1} caption`}
+            value={value.captions?.[image.id] ?? ""}
+            onChange={(v) => set("captions", { ...value.captions, [image.id]: v })}
+            english={image.alt}
+            maxLength={300}
+          />
+        ))}
       </div>
       <SaveBar status={status} dirty={dirty} label="Save Dutch translation" onSave={() => void save()} />
     </Panel>

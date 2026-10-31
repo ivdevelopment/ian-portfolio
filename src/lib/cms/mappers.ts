@@ -53,17 +53,24 @@ export function mediaRowToMedia(row: MediaRow): ProjectMedia | null {
  * descriptors (category, subtitle, tags) get a built-in Dutch rendering.
  */
 export function rowToProject(row: ProjectRow, locale: Locale = "en"): Project {
+  const nl = locale === "nl" ? (translationFor(row.translations, "nl") as Partial<Record<string, unknown>> | undefined) : undefined;
+  const pick = (value: unknown): string | undefined =>
+    typeof value === "string" && value.trim() !== "" ? value : undefined;
+
   const media = [...(row.project_media ?? [])].sort((a, b) => a.sort_order - b.sort_order);
-  const gallery = media.map(mediaRowToMedia).filter((m): m is ProjectMedia => m !== null);
+  const captions = (nl?.captions ?? {}) as Record<string, unknown>;
+  const gallery = media
+    .map((m): ProjectMedia | null => {
+      const item = mediaRowToMedia(m);
+      return item && { ...item, alt: pick(captions[m.id]) ?? item.alt };
+    })
+    .filter((m): m is ProjectMedia => m !== null);
   const features = [...(row.project_features ?? [])].sort((a, b) => a.sort_order - b.sort_order);
 
   const firstStill = gallery.find((m) => m.type === "image" || m.type === "gif");
   const thumbnail = resolveMediaUrl(row.thumbnail_path) ?? firstStill?.src ?? PLACEHOLDER_THUMBNAIL;
   const heroSource = gallery.find((m) => m.src === thumbnail && m.type !== "video") ?? firstStill;
 
-  const nl = locale === "nl" ? (translationFor(row.translations, "nl") as Partial<Record<string, unknown>> | undefined) : undefined;
-  const pick = (value: unknown): string | undefined =>
-    typeof value === "string" && value.trim() !== "" ? value : undefined;
   const baseFeatures = features.map((f) => f.label);
   const nlFeatures = Array.isArray(nl?.features)
     ? (nl.features as unknown[]).filter((f): f is string => typeof f === "string" && f.trim() !== "")

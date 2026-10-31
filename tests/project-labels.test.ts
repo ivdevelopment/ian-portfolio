@@ -26,6 +26,14 @@ describe("project labelling", () => {
     expect(projectDisclosure({ ...base, projectType: "concept" }, nl)).toMatch(/het getoonde merk/);
   });
 
+  it("describes a concept with no named company as a fictional business", () => {
+    const p = { ...base, kind: "concept", projectType: "concept" } as const;
+    expect(projectBadges(p, en)).toEqual(["Concept"]);
+    expect(projectDisclosure(p, en)).toMatch(/fictional business/);
+    expect(projectDisclosure(p, nl)).toMatch(/fictief bedrijf/);
+    expect(projectDisclosure({ ...p, client: "Afroton" }, en)).toMatch(/not affiliated with, Afroton/);
+  });
+
   it("labels sample content and personal projects in each language", () => {
     const sample = { ...base, isExample: true, projectType: "concept" } as const;
     expect(projectBadges(sample, en)).toEqual(["Concept", "Sample"]);
