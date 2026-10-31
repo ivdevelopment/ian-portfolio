@@ -139,6 +139,66 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"prospect_activities": {
+                  Row: {
+                    "created_at": string,"description": string | null,"id": string,"metadata": NonNullable<Json>,"occurred_at": string | null,"occurred_on": string,"prospect_id": string,"title": string,"type": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"description"?: string | null,"id"?: string,"metadata"?: NonNullable<Json>,"occurred_at"?: string | null,"occurred_on"?: string,"prospect_id": string,"title": string,"type": string
+                  }
+                  Update: {
+                    "created_at"?: string,"description"?: string | null,"id"?: string,"metadata"?: NonNullable<Json>,"occurred_at"?: string | null,"occurred_on"?: string,"prospect_id"?: string,"title"?: string,"type"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "prospect_activities_prospect_id_fkey"
+      columns: ["prospect_id"]
+isOneToOne: false
+      referencedRelation: "prospects"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"prospect_imports": {
+                  Row: {
+                    "created_at": string,"created_by": string | null,"duplicates": number,"file_name": string | null,"id": string,"rows_imported": number,"rows_parsed": number,"rows_skipped": number,"source": string,"warnings": NonNullable<Json>
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"created_by"?: string | null,"duplicates"?: number,"file_name"?: string | null,"id"?: string,"rows_imported": number,"rows_parsed": number,"rows_skipped": number,"source": string,"warnings"?: NonNullable<Json>
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by"?: string | null,"duplicates"?: number,"file_name"?: string | null,"id"?: string,"rows_imported"?: number,"rows_parsed"?: number,"rows_skipped"?: number,"source"?: string,"warnings"?: NonNullable<Json>
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"prospects": {
+                  Row: {
+                    "city": string | null,"company_name": string,"contact_delivery_status": string,"contact_name": string | null,"created_at": string,"email": string | null,"estimated_value_eur": number | null,"first_contact_on": string | null,"id": string,"last_activity_on": string | null,"last_activity_title": string | null,"last_contact_on": string | null,"legacy_ref": string | null,"linked_preview_id": string | null,"linked_project_id": string | null,"next_follow_up_on": string | null,"notes": string | null,"phone": string | null,"priority": string,"priority_order": number | null,"quote_value_eur": number | null,"sector": string | null,"source": string | null,"status": string,"status_order": number | null,"updated_at": string,"website_url": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "city"?: string | null,"company_name": string,"contact_delivery_status"?: string,"contact_name"?: string | null,"created_at"?: string,"email"?: string | null,"estimated_value_eur"?: number | null,"first_contact_on"?: string | null,"id"?: string,"last_activity_on"?: string | null,"last_activity_title"?: string | null,"last_contact_on"?: string | null,"legacy_ref"?: string | null,"linked_preview_id"?: string | null,"linked_project_id"?: string | null,"next_follow_up_on"?: string | null,"notes"?: string | null,"phone"?: string | null,"priority"?: string,"priority_order"?: never,"quote_value_eur"?: number | null,"sector"?: string | null,"source"?: string | null,"status"?: string,"status_order"?: never,"updated_at"?: string,"website_url"?: string | null
+                  }
+                  Update: {
+                    "city"?: string | null,"company_name"?: string,"contact_delivery_status"?: string,"contact_name"?: string | null,"created_at"?: string,"email"?: string | null,"estimated_value_eur"?: number | null,"first_contact_on"?: string | null,"id"?: string,"last_activity_on"?: string | null,"last_activity_title"?: string | null,"last_contact_on"?: string | null,"legacy_ref"?: string | null,"linked_preview_id"?: string | null,"linked_project_id"?: string | null,"next_follow_up_on"?: string | null,"notes"?: string | null,"phone"?: string | null,"priority"?: string,"priority_order"?: never,"quote_value_eur"?: number | null,"sector"?: string | null,"source"?: string | null,"status"?: string,"status_order"?: never,"updated_at"?: string,"website_url"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "prospects_linked_preview_id_fkey"
+      columns: ["linked_preview_id"]
+isOneToOne: false
+      referencedRelation: "client_previews"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "prospects_linked_project_id_fkey"
+      columns: ["linked_project_id"]
+isOneToOne: false
+      referencedRelation: "projects"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"review_invitations": {
                   Row: {
                     "client_name": string | null,"created_at": string,"created_by": string,"email": string | null,"expires_at": string,"id": string,"project_id": string | null,"review_id": string | null,"revoked_at": string | null,"token_hash": string,"used_at": string | null
@@ -281,6 +341,9 @@ isOneToOne: false
                            },
 "preview_upstream":
 { Args: { "p_id": string,"p_session_version": number }; Returns: Json
+                           },
+"prospect_summary":
+{ Args: { "p_today": string,"p_week_end": string }; Returns: Json
                            },
 "reset_preview_access_code":
 { Args: { "p_code": string,"p_id": string }; Returns: undefined
