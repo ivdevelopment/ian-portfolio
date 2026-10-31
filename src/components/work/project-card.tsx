@@ -17,6 +17,9 @@ type ProjectCardProps = {
   className?: string;
 };
 
+/** A dark backing keeps the label readable on any screenshot, including light ones. */
+const BADGE_CLASS = "rounded-full border border-line-strong bg-bg/85 px-2.5 py-1 text-xs text-ink backdrop-blur-md";
+
 /** Screenshot-first card. The whole card links to the case study. */
 export function ProjectCard({
   project,
@@ -39,10 +42,10 @@ export function ProjectCard({
         {(badges.length > 0 || (highlightFeatured && project.featured)) && (
           <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
             {highlightFeatured && project.featured && (
-              <span className="glass rounded-full px-2.5 py-1 text-xs text-ink">{dict.project.badges.featured}</span>
+              <span className={BADGE_CLASS}>{dict.project.badges.featured}</span>
             )}
             {badges.map((badge) => (
-              <span key={badge} className="glass rounded-full px-2.5 py-1 text-xs text-ink">
+              <span key={badge} className={BADGE_CLASS}>
                 {badge}
               </span>
             ))}
@@ -50,7 +53,7 @@ export function ProjectCard({
         )}
         <span
           aria-hidden
-          className="glass absolute right-3 bottom-3 inline-flex size-9 translate-y-1 items-center justify-center rounded-full text-ink opacity-0 transition-[opacity,transform] duration-500 ease-out-soft group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
+          className="absolute right-3 bottom-3 inline-flex size-9 translate-y-1 items-center rounded-full border border-line-strong bg-bg/85 backdrop-blur-md justify-center text-ink opacity-0 transition-[opacity,transform] duration-500 ease-out-soft group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
         >
           <ArrowUpRight className="size-4" />
         </span>
