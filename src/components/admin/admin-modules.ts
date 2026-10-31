@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   MessageSquareQuote,
   Settings,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 
@@ -35,6 +36,13 @@ export const adminModules: AdminModule[] = [
     description: "Create, edit, publish, feature and delete projects, and manage their media.",
     icon: FolderKanban,
     href: "/admin/projects",
+  },
+  {
+    id: "prospects",
+    label: "Prospects",
+    description: "Website-sales CRM: prospects, follow-ups and activity.",
+    icon: Users,
+    href: "/admin/prospects",
   },
   {
     id: "previews",

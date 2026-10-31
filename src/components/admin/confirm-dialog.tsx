@@ -11,6 +11,8 @@ type ConfirmDialogProps = {
   confirmLabel: string;
   pending?: boolean;
   error?: string | null;
+  /** Red for destructive actions (default); accent for everything else. */
+  tone?: "danger" | "primary";
   onConfirm: () => void;
   onClose: () => void;
 };
@@ -23,6 +25,7 @@ export function ConfirmDialog({
   confirmLabel,
   pending,
   error,
+  tone = "danger",
   onConfirm,
   onClose,
 }: ConfirmDialogProps) {
@@ -63,7 +66,7 @@ export function ConfirmDialog({
           size="sm"
           onClick={onConfirm}
           disabled={pending}
-          className="bg-danger text-bg shadow-none hover:brightness-110"
+          className={tone === "danger" ? "bg-danger text-bg shadow-none hover:brightness-110" : undefined}
         >
           {pending && <Loader2 aria-hidden className="size-4 animate-spin" />}
           {confirmLabel}

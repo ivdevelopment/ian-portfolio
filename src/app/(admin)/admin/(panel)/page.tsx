@@ -3,9 +3,15 @@ import { requireAdmin } from "@/lib/auth";
 import { AdminPageHeader, Badge, EmptyState, Panel, formatDate } from "@/components/admin/ui";
 import { InquiryStatusBadge } from "@/components/admin/inquiry-status";
 import { ButtonLink } from "@/components/ui/button";
+import { FollowUpCell, ProspectStatusBadge } from "@/components/admin/prospect-ui";
+import { brusselsToday } from "@/lib/prospects/dates";
+import { formatEur } from "@/lib/prospects/money";
+import { getSummary, listFollowUpQueue } from "@/lib/prospects/queries";
 
 export default async function AdminDashboardPage() {
   const { supabase } = await requireAdmin();
+  const today = brusselsToday();
+  const [crm, queue] = await Promise.all([getSummary(today), listFollowUpQueue(4, today)]);
 
   const [total, published, newInquiries, recentProjects, recentInquiries, pendingReviews, publishedReviews, recentReviews] =
     await Promise.all([
@@ -79,6 +85,56 @@ export default async function AdminDashboardPage() {
           </div>
         ))}
       </dl>
+
+      <Panel
+        className="mt-6"
+        title="Sales follow-ups"
+        actions={
+          <Link href="/admin/prospects" className="text-xs text-muted hover:text-ink">
+            View prospects
+          </Link>
+        }
+      >
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+          <div>
+            <dl className="grid grid-cols-3 gap-3 text-sm">
+              <Link href="/admin/prospects?followup=overdue" className="rounded-md border border-line p-2.5 hover:border-line-strong">
+                <dd className={"text-lg font-medium tabular-nums " + (crm.followups_overdue > 0 ? "text-danger" : "")}>{crm.followups_overdue}</dd>
+                <dt className="text-xs text-muted">Overdue</dt>
+              </Link>
+              <Link href="/admin/prospects?followup=today" className="rounded-md border border-line p-2.5 hover:border-line-strong">
+                <dd className="text-lg font-medium tabular-nums">{crm.followups_today}</dd>
+                <dt className="text-xs text-muted">Today</dt>
+              </Link>
+              <Link href="/admin/prospects?followup=week" className="rounded-md border border-line p-2.5 hover:border-line-strong">
+                <dd className="text-lg font-medium tabular-nums">{crm.followups_week}</dd>
+                <dt className="text-xs text-muted">Later this week</dt>
+              </Link>
+            </dl>
+            <p className="mt-3 text-xs text-muted">
+              {crm.total} prospects · {crm.replies} {crm.replies === 1 ? "reply" : "replies"}
+              {crm.pipeline_count > 0 ? ` · pipeline ${formatEur(crm.pipeline_value)}` : ""}
+            </p>
+          </div>
+          {queue.length === 0 ? (
+            <EmptyState>No follow-ups coming up.</EmptyState>
+          ) : (
+            <ul className="divide-y divide-line">
+              {queue.map((q) => (
+                <li key={q.id} className="flex items-center justify-between gap-3 py-2">
+                  <div className="min-w-0">
+                    <Link href={`/admin/prospects/${q.id}`} className="block truncate text-sm font-medium hover:text-accent">
+                      {q.company_name}
+                    </Link>
+                    <ProspectStatusBadge status={q.status} />
+                  </div>
+                  <FollowUpCell day={q.next_follow_up_on} status={q.status} today={today} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </Panel>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <Panel
