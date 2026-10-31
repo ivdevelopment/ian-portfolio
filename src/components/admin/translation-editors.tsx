@@ -1,16 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useDirtySaveState } from "./use-dirty-save";
 import { saveServicesTranslationAction } from "@/app/(admin)/admin/(panel)/pages/actions";
 import { saveProjectTranslationAction } from "@/app/(admin)/admin/(panel)/projects/actions";
 import { missingTranslationFields, type ProjectTranslation } from "@/lib/schemas/project-translation";
-import { SaveBar, type SaveStatus } from "./form-bits";
+import { SaveBar } from "./form-bits";
 import { Panel, adminInput } from "./ui";
-
-function nowLabel() {
-  return new Intl.DateTimeFormat("en-GB", { timeStyle: "short" }).format(new Date());
-}
 
 /** Label + input + the English text underneath for reference. */
 function TranslationField({
@@ -74,28 +70,17 @@ export type ServiceTranslationRow = {
 /** Dutch title, description and includes list for each service. Slugs, icons and order stay on the English tab. */
 export function ServicesTranslationEditor({ initial }: { initial: ServiceTranslationRow[] }) {
   const router = useRouter();
-  const [rows, setRows] = useState(initial);
-  const [status, setStatus] = useState<SaveStatus>({ kind: "idle" });
-  const [dirty, setDirty] = useState(false);
+  const { value: rows, setValue: setRows, dirty, status, save } = useDirtySaveState(
+    initial,
+    (draft) =>
+      saveServicesTranslationAction(
+        draft.map((r) => ({ id: r.id, title: r.title, description: r.description, includesText: r.includesText })),
+      ),
+    () => router.refresh(),
+  );
 
   const update = (i: number, patch: Partial<ServiceTranslationRow>) => {
     setRows((current) => current.map((row, index) => (index === i ? { ...row, ...patch } : row)));
-    setDirty(true);
-    setStatus({ kind: "idle" });
-  };
-
-  const save = async () => {
-    setStatus({ kind: "saving" });
-    const result = await saveServicesTranslationAction(
-      rows.map((r) => ({ id: r.id, title: r.title, description: r.description, includesText: r.includesText })),
-    );
-    if (!result.ok) {
-      setStatus({ kind: "error", message: result.error });
-      return;
-    }
-    setDirty(false);
-    setStatus({ kind: "saved", at: nowLabel() });
-    router.refresh();
   };
 
   if (rows.length === 0) return <p className="text-sm text-muted">No services yet — add them on the English tab first.</p>;
@@ -170,36 +155,24 @@ export function ProjectTranslationPanel({
   english: ProjectEnglish;
 }) {
   const router = useRouter();
-  const [value, setValue] = useState({ ...initial, featuresText: initial.features.join("\n") });
-  const [status, setStatus] = useState<SaveStatus>({ kind: "idle" });
-  const [dirty, setDirty] = useState(false);
+  const { value, setValue, dirty, status, save } = useDirtySaveState(
+    { ...initial, featuresText: initial.features.join("\n") },
+    ({ featuresText, ...rest }) =>
+      saveProjectTranslationAction(projectId, {
+        ...rest,
+        features: featuresText
+          .split("\n")
+          .map((f) => f.trim())
+          .filter(Boolean),
+      }),
+    () => router.refresh(),
+  );
 
   const set = <K extends keyof typeof value>(key: K, next: (typeof value)[K]) => {
     setValue((v) => ({ ...v, [key]: next }));
-    setDirty(true);
-    setStatus({ kind: "idle" });
   };
 
   const missing = missingTranslationFields({ ...value, features: value.featuresText.split("\n") });
-
-  const save = async () => {
-    setStatus({ kind: "saving" });
-    const { featuresText, ...rest } = value;
-    const result = await saveProjectTranslationAction(projectId, {
-      ...rest,
-      features: featuresText
-        .split("\n")
-        .map((f) => f.trim())
-        .filter(Boolean),
-    });
-    if (!result.ok) {
-      setStatus({ kind: "error", message: result.error });
-      return;
-    }
-    setDirty(false);
-    setStatus({ kind: "saved", at: nowLabel() });
-    router.refresh();
-  };
 
   return (
     <Panel

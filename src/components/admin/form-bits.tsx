@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import type { FieldErrors, FieldPath, FieldValues, UseFormReturn } from "react-hook-form";
 import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ export const SHARED_HINT = "Shared by every language — change it on the Englis
 export type SaveStatus =
   | { kind: "idle" }
   | { kind: "saving" }
-  | { kind: "saved"; at: string; warning?: string }
+  | { kind: "saved"; warning?: string }
   | { kind: "error"; message: string };
 
 export type SaveResult =
@@ -59,11 +59,7 @@ export function useSaveForm<T extends FieldValues>(
         return;
       }
       form.reset(values);
-      setStatus({
-        kind: "saved",
-        warning: result.warning,
-        at: new Intl.DateTimeFormat("en-GB", { timeStyle: "short" }).format(new Date()),
-      });
+      setStatus({ kind: "saved", warning: result.warning });
       router.refresh();
     },
     () => setStatus({ kind: "error", message: "Please fix the highlighted fields." }),
@@ -116,8 +112,22 @@ export function SaveBar({
   onSave: () => void;
 }) {
   const saving = status.kind === "saving";
+  // `dirty` undefined means "unknown": the button stays enabled. false disables it.
+  const clean = dirty === false;
+
+  // Warn before a refresh / tab close / external navigation would discard edits.
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+
   return (
-    <div className="glass-strong sticky bottom-3 z-10 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-card px-4 py-3">
+    <div className="glass-strong sticky bottom-3 z-10 mt-4 flex items-center justify-end gap-3 rounded-card px-4 py-2.5">
       <div aria-live="polite" className="min-h-5 text-sm">
         {status.kind === "error" && (
           <span role="alert" className="inline-flex items-center gap-2 text-danger">
@@ -125,15 +135,15 @@ export function SaveBar({
             {status.message}
           </span>
         )}
-        {status.kind === "saved" && (
-          <span role="status" className="inline-flex items-center gap-2 text-muted">
+        {status.kind !== "error" && dirty && !saving && <span className="text-muted">Unsaved changes</span>}
+        {status.kind === "saved" && !dirty && (
+          <span role="status" className="inline-flex items-center gap-1.5 text-muted">
             <CheckCircle2 aria-hidden className="size-4 text-accent" />
-            Saved at {status.at}.{status.warning ? ` ${status.warning}` : ""}
+            {status.warning ?? "Saved"}
           </span>
         )}
-        {status.kind === "idle" && dirty && <span className="text-muted">Unsaved changes</span>}
       </div>
-      <Button onClick={onSave} disabled={saving} size="sm">
+      <Button onClick={onSave} disabled={saving || clean} size="sm">
         {saving && <Loader2 aria-hidden className="size-4 animate-spin" />}
         {saving ? "Saving…" : label}
       </Button>

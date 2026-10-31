@@ -226,3 +226,13 @@ body {
     display: none;
   }
 }
+
+/* Native select popups (admin): keep them dark on Windows/Chrome instead of bright white. */
+select {
+  color-scheme: dark;
+}
+select option,
+select optgroup {
+  background-color: var(--color-elevated);
+  color: var(--color-ink);
+}

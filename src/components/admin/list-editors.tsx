@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { saveServicesAction, saveSkillsAction } from "@/app/(admin)/admin/(panel)/pages/actions";
+import { snapshotEqual } from "@/lib/dirty";
 import { slugify, uniqueSlug } from "@/lib/slug";
 import {
   SERVICE_ICONS,
@@ -50,6 +51,8 @@ function groupErrors(errors: Record<string, string>): Map<number, Record<string,
 }
 
 function useListSave<T>(
+  items: T[],
+  initial: T[],
   build: (draft: T[]) => unknown,
   schemaParse: (value: unknown) => { success: true } | { success: false; issues: Array<{ path: PropertyKey[]; message: string }> },
   action: (value: unknown) => Promise<{ ok: true } | { ok: false; error: string; fieldErrors?: Record<string, string> }>,
@@ -57,7 +60,9 @@ function useListSave<T>(
   const router = useRouter();
   const [status, setStatus] = useState<SaveStatus>({ kind: "idle" });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [dirty, setDirty] = useState(false);
+  // Dirty = differs from the last successfully saved list (so reverting an edit makes it clean again).
+  const [baseline, setBaseline] = useState<T[]>(initial);
+  const dirty = !snapshotEqual(items, baseline);
 
   const save = async (draft: T[]) => {
     const value = build(draft);
@@ -80,12 +85,12 @@ function useListSave<T>(
       setStatus({ kind: "error", message: result.error });
       return;
     }
-    setDirty(false);
-    setStatus({ kind: "saved", at: new Intl.DateTimeFormat("en-GB", { timeStyle: "short" }).format(new Date()) });
+    setBaseline(draft);
+    setStatus({ kind: "saved" });
     router.refresh();
   };
 
-  return { status, errors, dirty, setDirty, save };
+  return { status, errors, dirty, setStatus, save };
 }
 
 /* -------------------------------------------------------------- services */
@@ -94,7 +99,9 @@ export function ServicesEditor({ initial }: { initial: ServiceDraft[] }) {
   const [items, setItems] = useState(initial);
   const [pendingDelete, setPendingDelete] = useState<number | null>(null);
 
-  const { status, errors, dirty, setDirty, save } = useListSave<ServiceDraft>(
+  const { status, errors, dirty, save } = useListSave<ServiceDraft>(
+    items,
+    initial,
     (draft) =>
       draft.map((s) => ({
         id: s.id,
@@ -116,7 +123,6 @@ export function ServicesEditor({ initial }: { initial: ServiceDraft[] }) {
 
   const update = (i: number, patch: Partial<ServiceDraft>) => {
     setItems((list) => list.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
-    setDirty(true);
   };
 
   return (
@@ -212,10 +218,10 @@ export function ServicesEditor({ initial }: { initial: ServiceDraft[] }) {
                       Enabled
                       <span className="text-xs text-subtle">{s.enabled ? "(visible)" : "(hidden)"}</span>
                     </label>
-                    <button type="button" className={rowButton} disabled={i === 0} aria-label={`Move ${s.title || "service"} up`} onClick={() => { setItems((l) => move(l, i, i - 1)); setDirty(true); }}>
+                    <button type="button" className={rowButton} disabled={i === 0} aria-label={`Move ${s.title || "service"} up`} onClick={() => { setItems((l) => move(l, i, i - 1)); }}>
                       <ArrowUp aria-hidden className="size-3.5" />
                     </button>
-                    <button type="button" className={rowButton} disabled={i === items.length - 1} aria-label={`Move ${s.title || "service"} down`} onClick={() => { setItems((l) => move(l, i, i + 1)); setDirty(true); }}>
+                    <button type="button" className={rowButton} disabled={i === items.length - 1} aria-label={`Move ${s.title || "service"} down`} onClick={() => { setItems((l) => move(l, i, i + 1)); }}>
                       <ArrowDown aria-hidden className="size-3.5" />
                     </button>
                     <button type="button" className={cn(rowButton, "hover:border-danger/50 hover:text-danger")} aria-label={`Delete ${s.title || "service"}`} onClick={() => setPendingDelete(i)}>
@@ -238,7 +244,6 @@ export function ServicesEditor({ initial }: { initial: ServiceDraft[] }) {
               ...l,
               { id: crypto.randomUUID(), slug, title: "", description: "", icon: "design", includesText: "", enabled: true },
             ]);
-            setDirty(true);
           }}
         >
           <Plus aria-hidden className="size-4" /> Add service
@@ -255,7 +260,6 @@ export function ServicesEditor({ initial }: { initial: ServiceDraft[] }) {
         onConfirm={() => {
           if (pendingDelete === null) return;
           setItems((l) => l.filter((_, idx) => idx !== pendingDelete));
-          setDirty(true);
           setPendingDelete(null);
         }}
       >
@@ -272,7 +276,9 @@ export function SkillsEditor({ initial }: { initial: SkillDraft[] }) {
   const [draftName, setDraftName] = useState("");
   const [pendingDelete, setPendingDelete] = useState<number | null>(null);
 
-  const { status, errors, dirty, setDirty, save } = useListSave<SkillDraft>(
+  const { status, errors, dirty, save } = useListSave<SkillDraft>(
+    items,
+    initial,
     (draft) => draft.map((s) => ({ id: s.id, name: s.name, enabled: s.enabled })),
     (value) => skillsListSchema.safeParse(value) as never,
     saveSkillsAction,
@@ -281,14 +287,12 @@ export function SkillsEditor({ initial }: { initial: SkillDraft[] }) {
 
   const update = (i: number, patch: Partial<SkillDraft>) => {
     setItems((list) => list.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
-    setDirty(true);
   };
   const add = () => {
     const name = draftName.trim();
     if (!name) return;
     setItems((l) => [...l, { id: crypto.randomUUID(), name, enabled: true }]);
     setDraftName("");
-    setDirty(true);
   };
 
   return (
@@ -313,10 +317,10 @@ export function SkillsEditor({ initial }: { initial: SkillDraft[] }) {
                 <input type="checkbox" checked={s.enabled} className="size-4 accent-[var(--color-accent-strong)]" onChange={(ev) => update(i, { enabled: ev.target.checked })} />
                 Enabled
               </label>
-              <button type="button" className={rowButton} disabled={i === 0} aria-label={`Move ${s.name} up`} onClick={() => { setItems((l) => move(l, i, i - 1)); setDirty(true); }}>
+              <button type="button" className={rowButton} disabled={i === 0} aria-label={`Move ${s.name} up`} onClick={() => { setItems((l) => move(l, i, i - 1)); }}>
                 <ArrowUp aria-hidden className="size-3.5" />
               </button>
-              <button type="button" className={rowButton} disabled={i === items.length - 1} aria-label={`Move ${s.name} down`} onClick={() => { setItems((l) => move(l, i, i + 1)); setDirty(true); }}>
+              <button type="button" className={rowButton} disabled={i === items.length - 1} aria-label={`Move ${s.name} down`} onClick={() => { setItems((l) => move(l, i, i + 1)); }}>
                 <ArrowDown aria-hidden className="size-3.5" />
               </button>
               <button type="button" className={cn(rowButton, "hover:border-danger/50 hover:text-danger")} aria-label={`Delete ${s.name}`} onClick={() => setPendingDelete(i)}>
@@ -357,7 +361,6 @@ export function SkillsEditor({ initial }: { initial: SkillDraft[] }) {
         onConfirm={() => {
           if (pendingDelete === null) return;
           setItems((l) => l.filter((_, idx) => idx !== pendingDelete));
-          setDirty(true);
           setPendingDelete(null);
         }}
       >

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Controller, useFieldArray, useForm, useWatch, type FieldPath } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -21,6 +21,7 @@ import {
 } from "@/app/(admin)/admin/(panel)/projects/actions";
 import { MEDIA_BUCKET } from "@/lib/supabase/env";
 import { createBrowserSupabase } from "@/lib/supabase/browser";
+import { AdminSelect } from "./admin-select";
 import { slugify } from "@/lib/slug";
 import {
   KIND_LABELS,
@@ -46,7 +47,7 @@ type Props = {
 type Status =
   | { kind: "idle" }
   | { kind: "saving" }
-  | { kind: "saved"; warning?: string; at: string }
+  | { kind: "saved"; warning?: string }
   | { kind: "error"; message: string };
 
 const PREVIEW_OPTIONS = [
@@ -118,7 +119,6 @@ export function ProjectEditor({ mode, initial, notice }: Props) {
     notice
       ? {
           kind: "saved",
-          at: "",
           warning:
             notice === "duplicated"
               ? "Duplicated as a draft. Review the details, then publish when ready."
@@ -126,6 +126,8 @@ export function ProjectEditor({ mode, initial, notice }: Props) {
         }
       : { kind: "idle" },
   );
+  // The one-off "Project created" note disappears after the first save in this session.
+  const [savedSince, setSavedSince] = useState(false);
   const [slugTouched, setSlugTouched] = useState(mode === "edit");
   const [slugUnlocked, setSlugUnlocked] = useState(mode === "create");
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -138,6 +140,19 @@ export function ProjectEditor({ mode, initial, notice }: Props) {
   const published = useWatch({ control, name: "published" });
   const slugValue = useWatch({ control, name: "slug" });
   const wasPublished = initial.published;
+  // Reliable react-hook-form dirty state: clean again when values return to the saved ones.
+  const isDirty = form.formState.isDirty;
+
+  // Warn before a refresh / tab close would discard unsaved edits.
+  useEffect(() => {
+    if (!isDirty) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [isDirty]);
   const saving = status.kind === "saving";
 
   const applyServerErrors = (fieldErrors?: Record<string, string>) => {
@@ -165,11 +180,8 @@ export function ProjectEditor({ mode, initial, notice }: Props) {
         }
         form.reset(values);
         setSlugUnlocked(false);
-        setStatus({
-          kind: "saved",
-          warning: result.warning,
-          at: new Intl.DateTimeFormat("en-GB", { timeStyle: "short" }).format(new Date()),
-        });
+        setSavedSince(true);
+        setStatus({ kind: "saved", warning: result.warning });
         router.refresh();
       },
       () => setStatus({ kind: "error", message: "Please fix the highlighted fields." }),
@@ -210,19 +222,16 @@ export function ProjectEditor({ mode, initial, notice }: Props) {
             {status.message}
           </div>
         )}
-        {status.kind === "saved" && (status.at || status.warning) && (
+        {status.kind === "saved" && status.warning && (
           <div
             role="status"
             className="flex gap-2 rounded-card border border-accent/40 bg-accent-soft p-3 text-sm"
           >
             <CheckCircle2 aria-hidden className="mt-0.5 size-4 shrink-0 text-accent" />
-            <p>
-              {status.at ? `Saved at ${status.at}. ` : notice === "created" ? "" : ""}
-              {status.warning}
-            </p>
+            <p>{status.warning}</p>
           </div>
         )}
-        {notice === "created" && status.kind === "saved" && !status.at && (
+        {notice === "created" && !savedSince && status.kind === "saved" && !status.warning && (
           <div role="status" className="flex gap-2 rounded-card border border-accent/40 bg-accent-soft p-3 text-sm">
             <CheckCircle2 aria-hidden className="mt-0.5 size-4 shrink-0 text-accent" />
             Project created.
@@ -335,13 +344,18 @@ export function ProjectEditor({ mode, initial, notice }: Props) {
             </Field>
 
             <Field id="kind" label="Type of work" hint="Used by the public filters.">
-              <select id="kind" className={cn(adminInput, "h-10")} {...register("kind")}>
-                {PROJECT_KINDS.map((k) => (
-                  <option key={k} value={k}>
-                    {KIND_LABELS[k]}
-                  </option>
-                ))}
-              </select>
+              <Controller
+                control={control}
+                name="kind"
+                render={({ field }) => (
+                  <AdminSelect
+                    id="kind"
+                    value={field.value}
+                    onChange={field.onChange}
+                    options={PROJECT_KINDS.map((k) => ({ value: k, label: KIND_LABELS[k] }))}
+                  />
+                )}
+              />
             </Field>
 
             <Field id="year" label="Year" error={err("year")}>
@@ -367,14 +381,21 @@ export function ProjectEditor({ mode, initial, notice }: Props) {
               hint="Be accurate: label concepts and personal work as such."
               className="sm:col-span-2"
             >
-              <select id="projectType" className={cn(adminInput, "h-10")} {...register("projectType")}>
-                <option value="">Not specified</option>
-                {PROJECT_TYPE_VALUES.map((t) => (
-                  <option key={t} value={t}>
-                    {PROJECT_TYPE_LABELS[t]}
-                  </option>
-                ))}
-              </select>
+              <Controller
+                control={control}
+                name="projectType"
+                render={({ field }) => (
+                  <AdminSelect
+                    id="projectType"
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    options={[
+                      { value: "", label: "Not specified" },
+                      ...PROJECT_TYPE_VALUES.map((t) => ({ value: t, label: PROJECT_TYPE_LABELS[t] })),
+                    ]}
+                  />
+                )}
+              />
             </Field>
           </div>
         </Panel>
@@ -615,9 +636,9 @@ export function ProjectEditor({ mode, initial, notice }: Props) {
           <div className="mt-5 flex flex-col gap-2">
             {wasPublished ? (
               <>
-                <Button onClick={() => save(true)} disabled={saving}>
+                <Button onClick={() => save(true)} disabled={saving || !isDirty}>
                   {saving && published && <Loader2 aria-hidden className="size-4 animate-spin" />}
-                  Save changes
+                  {saving && published ? "Saving…" : "Save changes"}
                 </Button>
                 <Button variant="secondary" onClick={() => save(false)} disabled={saving}>
                   Move to draft
