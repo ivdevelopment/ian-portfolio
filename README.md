@@ -54,7 +54,7 @@ npm run dev:local                 # http://localhost:3000 against the LOCAL stac
 | `ZOHO_SMTP_HOST` / `ZOHO_SMTP_PORT` | app (server) | optional | Zoho SMTP, default `smtppro.zoho.eu` / `465` (implicit TLS; `587` uses STARTTLS) |
 | `ZOHO_SMTP_USER` / `ZOHO_SMTP_PASSWORD` | app (server) | optional | The Zoho mailbox and its (application-specific) password. Server-only; this mailbox is also the From address |
 | `CONTACT_NOTIFICATION_EMAIL` | app (server) | optional | Where new-inquiry emails go (defaults to `ZOHO_SMTP_USER`) |
-| `SUPABASE_SERVICE_ROLE_KEY` | **your machine only** | no | Used solely by `scripts/create-admin.mjs` and `scripts/reset-admin-password.mjs`. **Never set it in hosting**, never prefix with `NEXT_PUBLIC_` |
+| `SUPABASE_SERVICE_ROLE_KEY` | **your machine only** | no | Used solely by `scripts/create-admin.mjs`, `scripts/reset-admin-password.mjs` and `scripts/portfolio-import/`. **Never set it in hosting**, never prefix with `NEXT_PUBLIC_` |
 
 The running application never uses the service-role key. Vercel's own variables (`VERCEL`, `VERCEL_ENV`, `VERCEL_PROJECT_PRODUCTION_URL`) are read automatically.
 
@@ -179,6 +179,22 @@ Bucket: `project-media` (public read; only admins can upload, replace or delete)
 | Video | `video/mp4` | 50 MB (bucket ceiling) |
 
 Validated in the browser, again on the server (path ownership, type/extension match) and by Storage itself (MIME allow-list and size). SVG and HTML uploads are rejected. Unsaved uploads are removed if you cancel; files dropped from a project are removed when you save.
+
+## Importing the concept sites
+
+The nine concept demos are ordinary CMS projects, created by a repeatable import from `portfolio-projects.json` (kept with the screenshots in `D:\Websites\Portfolio Assets`). `scripts/portfolio-import/curation.mjs` holds the editorial choices: order, featured state, gallery and Dutch captions.
+
+```bash
+npm run portfolio:import:local            # rehearse on the local stack
+npm run portfolio:import -- --remote --dry-run
+npm run portfolio:import -- --remote      # hosted project; needs SUPABASE_SERVICE_ROLE_KEY in .env.local
+npm run portfolio:import -- --remote --rollback --yes   # removes exactly these nine and their files
+```
+
+- **Safe to re-run.** Project and media ids are UUIDv5 values derived from the slug, and files are named from their content hash, so a re-run updates the same rows and uploads only changed files. A slug held by a project the tool didn't create stops the run before anything is written.
+- **A re-run restores the imported fields**, overwriting admin edits to these nine projects. Change `curation.mjs` or the manifest instead, or stop re-running once you edit them by hand.
+- **Other projects are never written.** Each run saves the project list to `import-backups/` beside the manifest, then checks that everything else is unchanged.
+- The service-role key is needed because `save_project()` only accepts a signed-in admin. It stays on your machine. Public pages show an import after the next deployment, or within the hour.
 
 ## Security summary
 

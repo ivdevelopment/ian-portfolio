@@ -19,7 +19,9 @@
     "build:local": "node scripts/run-local.mjs next build",
     "start:local": "node scripts/run-local.mjs next start",
     "admin:reset-password": "node --env-file=.env.local scripts/reset-admin-password.mjs",
-    "admin:diagnose": "node --env-file=.env.local scripts/diagnose-auth.mjs"
+    "admin:diagnose": "node --env-file=.env.local scripts/diagnose-auth.mjs",
+    "portfolio:import": "node --env-file=.env.local scripts/portfolio-import/import.mjs",
+    "portfolio:import:local": "node --env-file=.env.supabase-local scripts/portfolio-import/import.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^6.0.2",
