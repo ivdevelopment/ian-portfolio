@@ -37,6 +37,20 @@ export type Database = {
                   Relationships: [
                     
                   ]
+                },"client_previews": {
+                  Row: {
+                    "access_code_hash": string,"access_count": number,"active": boolean,"client_name": string,"created_at": string,"expires_at": string | null,"id": string,"last_accessed_at": string | null,"notes": string | null,"project_name": string,"session_ttl_hours": number,"session_version": number,"subdomain": string,"target_url": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "access_code_hash": string,"access_count"?: number,"active"?: boolean,"client_name": string,"created_at"?: string,"expires_at"?: string | null,"id"?: string,"last_accessed_at"?: string | null,"notes"?: string | null,"project_name": string,"session_ttl_hours"?: number,"session_version"?: number,"subdomain": string,"target_url": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "access_code_hash"?: string,"access_count"?: number,"active"?: boolean,"client_name"?: string,"created_at"?: string,"expires_at"?: string | null,"id"?: string,"last_accessed_at"?: string | null,"notes"?: string | null,"project_name"?: string,"session_ttl_hours"?: number,"session_version"?: number,"subdomain"?: string,"target_url"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"inquiries": {
                   Row: {
                     "budget": string,"created_at": string,"email": string,"id": string,"ip_hash": string | null,"message": string,"name": string,"project_type": string,"status": Database["public"]['Enums']["inquiry_status"],"updated_at": string
@@ -50,6 +64,26 @@ export type Database = {
                   }
                   Relationships: [
                     
+                  ]
+                },"preview_access_attempts": {
+                  Row: {
+                    "attempted_at": string,"id": number,"ip_hash": string,"preview_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "attempted_at"?: string,"id"?: never,"ip_hash": string,"preview_id": string
+                  }
+                  Update: {
+                    "attempted_at"?: string,"id"?: never,"ip_hash"?: string,"preview_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "preview_access_attempts_preview_id_fkey"
+      columns: ["preview_id"]
+isOneToOne: false
+      referencedRelation: "client_previews"
+      referencedColumns: ["id"]
+    }
                   ]
                 },"project_features": {
                   Row: {
@@ -93,14 +127,14 @@ isOneToOne: false
                   ]
                 },"projects": {
                   Row: {
-                    "category": string,"client": string | null,"created_at": string,"description": string | null,"featured": boolean,"github_url": string | null,"id": string,"is_example": boolean,"kind": Database["public"]['Enums']["project_kind"],"live_url": string | null,"preview_mode": Database["public"]['Enums']["preview_mode"],"preview_url": string | null,"project_type": Database["public"]['Enums']["project_type"] | null,"published": boolean,"published_at": string | null,"short_description": string,"slug": string,"sort_order": number,"subtitle": string | null,"tags": (string)[],"technologies": (string)[],"thumbnail_path": string | null,"title": string,"translations": Json,"updated_at": string,"year": number | null
+                    "category": string,"client": string | null,"created_at": string,"description": string | null,"featured": boolean,"github_url": string | null,"id": string,"is_example": boolean,"kind": Database["public"]['Enums']["project_kind"],"live_url": string | null,"preview_mode": Database["public"]['Enums']["preview_mode"],"preview_url": string | null,"project_type": Database["public"]['Enums']["project_type"] | null,"published": boolean,"published_at": string | null,"short_description": string,"slug": string,"sort_order": number,"subtitle": string | null,"tags": (string)[],"technologies": (string)[],"thumbnail_path": string | null,"title": string,"translations": NonNullable<Json>,"updated_at": string,"year": number | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "category": string,"client"?: string | null,"created_at"?: string,"description"?: string | null,"featured"?: boolean,"github_url"?: string | null,"id"?: string,"is_example"?: boolean,"kind"?: Database["public"]['Enums']["project_kind"],"live_url"?: string | null,"preview_mode"?: Database["public"]['Enums']["preview_mode"],"preview_url"?: string | null,"project_type"?: Database["public"]['Enums']["project_type"] | null,"published"?: boolean,"published_at"?: string | null,"short_description": string,"slug": string,"sort_order"?: number,"subtitle"?: string | null,"tags"?: (string)[],"technologies"?: (string)[],"thumbnail_path"?: string | null,"title": string,"translations"?: Json,"updated_at"?: string,"year"?: number | null
+                    "category": string,"client"?: string | null,"created_at"?: string,"description"?: string | null,"featured"?: boolean,"github_url"?: string | null,"id"?: string,"is_example"?: boolean,"kind"?: Database["public"]['Enums']["project_kind"],"live_url"?: string | null,"preview_mode"?: Database["public"]['Enums']["preview_mode"],"preview_url"?: string | null,"project_type"?: Database["public"]['Enums']["project_type"] | null,"published"?: boolean,"published_at"?: string | null,"short_description": string,"slug": string,"sort_order"?: number,"subtitle"?: string | null,"tags"?: (string)[],"technologies"?: (string)[],"thumbnail_path"?: string | null,"title": string,"translations"?: NonNullable<Json>,"updated_at"?: string,"year"?: number | null
                   }
                   Update: {
-                    "category"?: string,"client"?: string | null,"created_at"?: string,"description"?: string | null,"featured"?: boolean,"github_url"?: string | null,"id"?: string,"is_example"?: boolean,"kind"?: Database["public"]['Enums']["project_kind"],"live_url"?: string | null,"preview_mode"?: Database["public"]['Enums']["preview_mode"],"preview_url"?: string | null,"project_type"?: Database["public"]['Enums']["project_type"] | null,"published"?: boolean,"published_at"?: string | null,"short_description"?: string,"slug"?: string,"sort_order"?: number,"subtitle"?: string | null,"tags"?: (string)[],"technologies"?: (string)[],"thumbnail_path"?: string | null,"title"?: string,"translations"?: Json,"updated_at"?: string,"year"?: number | null
+                    "category"?: string,"client"?: string | null,"created_at"?: string,"description"?: string | null,"featured"?: boolean,"github_url"?: string | null,"id"?: string,"is_example"?: boolean,"kind"?: Database["public"]['Enums']["project_kind"],"live_url"?: string | null,"preview_mode"?: Database["public"]['Enums']["preview_mode"],"preview_url"?: string | null,"project_type"?: Database["public"]['Enums']["project_type"] | null,"published"?: boolean,"published_at"?: string | null,"short_description"?: string,"slug"?: string,"sort_order"?: number,"subtitle"?: string | null,"tags"?: (string)[],"technologies"?: (string)[],"thumbnail_path"?: string | null,"title"?: string,"translations"?: NonNullable<Json>,"updated_at"?: string,"year"?: number | null
                   }
                   Relationships: [
                     
@@ -173,42 +207,42 @@ isOneToOne: false
                   ]
                 },"services": {
                   Row: {
-                    "created_at": string,"description": string,"enabled": boolean,"icon": string,"id": string,"includes": (string)[],"slug": string,"sort_order": number,"title": string,"translations": Json,"updated_at": string
+                    "created_at": string,"description": string,"enabled": boolean,"icon": string,"id": string,"includes": (string)[],"slug": string,"sort_order": number,"title": string,"translations": NonNullable<Json>,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"description": string,"enabled"?: boolean,"icon"?: string,"id"?: string,"includes"?: (string)[],"slug": string,"sort_order"?: number,"title": string,"translations"?: Json,"updated_at"?: string
+                    "created_at"?: string,"description": string,"enabled"?: boolean,"icon"?: string,"id"?: string,"includes"?: (string)[],"slug": string,"sort_order"?: number,"title": string,"translations"?: NonNullable<Json>,"updated_at"?: string
                   }
                   Update: {
-                    "created_at"?: string,"description"?: string,"enabled"?: boolean,"icon"?: string,"id"?: string,"includes"?: (string)[],"slug"?: string,"sort_order"?: number,"title"?: string,"translations"?: Json,"updated_at"?: string
+                    "created_at"?: string,"description"?: string,"enabled"?: boolean,"icon"?: string,"id"?: string,"includes"?: (string)[],"slug"?: string,"sort_order"?: number,"title"?: string,"translations"?: NonNullable<Json>,"updated_at"?: string
                   }
                   Relationships: [
                     
                   ]
                 },"site_content": {
                   Row: {
-                    "content": NonNullable<Json>,"key": string,"translations": Json,"updated_at": string
+                    "content": NonNullable<Json>,"key": string,"translations": NonNullable<Json>,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "content": NonNullable<Json>,"key": string,"translations"?: Json,"updated_at"?: string
+                    "content": NonNullable<Json>,"key": string,"translations"?: NonNullable<Json>,"updated_at"?: string
                   }
                   Update: {
-                    "content"?: NonNullable<Json>,"key"?: string,"translations"?: Json,"updated_at"?: string
+                    "content"?: NonNullable<Json>,"key"?: string,"translations"?: NonNullable<Json>,"updated_at"?: string
                   }
                   Relationships: [
                     
                   ]
                 },"site_settings": {
                   Row: {
-                    "contact_email": string | null,"display_name": string,"github_url": string | null,"id": boolean,"instagram_url": string | null,"linkedin_url": string | null,"location": string | null,"seo_default_description": string,"seo_default_title": string,"seo_og_title": string | null,"seo_title_template": string,"site_name": string,"translations": Json,"updated_at": string,"x_url": string | null
+                    "contact_email": string | null,"display_name": string,"github_url": string | null,"id": boolean,"instagram_url": string | null,"linkedin_url": string | null,"location": string | null,"seo_default_description": string,"seo_default_title": string,"seo_og_title": string | null,"seo_title_template": string,"site_name": string,"translations": NonNullable<Json>,"updated_at": string,"x_url": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "contact_email"?: string | null,"display_name": string,"github_url"?: string | null,"id"?: boolean,"instagram_url"?: string | null,"linkedin_url"?: string | null,"location"?: string | null,"seo_default_description": string,"seo_default_title": string,"seo_og_title"?: string | null,"seo_title_template": string,"site_name": string,"translations"?: Json,"updated_at"?: string,"x_url"?: string | null
+                    "contact_email"?: string | null,"display_name": string,"github_url"?: string | null,"id"?: boolean,"instagram_url"?: string | null,"linkedin_url"?: string | null,"location"?: string | null,"seo_default_description": string,"seo_default_title": string,"seo_og_title"?: string | null,"seo_title_template": string,"site_name": string,"translations"?: NonNullable<Json>,"updated_at"?: string,"x_url"?: string | null
                   }
                   Update: {
-                    "contact_email"?: string | null,"display_name"?: string,"github_url"?: string | null,"id"?: boolean,"instagram_url"?: string | null,"linkedin_url"?: string | null,"location"?: string | null,"seo_default_description"?: string,"seo_default_title"?: string,"seo_og_title"?: string | null,"seo_title_template"?: string,"site_name"?: string,"translations"?: Json,"updated_at"?: string,"x_url"?: string | null
+                    "contact_email"?: string | null,"display_name"?: string,"github_url"?: string | null,"id"?: boolean,"instagram_url"?: string | null,"linkedin_url"?: string | null,"location"?: string | null,"seo_default_description"?: string,"seo_default_title"?: string,"seo_og_title"?: string | null,"seo_title_template"?: string,"site_name"?: string,"translations"?: NonNullable<Json>,"updated_at"?: string,"x_url"?: string | null
                   }
                   Relationships: [
                     
@@ -233,11 +267,23 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            "get_review_invitation":
+            "create_client_preview":
+{ Args: { "p_client_name": string,"p_code": string,"p_expires_at": string,"p_notes": string,"p_project_name": string,"p_session_ttl_hours": number,"p_subdomain": string,"p_target_url": string }; Returns: string
+                           },
+"get_review_invitation":
 { Args: { "p_token_hash": string }; Returns: Json
                            },
 "is_admin":
 { Args: Record<PropertyKey, never>; Returns: boolean
+                           },
+"preview_gate":
+{ Args: { "p_subdomain": string }; Returns: Json
+                           },
+"preview_target":
+{ Args: { "p_id": string,"p_session_version": number }; Returns: string
+                           },
+"reset_preview_access_code":
+{ Args: { "p_code": string,"p_id": string }; Returns: undefined
                            },
 "save_project":
 { Args: { "p_features": Json,"p_id": string,"p_media": Json,"p_project": Json }; Returns: string
@@ -253,6 +299,9 @@ isOneToOne: false
                            },
 "submit_review":
 { Args: { "p_company": string,"p_ip_hash"?: string,"p_name": string,"p_rating": number,"p_role": string,"p_text": string,"p_token_hash": string }; Returns: string
+                           },
+"verify_preview_access":
+{ Args: { "p_code": string,"p_ip_hash": string,"p_subdomain": string }; Returns: Json
                            }
           }
           Enums: {
