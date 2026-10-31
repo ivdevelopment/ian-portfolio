@@ -111,7 +111,7 @@ export async function handleGatewayRequest(request: Request, deps: GatewayDeps):
   // 3. Crawlers: always "no", with or without access.
   if (path === "/robots.txt" && (method === "GET" || method === "HEAD")) return text(ROBOTS_DISALLOW_ALL, 200);
 
-  // 4. Preview state, checked on EVERY request (disable / expiry / reset apply immediately, bounded by the tiny state cache).
+  // 4. Preview state, read from the database on EVERY request: disable / expiry / code reset / target change apply immediately.
   let gate;
   try {
     gate = await store.gate(subdomain);
@@ -152,14 +152,14 @@ export async function handleGatewayRequest(request: Request, deps: GatewayDeps):
   }
 
   // 7. Authorised: resolve the target (never exposed to the browser) and proxy.
-  let targetRaw: string | null;
+  let upstreamInfo;
   try {
-    targetRaw = await store.target(gate.id, gate.sessionVersion);
+    upstreamInfo = await store.upstream(gate.id, gate.sessionVersion);
   } catch {
     return page(targetUnavailablePage(), 503);
   }
-  if (!targetRaw) return page(unavailablePage(), 503);
-  const target = validateTargetUrl(targetRaw, { blockedDomains: [config.baseDomain] });
+  if (!upstreamInfo) return page(unavailablePage(), 503);
+  const target = validateTargetUrl(upstreamInfo.url, { blockedDomains: [config.baseDomain] });
   if (!target.ok) {
     log({ event: "preview_target_rejected", subdomain, id: gate.id });
     return page(targetUnavailablePage(), 502);
@@ -179,12 +179,24 @@ export async function handleGatewayRequest(request: Request, deps: GatewayDeps):
     body = buffer.length > 0 ? buffer : undefined;
   }
 
+  // The origin's shared secret goes to THIS preview's origin only. A preview that requires one but whose
+  // secret is not configured fails closed instead of being proxied without it.
+  const upstreamHeaders = buildUpstreamHeaders(request.headers, ctx);
+  if (upstreamInfo.auth.type === "header") {
+    const secret = config.upstreamSecret(upstreamInfo.auth.secretRef);
+    if (!secret) {
+      log({ event: "preview_upstream_secret_missing", subdomain, id: gate.id });
+      return page(targetUnavailablePage(), 503);
+    }
+    upstreamHeaders[upstreamInfo.auth.headerName.toLowerCase()] = secret;
+  }
+
   let upstream: UpstreamResponse;
   try {
     upstream = await deps.fetchUpstream({
       url: upstreamUrl,
       method,
-      headers: buildUpstreamHeaders(request.headers, ctx),
+      headers: upstreamHeaders,
       body,
     });
   } catch (error) {
@@ -222,6 +234,8 @@ export async function handleGatewayRequest(request: Request, deps: GatewayDeps):
       }
       chunks.push(chunk as Buffer);
     }
+    // The body changes, so validators and range support of the original no longer describe it.
+    for (const h of ["etag", "last-modified", "accept-ranges"]) headers.delete(h);
     const rewritten = rewriteBodyText(Buffer.concat(chunks).toString("utf8"), ctx);
     return new Response(rewritten, { status, headers });
   }

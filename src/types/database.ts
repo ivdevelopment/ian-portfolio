@@ -39,14 +39,14 @@ export type Database = {
                   ]
                 },"client_previews": {
                   Row: {
-                    "access_code_hash": string,"access_count": number,"active": boolean,"client_name": string,"created_at": string,"expires_at": string | null,"id": string,"last_accessed_at": string | null,"notes": string | null,"project_name": string,"session_ttl_hours": number,"session_version": number,"subdomain": string,"target_url": string,"updated_at": string
+                    "access_code_hash": string,"access_count": number,"active": boolean,"client_name": string,"created_at": string,"expires_at": string | null,"id": string,"last_accessed_at": string | null,"notes": string | null,"project_name": string,"session_ttl_hours": number,"session_version": number,"subdomain": string,"target_url": string,"updated_at": string,"upstream_auth_type": string,"upstream_header_name": string | null,"upstream_secret_ref": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "access_code_hash": string,"access_count"?: number,"active"?: boolean,"client_name": string,"created_at"?: string,"expires_at"?: string | null,"id"?: string,"last_accessed_at"?: string | null,"notes"?: string | null,"project_name": string,"session_ttl_hours"?: number,"session_version"?: number,"subdomain": string,"target_url": string,"updated_at"?: string
+                    "access_code_hash": string,"access_count"?: number,"active"?: boolean,"client_name": string,"created_at"?: string,"expires_at"?: string | null,"id"?: string,"last_accessed_at"?: string | null,"notes"?: string | null,"project_name": string,"session_ttl_hours"?: number,"session_version"?: number,"subdomain": string,"target_url": string,"updated_at"?: string,"upstream_auth_type"?: string,"upstream_header_name"?: string | null,"upstream_secret_ref"?: string | null
                   }
                   Update: {
-                    "access_code_hash"?: string,"access_count"?: number,"active"?: boolean,"client_name"?: string,"created_at"?: string,"expires_at"?: string | null,"id"?: string,"last_accessed_at"?: string | null,"notes"?: string | null,"project_name"?: string,"session_ttl_hours"?: number,"session_version"?: number,"subdomain"?: string,"target_url"?: string,"updated_at"?: string
+                    "access_code_hash"?: string,"access_count"?: number,"active"?: boolean,"client_name"?: string,"created_at"?: string,"expires_at"?: string | null,"id"?: string,"last_accessed_at"?: string | null,"notes"?: string | null,"project_name"?: string,"session_ttl_hours"?: number,"session_version"?: number,"subdomain"?: string,"target_url"?: string,"updated_at"?: string,"upstream_auth_type"?: string,"upstream_header_name"?: string | null,"upstream_secret_ref"?: string | null
                   }
                   Relationships: [
                     
@@ -279,8 +279,8 @@ isOneToOne: false
 "preview_gate":
 { Args: { "p_subdomain": string }; Returns: Json
                            },
-"preview_target":
-{ Args: { "p_id": string,"p_session_version": number }; Returns: string
+"preview_upstream":
+{ Args: { "p_id": string,"p_session_version": number }; Returns: Json
                            },
 "reset_preview_access_code":
 { Args: { "p_code": string,"p_id": string }; Returns: undefined

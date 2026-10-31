@@ -76,7 +76,7 @@ this with a service binding if the gateway itself runs on Cloudflare). The schem
 | `PREVIEW_IP_HASH_SALT` | gateway | ≥ 16 chars. |
 | `PREVIEW_BASE_DOMAIN` | gateway + main | Default `ianverlinden.com`. |
 | `PREVIEW_GATEWAY_ONLY` | gateway project only | `1` = answer preview hosts only (404 elsewhere). |
-| `PREVIEW_STATE_CACHE_SECONDS` | gateway | 0–30, default 5. |
+| `PREVIEW_UPSTREAM_SECRET_<REF>` | gateway project only | Shared secret (≥ 24 chars) for the preview whose `upstream_secret_ref` is `<ref>` (upper-cased), e.g. `PREVIEW_UPSTREAM_SECRET_GEERTKIPS`. Mark as sensitive. |
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | gateway + main | Same Supabase project. |
 
 None is `NEXT_PUBLIC_*` (except the existing Supabase public pair). **Never** set the service-role key in either project.
@@ -84,6 +84,20 @@ None is `NEXT_PUBLIC_*` (except the existing Supabase public pair). **Never** se
 ```bash
 node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"   # run twice: secret and salt
 ```
+
+## Revocation is immediate
+
+Preview state is read from the database on **every** request (`preview_gate` + `preview_upstream`); nothing is cached. Disabling a preview, resetting its code, changing its target or upstream auth, or letting it expire is therefore enforced on the visitor's very next request (disable/target/upstream changes also bump `session_version`, so re-enabling never revives an old session). The cost is two small RPCs per proxied request.
+
+## Protecting the client's origin (shared secret)
+
+A client's origin (e.g. a Worker on `workers.dev`) is public and would bypass the gateway. The origin should only answer requests that carry a shared secret:
+
+- `client_previews.upstream_auth_type` = `header`, `upstream_header_name` (e.g. `x-ik-gateway-auth`) and `upstream_secret_ref` (e.g. `geertkips`). These are names, not secrets, and readable by admins only.
+- The **value** lives only in the gateway project's environment (`PREVIEW_UPSTREAM_SECRET_GEERTKIPS`) and in the origin's own secret store. The database never holds it, so a database leak reveals nothing and each preview can have its own credential.
+- The gateway sends the header only to that preview's origin, replaces anything a visitor sends under that name, fails closed (503, no request to the origin) if the secret is not configured, and never logs or returns it.
+- Changing any of these settings ends existing sessions. They are set with SQL for now (no admin form field yet).
+- Geert Kips' Worker (`worker/index.js`) requires the header on every host except `UNGATED_HOSTS` (its still-public custom domain), answering a bare `404` otherwise, and compares in constant time. Remove the custom domain from `UNGATED_HOSTS` when it is migrated.
 
 ## Database
 

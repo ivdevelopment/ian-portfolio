@@ -8,7 +8,8 @@ export type PreviewConfig = {
   /** Null when not configured: the gateway then fails closed (shows "unavailable"). */
   sessionSecret: string | null;
   ipSalt: string | null;
-  stateCacheSeconds: number;
+  /** Resolves a preview's `upstream_secret_ref` to its secret (PREVIEW_UPSTREAM_SECRET_<REF>), or null. */
+  upstreamSecret: (ref: string) => string | null;
   /** A dedicated gateway deployment serves ONLY preview hosts. */
   gatewayOnly: boolean;
   production: boolean;
@@ -22,13 +23,16 @@ export function getPreviewConfig(env: Env = process.env): PreviewConfig {
   const production = env.NODE_ENV === "production";
   const secret = env.PREVIEW_SESSION_SECRET;
   const salt = env.PREVIEW_IP_HASH_SALT;
-  const cacheSeconds = Number(env.PREVIEW_STATE_CACHE_SECONDS ?? "5");
 
   return {
     baseDomain: configured && isValidBaseDomain(configured) ? configured : "ianverlinden.com",
     sessionSecret: secret && secret.length >= MIN_SECRET_LENGTH ? secret : null,
     ipSalt: salt && salt.length >= 16 ? salt : null,
-    stateCacheSeconds: Number.isFinite(cacheSeconds) ? Math.min(30, Math.max(0, cacheSeconds)) : 5,
+    upstreamSecret: (ref) => {
+      if (!/^[a-z][a-z0-9_]{0,39}$/.test(ref)) return null;
+      const value = env[`PREVIEW_UPSTREAM_SECRET_${ref.toUpperCase()}`];
+      return value && value.length >= 24 ? value : null;
+    },
     gatewayOnly: env.PREVIEW_GATEWAY_ONLY === "1",
     production,
     allowLocalhost: !production,

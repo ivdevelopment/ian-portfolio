@@ -9,10 +9,23 @@ export type VerifyOutcome =
   | { result: "denied" | "limited" | "unavailable" | "missing" }
   | { result: "ok"; id: string; sessionVersion: number; sessionTtlHours: number; expiresAt: string | null };
 
+/**
+ * Where an authorised session is proxied to, and how the origin is told the request comes from the gateway.
+ * `secretRef` only NAMES a secret; its value lives in the gateway's environment, never in the database.
+ */
+export type UpstreamTarget = {
+  url: string;
+  auth: { type: "none" } | { type: "header"; headerName: string; secretRef: string };
+};
+
+/**
+ * Every method reads the database on every call. Nothing about a preview's state is cached, so a disable,
+ * code reset, target change or expiry applies on the very next request.
+ */
 export interface PreviewStore {
   gate(subdomain: string): Promise<GateInfo>;
   verify(subdomain: string, code: string, ipHash: string): Promise<VerifyOutcome>;
-  target(id: string, sessionVersion: number): Promise<string | null>;
+  upstream(id: string, sessionVersion: number): Promise<UpstreamTarget | null>;
 }
 
 const okFields = {
@@ -29,6 +42,14 @@ const verifySchema = z.discriminatedUnion("result", [
   z.object({ result: z.enum(["denied", "limited", "unavailable", "missing"]) }),
   z.object({ result: z.literal("ok"), ...okFields }),
 ]);
+const upstreamSchema = z
+  .object({
+    target_url: z.string(),
+    auth_type: z.enum(["none", "header"]),
+    header_name: z.string().nullable().optional(),
+    secret_ref: z.string().nullable().optional(),
+  })
+  .nullable();
 
 type Rpc = (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { message: string } | null }>;
 
@@ -51,50 +72,17 @@ export function createRpcStore(rpc: Rpc): PreviewStore {
         ? { result: "ok", id: parsed.id, sessionVersion: parsed.session_version, sessionTtlHours: parsed.session_ttl_hours, expiresAt: parsed.expires_at ?? null }
         : { result: parsed.result };
     },
-    async target(id, sessionVersion) {
-      const { data, error } = await rpc("preview_target", { p_id: id, p_session_version: sessionVersion });
+    async upstream(id, sessionVersion) {
+      const { data, error } = await rpc("preview_upstream", { p_id: id, p_session_version: sessionVersion });
       if (error) throw new Error("preview target lookup failed");
-      return typeof data === "string" ? data : null;
-    },
-  };
-}
-
-/**
- * Short in-memory cache of preview state, so one page load with many assets costs one lookup.
- * It bounds how long a disable / expiry / code reset can take to be noticed by this instance
- * (default 5 s, 0 disables the cache). Verification is never cached; a login clears the entry.
- */
-export function withStateCache(store: PreviewStore, seconds: number, now: () => number = Date.now): PreviewStore {
-  if (seconds <= 0) return store;
-  const gates = new Map<string, { at: number; value: GateInfo }>();
-  const targets = new Map<string, { at: number; value: string | null }>();
-  const fresh = (at: number) => now() - at < seconds * 1000;
-  const trim = (m: Map<string, unknown>) => {
-    if (m.size > 500) m.clear();
-  };
-
-  return {
-    async gate(subdomain) {
-      const hit = gates.get(subdomain);
-      if (hit && fresh(hit.at)) return hit.value;
-      const value = await store.gate(subdomain);
-      trim(gates);
-      gates.set(subdomain, { at: now(), value });
-      return value;
-    },
-    async verify(subdomain, code, ipHash) {
-      const result = await store.verify(subdomain, code, ipHash);
-      gates.delete(subdomain);
-      return result;
-    },
-    async target(id, version) {
-      const key = `${id}:${version}`;
-      const hit = targets.get(key);
-      if (hit && fresh(hit.at)) return hit.value;
-      const value = await store.target(id, version);
-      trim(targets);
-      targets.set(key, { at: now(), value });
-      return value;
+      const parsed = upstreamSchema.parse(data ?? null);
+      if (!parsed) return null;
+      if (parsed.auth_type === "header") {
+        // A half-configured credential must never degrade into "no credential".
+        if (!parsed.header_name || !parsed.secret_ref) throw new Error("preview upstream auth incomplete");
+        return { url: parsed.target_url, auth: { type: "header", headerName: parsed.header_name, secretRef: parsed.secret_ref } };
+      }
+      return { url: parsed.target_url, auth: { type: "none" } };
     },
   };
 }

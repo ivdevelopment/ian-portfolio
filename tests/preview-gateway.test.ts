@@ -8,19 +8,19 @@ import { GATEWAY_PREFIX, handleGatewayRequest, originalPath, type GatewayDeps } 
 import type { UpstreamResponse } from "@/lib/preview/safe-fetch";
 import { UpstreamError, createSafeLookup } from "@/lib/preview/safe-fetch";
 import { signSession, sessionExpiry } from "@/lib/preview/session";
-import type { GateInfo, PreviewStore, VerifyOutcome } from "@/lib/preview/store";
-import { withStateCache } from "@/lib/preview/store";
+import type { GateInfo, PreviewStore, VerifyOutcome, UpstreamTarget } from "@/lib/preview/store";
 
 const SECRET = "s".repeat(40);
 const CODE = "GK-7F3K-9MQX-P4TD";
 const TARGET = "https://client-site.example-host.com";
 const HOST = "geertkips.ianverlinden.com";
+const UPSTREAM_SECRET = "u".repeat(48);
 
 const config: PreviewConfig = {
   baseDomain: "ianverlinden.com",
   sessionSecret: SECRET,
   ipSalt: "x".repeat(16),
-  stateCacheSeconds: 0,
+  upstreamSecret: (ref) => (ref === "geertkips" ? UPSTREAM_SECRET : null),
   gatewayOnly: false,
   production: true,
   allowLocalhost: false,
@@ -28,7 +28,7 @@ const config: PreviewConfig = {
 
 /** An in-memory stand-in with the same semantics as the SQL functions. */
 class FakeDb implements PreviewStore {
-  previews = new Map<string, { id: string; code: string; active: boolean; expiresAt: Date | null; version: number; ttl: number; target: string }>();
+  previews = new Map<string, { id: string; code: string; active: boolean; expiresAt: Date | null; version: number; ttl: number; target: string; auth: UpstreamTarget["auth"] }>();
   failures: Array<{ sub: string; ip: string }> = [];
   logins = 0;
   verifyCalls = 0;
@@ -38,7 +38,7 @@ class FakeDb implements PreviewStore {
     this.add("other", "22222222-2222-4222-8222-222222222222");
   }
   add(sub: string, id: string) {
-    this.previews.set(sub, { id, code: CODE, active: true, expiresAt: null, version: 1, ttl: 168, target: TARGET });
+    this.previews.set(sub, { id, code: CODE, active: true, expiresAt: null, version: 1, ttl: 168, target: TARGET, auth: { type: "none" } });
   }
   p(sub = "geertkips") {
     return this.previews.get(sub)!;
@@ -70,9 +70,9 @@ class FakeDb implements PreviewStore {
     this.failures.push({ sub, ip });
     return { result: "denied" };
   }
-  async target(id: string, version: number) {
+  async upstream(id: string, version: number): Promise<UpstreamTarget | null> {
     const p = [...this.previews.values()].find((x) => x.id === id);
-    return p && this.state(p) === "ok" && p.version === version ? p.target : null;
+    return p && this.state(p) === "ok" && p.version === version ? { url: p.target, auth: p.auth } : null;
   }
   reset(newCode: string, sub = "geertkips") {
     this.p(sub).code = newCode;
@@ -536,29 +536,178 @@ describe("upstream failures never leak details", () => {
   });
 
   it("a database outage yields the same clean page, not a crash", async () => {
-    const { deps } = setup({}, { store: { gate: async () => { throw new Error("db down"); }, verify: async () => { throw new Error("x"); }, target: async () => null } });
+    const { deps } = setup({}, { store: { gate: async () => { throw new Error("db down"); }, verify: async () => { throw new Error("x"); }, upstream: async () => null } });
     const res = await handleGatewayRequest(req("/"), deps);
     expect(res.status).toBe(503);
     expect(await res.text()).not.toMatch(/db down/);
   });
 });
 
-describe("state cache", () => {
-  it("serves repeated lookups from memory for the configured window, then refreshes", async () => {
-    let t = 1_000;
-    const db = new FakeDb();
-    const cached = withStateCache(db, 5, () => t);
-    await cached.gate("geertkips");
-    await cached.gate("geertkips");
-    expect(db.gateCalls).toBe(1);
-    t += 6_000;
-    await cached.gate("geertkips");
-    expect(db.gateCalls).toBe(2);
-    // A login always clears the entry and is never answered from cache.
-    await cached.verify("geertkips", "wrong", "ip");
-    await cached.gate("geertkips");
+describe("revocation is immediate (no state cache)", () => {
+  const authed = async (deps: GatewayDeps, db: FakeDb) => (await handleGatewayRequest(req("/", { headers: { cookie: cookieFor(db) } }), deps)).status;
+
+  it("asks the store on every single request", async () => {
+    const { deps, db } = setup();
+    const cookie = cookieFor(db);
+    for (let i = 0; i < 3; i++) await handleGatewayRequest(req("/", { headers: { cookie } }), deps);
     expect(db.gateCalls).toBe(3);
-    expect(withStateCache(db, 0)).toBe(db);
+  });
+
+  it("disable, expiry, reset and target change take effect on the very next request", async () => {
+    const { deps, db } = setup();
+    const old = cookieFor(db);
+    const get = async (cookie: string) => (await handleGatewayRequest(req("/", { headers: { cookie } }), deps)).status;
+    expect(await get(old)).toBe(200);
+
+    db.setActive(false);
+    expect(await get(old)).toBe(503);
+    db.setActive(true);
+    expect(await get(old)).toBe(401); // the old session never comes back
+
+    const fresh = cookieFor(db);
+    expect(await get(fresh)).toBe(200);
+    db.reset("GK-NEW1-CODE-2026");
+    expect(await get(fresh)).toBe(401);
+
+    const again = cookieFor(db);
+    expect(await get(again)).toBe(200);
+    db.p().expiresAt = new Date("2026-11-01T09:59:59Z");
+    expect(await get(again)).toBe(503);
+
+    db.p().expiresAt = null;
+    db.p().version++; // re-pointing bumps the generation
+    expect(await get(again)).toBe(401);
+    expect(await authed(deps, db)).toBe(200);
+  });
+});
+
+describe("upstream shared secret", () => {
+  const withAuth = (db: FakeDb, sub = "geertkips") => {
+    db.p(sub).auth = { type: "header", headerName: "x-gw-auth", secretRef: sub };
+  };
+
+  it("sends the secret header to the matching preview's origin, and only there", async () => {
+    const { deps, db, calls } = setup();
+    withAuth(db);
+    await handleGatewayRequest(req("/page", { headers: { cookie: cookieFor(db) } }), deps);
+    expect(calls[0].headers["x-gw-auth"]).toBe(UPSTREAM_SECRET);
+
+    // A preview without upstream auth never receives it.
+    db.add("plain", "33333333-3333-4333-8333-333333333333");
+    await handleGatewayRequest(req("/", { host: "plain.ianverlinden.com", headers: { cookie: cookieFor(db, "plain") } }), deps);
+    expect(calls[1].headers["x-gw-auth"]).toBeUndefined();
+    expect(Object.values(calls[1].headers)).not.toContain(UPSTREAM_SECRET);
+  });
+
+  it("a visitor cannot supply or override the header", async () => {
+    const { deps, db, calls } = setup();
+    await handleGatewayRequest(req("/", { headers: { cookie: cookieFor(db), "x-gw-auth": "attacker" } }), deps);
+    expect(calls[0].headers["x-gw-auth"]).toBeUndefined();
+    withAuth(db);
+    await handleGatewayRequest(req("/", { headers: { cookie: cookieFor(db), "x-gw-auth": "attacker" } }), deps);
+    expect(calls[1].headers["x-gw-auth"]).toBe(UPSTREAM_SECRET);
+  });
+
+  it("fails closed when the referenced secret is not configured, without calling the origin", async () => {
+    const { deps, db, calls, logs } = setup();
+    db.p().auth = { type: "header", headerName: "x-gw-auth", secretRef: "unknownref" };
+    const res = await handleGatewayRequest(req("/", { headers: { cookie: cookieFor(db) } }), deps);
+    expect(res.status).toBe(503);
+    expect(calls).toHaveLength(0);
+    expect(JSON.stringify(logs)).toContain("preview_upstream_secret_missing");
+  });
+
+  it("never reveals the secret in responses or logs (including failures)", async () => {
+    for (const spec of [{}, { status: 302, headers: { location: "/x" } }, { error: new UpstreamError("network") }]) {
+      const { deps, db, logs } = setup(spec);
+      withAuth(db);
+      const res = await handleGatewayRequest(req("/", { headers: { cookie: cookieFor(db) } }), deps);
+      const seen = JSON.stringify([...res.headers]) + (await res.text());
+      expect(seen).not.toContain(UPSTREAM_SECRET);
+      expect(JSON.stringify(logs)).not.toContain(UPSTREAM_SECRET);
+    }
+  });
+});
+
+describe("proxy compatibility: URL shapes and Range", () => {
+  const go = async (path: string, spec: UpstreamSpec = {}, headers: Record<string, string> = {}) => {
+    const { deps, db, calls } = setup(spec);
+    const res = await handleGatewayRequest(req(path, { headers: { cookie: cookieFor(db), ...headers } }), deps);
+    return { res, calls };
+  };
+
+  it("passes /foo, /foo/, /foo?x=1 and /foo/?x=1 to the origin exactly as requested", async () => {
+    for (const path of ["/foo", "/foo/", "/foo?x=1", "/foo/?x=1", "/a/b/?q=a%20b&z=", "/?only=query"]) {
+      const { calls } = await go(path);
+      expect(calls[0].url, path).toBe(`${TARGET}${path}`);
+    }
+  });
+
+  it("keeps the origin's own trailing-slash redirects, pointing at the preview host", async () => {
+    const { res } = await go("/foo", { status: 308, headers: { location: `${TARGET}/foo/?x=1` } });
+    expect(res.status).toBe(308);
+    expect(res.headers.get("location")).toBe(`https://${HOST}/foo/?x=1`);
+    const rel = await go("/bar/", { status: 301, headers: { location: "/bar" } });
+    expect(rel.res.headers.get("location")).toBe(`https://${HOST}/bar`);
+  });
+
+  it("forwards a valid Range (and If-Range) and ignores a malformed one", async () => {
+    const ok = await go("/v.mp4", {}, { range: "bytes=0-99", "if-range": '"abc"' });
+    expect(ok.calls[0].headers.range).toBe("bytes=0-99");
+    expect(ok.calls[0].headers["if-range"]).toBe('"abc"');
+    for (const bad of ["bytes=abc", "items=0-5", "bytes=0-99; evil", "bytes=" + "1-2,".repeat(40), "x".repeat(300)]) {
+      const r = await go("/v.mp4", {}, { range: bad, "if-range": '"abc"' });
+      expect(r.calls[0].headers.range, bad).toBeUndefined();
+      expect(r.calls[0].headers["if-range"], bad).toBeUndefined();
+    }
+    expect((await go("/v.mp4", {}, { "if-range": '"abc"' })).calls[0].headers["if-range"]).toBeUndefined();
+  });
+
+  it("preserves a 206 with its range headers and validators, still private and no-store", async () => {
+    const { res } = await go(
+      "/v.mp4",
+      { status: 206, body: "0123456789", headers: { "content-type": "video/mp4", "content-range": "bytes 0-9/1000", "content-length": "10", "accept-ranges": "bytes", etag: '"v1"', "last-modified": "Wed, 21 Oct 2026 07:28:00 GMT" } },
+      { range: "bytes=0-9" },
+    );
+    expect(res.status).toBe(206);
+    expect(res.headers.get("content-range")).toBe("bytes 0-9/1000");
+    expect(res.headers.get("accept-ranges")).toBe("bytes");
+    expect(res.headers.get("content-length")).toBe("10");
+    expect(res.headers.get("etag")).toBe('"v1"');
+    expect(res.headers.get("last-modified")).toBe("Wed, 21 Oct 2026 07:28:00 GMT");
+    expect(res.headers.get("cache-control")).toBe("private, no-store, max-age=0");
+    expect(await res.text()).toBe("0123456789");
+  });
+
+  it("never rewrites a partial text response (it would corrupt the byte range)", async () => {
+    const body = `<a href="${TARGET}/x">`;
+    const { res } = await go("/p.html", { status: 206, body, headers: { "content-range": `bytes 0-${body.length - 1}/999`, "content-length": String(body.length) } }, { range: "bytes=0-5" });
+    expect(await res.text()).toBe(body);
+  });
+
+  it("passes 416 through with its Content-Range", async () => {
+    const { res } = await go("/v.mp4", { status: 416, body: "", headers: { "content-type": "text/plain", "content-range": "bytes */1000" } }, { range: "bytes=5000-6000" });
+    expect(res.status).toBe(416);
+    expect(res.headers.get("content-range")).toBe("bytes */1000");
+  });
+
+  it("drops validators and range support when it rewrites the body itself", async () => {
+    const { res } = await go("/", { headers: { etag: '"h"', "last-modified": "x", "accept-ranges": "bytes" } });
+    expect(res.headers.get("etag")).toBeNull();
+    expect(res.headers.get("last-modified")).toBeNull();
+    expect(res.headers.get("accept-ranges")).toBeNull();
+  });
+
+  it("serves static assets untouched (binary) and never mentions the target host in headers", async () => {
+    const png = Buffer.from([137, 80, 78, 71, 0, 255, 1, 2]);
+    const { res } = await go("/i.png", { body: png, headers: { "content-type": "image/png", "content-length": String(png.length), server: "cloudflare", "cf-ray": "abc", link: `<${TARGET}/s.css>; rel=preload` } });
+    expect(Buffer.from(await res.arrayBuffer())).toEqual(png);
+    const headers = JSON.stringify([...res.headers]);
+    expect(headers).not.toContain("example-host");
+    expect(res.headers.get("server")).toBeNull();
+    expect(res.headers.get("cf-ray")).toBeNull();
+    expect(res.headers.get("x-robots-tag")).toBe("noindex, nofollow, noarchive");
+    expect(res.headers.get("x-content-type-options")).toBe("nosniff");
   });
 });
 

@@ -172,9 +172,30 @@ describe.skipIf(!enabled)("P5 client previews", () => {
 
     it("serves the target only for the right id and session generation", async () => {
       const id = await make("target");
-      expect((await anon.rpc("preview_target", { p_id: id, p_session_version: 1 })).data).toBe("https://client-site.example-host.com");
-      expect((await anon.rpc("preview_target", { p_id: id, p_session_version: 2 })).data).toBeNull();
-      expect((await anon.rpc("preview_target", { p_id: randomUUID(), p_session_version: 1 })).data).toBeNull();
+      expect((await anon.rpc("preview_upstream", { p_id: id, p_session_version: 1 })).data).toEqual({ target_url: "https://client-site.example-host.com", auth_type: "none", header_name: null, secret_ref: null });
+      expect((await anon.rpc("preview_upstream", { p_id: id, p_session_version: 2 })).data).toBeNull();
+      expect((await anon.rpc("preview_upstream", { p_id: randomUUID(), p_session_version: 1 })).data).toBeNull();
+    });
+  });
+
+  describe("upstream authentication settings", () => {
+    it("exposes only the header name and secret REFERENCE, enforces completeness, and ends sessions when changed", async () => {
+      const id = await make("upauth");
+      const bad = await admin.from("client_previews").update({ upstream_auth_type: "header" }).eq("id", id);
+      expect(bad.error).not.toBeNull(); // header auth needs a name and a reference
+      const badRef = await admin.from("client_previews").update({ upstream_auth_type: "header", upstream_header_name: "x-gw-auth", upstream_secret_ref: "Bad Ref!" }).eq("id", id);
+      expect(badRef.error).not.toBeNull();
+
+      const ok = await admin.from("client_previews").update({ upstream_auth_type: "header", upstream_header_name: "x-gw-auth", upstream_secret_ref: "upauth" }).eq("id", id);
+      expect(ok.error).toBeNull();
+      // The old generation is dead, the new one resolves with the settings (no secret value exists in the database).
+      expect((await anon.rpc("preview_upstream", { p_id: id, p_session_version: 1 })).data).toBeNull();
+      expect((await anon.rpc("preview_upstream", { p_id: id, p_session_version: 2 })).data).toEqual({
+        target_url: "https://client-site.example-host.com", auth_type: "header", header_name: "x-gw-auth", secret_ref: "upauth",
+      });
+      // Not readable by the anonymous role, and not a gateway-function output.
+      expect((await anon.from("client_previews").select("upstream_secret_ref").eq("id", id)).data ?? []).toHaveLength(0);
+      expect(JSON.stringify((await anon.rpc("preview_gate", { p_subdomain: sub("upauth") })).data)).not.toMatch(/upauth|x-gw-auth/);
     });
   });
 
@@ -223,7 +244,7 @@ describe.skipIf(!enabled)("P5 client previews", () => {
     it("a code reset replaces the code and invalidates every existing session", async () => {
       const id = await make("reset");
       const before = (await verify("reset", CODE)).data as { session_version: number };
-      expect((await anon.rpc("preview_target", { p_id: id, p_session_version: before.session_version })).data).not.toBeNull();
+      expect((await anon.rpc("preview_upstream", { p_id: id, p_session_version: before.session_version })).data).not.toBeNull();
 
       const NEW_CODE = "GK-NEW1-CODE-2026";
       expect((await admin.rpc("reset_preview_access_code", { p_id: id, p_code: NEW_CODE })).error).toBeNull();
@@ -233,7 +254,7 @@ describe.skipIf(!enabled)("P5 client previews", () => {
       expect(after).toMatchObject({ result: "ok" });
       expect(after.session_version).toBe(before.session_version + 1);
       // The old session generation is dead.
-      expect((await anon.rpc("preview_target", { p_id: id, p_session_version: before.session_version })).data).toBeNull();
+      expect((await anon.rpc("preview_upstream", { p_id: id, p_session_version: before.session_version })).data).toBeNull();
     });
 
     it("rejects a reset by non-admins and with weak codes", async () => {
@@ -250,26 +271,26 @@ describe.skipIf(!enabled)("P5 client previews", () => {
 
       expect((await admin.from("client_previews").update({ active: false }).eq("id", id)).error).toBeNull();
       expect((await anon.rpc("preview_gate", { p_subdomain: sub("disable") })).data).toEqual({ state: "inactive" });
-      expect((await anon.rpc("preview_target", { p_id: id, p_session_version: session.session_version })).data).toBeNull();
+      expect((await anon.rpc("preview_upstream", { p_id: id, p_session_version: session.session_version })).data).toBeNull();
       expect((await verify("disable", CODE, "ip-d")).data).toEqual({ result: "unavailable" });
 
       expect((await admin.from("client_previews").update({ active: true }).eq("id", id)).error).toBeNull();
       // The old session stays dead; a fresh login works.
-      expect((await anon.rpc("preview_target", { p_id: id, p_session_version: session.session_version })).data).toBeNull();
+      expect((await anon.rpc("preview_upstream", { p_id: id, p_session_version: session.session_version })).data).toBeNull();
       const fresh = (await verify("disable", CODE, "ip-d2")).data as { result: string; session_version: number };
       expect(fresh.result).toBe("ok");
       expect(fresh.session_version).toBe(session.session_version + 1);
-      expect((await anon.rpc("preview_target", { p_id: id, p_session_version: fresh.session_version })).data).not.toBeNull();
+      expect((await anon.rpc("preview_upstream", { p_id: id, p_session_version: fresh.session_version })).data).not.toBeNull();
     });
 
     it("an expired preview is unavailable everywhere, with no cron needed", async () => {
       const id = await make("expiry", { p_expires_at: new Date(Date.now() + 60_000).toISOString() });
       const session = (await verify("expiry", CODE)).data as { session_version: number };
-      expect((await anon.rpc("preview_target", { p_id: id, p_session_version: session.session_version })).data).not.toBeNull();
+      expect((await anon.rpc("preview_upstream", { p_id: id, p_session_version: session.session_version })).data).not.toBeNull();
 
       await service.from("client_previews").update({ expires_at: new Date(Date.now() - 1000).toISOString() }).eq("id", id);
       expect((await anon.rpc("preview_gate", { p_subdomain: sub("expiry") })).data).toEqual({ state: "expired" });
-      expect((await anon.rpc("preview_target", { p_id: id, p_session_version: session.session_version })).data).toBeNull();
+      expect((await anon.rpc("preview_upstream", { p_id: id, p_session_version: session.session_version })).data).toBeNull();
       expect((await verify("expiry", CODE, "ip-e")).data).toEqual({ result: "unavailable" });
 
       // Extending the expiry makes it available again.
@@ -281,7 +302,7 @@ describe.skipIf(!enabled)("P5 client previews", () => {
       const id = await make("repoint");
       const session = (await verify("repoint", CODE)).data as { session_version: number };
       expect((await admin.from("client_previews").update({ target_url: "https://another-site.example-host.com" }).eq("id", id)).error).toBeNull();
-      expect((await anon.rpc("preview_target", { p_id: id, p_session_version: session.session_version })).data).toBeNull();
+      expect((await anon.rpc("preview_upstream", { p_id: id, p_session_version: session.session_version })).data).toBeNull();
     });
   });
 
