@@ -104,6 +104,8 @@ describe("static configuration", () => {
 
   it("uses the same host pattern to keep the portfolio's CSP and headers off preview hosts", () => {
     const next = readFileSync("next.config.ts", "utf8");
-    expect(next).toContain(`missing: [{ type: "host", value: "${HOST_PATTERN.replace(/\\/g, "\\\\")}" }]`);
+    const literal = `missing: [{ type: "host", value: "${HOST_PATTERN.replace(/\\/g, "\\\\")}" }]`;
+    // Once for the security headers, once for the gateway-only catch-all rewrite.
+    expect(next.split(literal).length - 1).toBe(2);
   });
 });

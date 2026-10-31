@@ -69,6 +69,25 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  /**
+   * Dedicated preview-gateway deployment (PREVIEW_GATEWAY_ONLY=1 at build time): the proxy cannot see API routes
+   * or files with an extension, so everything that is NOT a preview host is rewritten, before the filesystem,
+   * to the gateway route, which answers 404. Without the flag (the main site) there are no rewrites at all.
+   */
+  async rewrites() {
+    if (process.env.PREVIEW_GATEWAY_ONLY !== "1") return [];
+    return {
+      beforeFiles: [
+        {
+          source: "/:path*",
+          missing: [{ type: "host", value: "(?!www\\.)[a-z0-9-]+\\.(ianverlinden\\.com|localhost)" }],
+          destination: "/gw-preview/not-a-preview-host",
+        },
+      ],
+      afterFiles: [],
+      fallback: [],
+    };
+  },
   turbopack: {
     rules: {
       "*.css": {
