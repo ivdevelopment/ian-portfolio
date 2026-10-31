@@ -59,7 +59,15 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   poweredByHeader: false,
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      {
+        source: "/:path*",
+        // Not for preview hosts: they show a client's own site, which must not inherit this site's CSP/headers
+        // (the gateway sets its own, preview-specific headers). Keep the literal in sync with src/proxy.ts.
+        missing: [{ type: "host", value: "(?!www\\.)[a-z0-9-]+\\.(ianverlinden\\.com|localhost)" }],
+        headers: securityHeaders,
+      },
+    ];
   },
   turbopack: {
     rules: {
