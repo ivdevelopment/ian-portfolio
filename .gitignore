@@ -47,3 +47,6 @@ next-env.d.ts
 .claude/
 supabase/.temp/
 supabase/.branches/
+
+# one-time prospect migration data (real business contacts: never committed)
+scripts/prospects-legacy/data/
