@@ -1,5 +1,3 @@
-import { isIP } from "node:net";
-
 /** Suffixes that can only mean "internal" or "not a real public website". */
 const BLOCKED_SUFFIXES = [
   ".localhost", ".local", ".internal", ".lan", ".home", ".home.arpa", ".intranet", ".corp",
@@ -46,7 +44,8 @@ export function validateTargetUrl(raw: string, opts: { blockedDomains?: string[]
   // WHATWG parsing already canonicalises decimal/hex/octal IPv4 into dotted form and wraps IPv6 in [].
   const hostname = url.hostname.toLowerCase().replace(/\.$/, "");
   if (!hostname) return { ok: false, error: "That doesn't look like a valid URL." };
-  if (hostname.startsWith("[") || isIP(hostname) !== 0) {
+  // (Pure JS on purpose: this module also runs in the browser form, where node:net does not exist.)
+  if (hostname.startsWith("[") || hostname.includes(":") || /^\d{1,3}(\.\d{1,3}){3}$/.test(hostname)) {
     return { ok: false, error: "Use a website name, not an IP address." };
   }
   const labels = hostname.split(".");

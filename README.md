@@ -119,6 +119,15 @@ The site is bilingual. **Dutch is the default and has no URL prefix**; English l
 - **Dates and currency**: `Europe/Brussels`; Dutch "29 oktober 2026" / "€ 1.000", English "October 29, 2026" / "€1,000". Stored enum values (project types, budgets) never change, only their labels.
 - **Order of deployment**: apply the migration (`npx supabase db push`) before saving Dutch translations in the admin. The public site works without it (known Dutch rendering + English fallback).
 
+## Client previews
+
+Admin → **Client Previews** manages private, access-code protected previews of client sites on their own subdomain
+(`https://<name>.ianverlinden.com`). A gateway (same codebase, best run as a separate Vercel project with
+`PREVIEW_GATEWAY_ONLY=1`) shows a branded access screen, checks the code, and reverse-proxies the client's site while keeping
+the preview hostname. Codes are stored only as bcrypt hashes inside the database; sessions are signed, host- and preview-bound
+cookies that die on reset/disable/expiry; everything is private, no-store and noindex. Setup, security model, the exact DNS and
+Vercel steps, the **Geert Kips migration order and rollback**, and extension points: [docs/client-previews.md](docs/client-previews.md).
+
 ## Deploying to Vercel
 
 1. Push the repository to GitHub and **Import** it in Vercel (framework preset: Next.js, production branch: `main`). No build or output overrides are needed; nothing depends on Docker, local files or a local database.
