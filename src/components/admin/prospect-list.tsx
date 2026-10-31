@@ -219,8 +219,8 @@ export function ProspectList({ rows, total, filters, sectors, today }: Props) {
       ) : (
         <>
           {/* Desktop table */}
-          <div className={cn("hidden overflow-hidden rounded-card border border-line bg-glass lg:block", navigating && "opacity-70")}>
-            <table className="w-full text-left text-sm">
+          <div className={cn("hidden overflow-x-auto rounded-card border border-line bg-glass xl:block", navigating && "opacity-70")}>
+            <table className="w-full min-w-[62rem] text-left text-sm">
               <thead className="border-b border-line text-xs text-subtle">
                 <tr>
                   <th className="w-10 py-2.5 pl-4">
@@ -284,7 +284,7 @@ export function ProspectList({ rows, total, filters, sectors, today }: Props) {
           </div>
 
           {/* Mobile and tablet cards */}
-          <ul className={cn("space-y-2 lg:hidden", navigating && "opacity-70")}>
+          <ul className={cn("space-y-2 xl:hidden", navigating && "opacity-70")}>
             {rows.map((r) => (
               <li key={r.id} className={cn("rounded-card border border-line bg-glass p-3", selected.has(r.id) && "border-accent/50")}>
                 <div className="flex items-start gap-3">
