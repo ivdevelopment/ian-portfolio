@@ -58,6 +58,9 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   cacheComponents: true,
   poweredByHeader: false,
+  // Dedicated gateway deployment only: the client's own URL behaviour (/foo vs /foo/) must reach its origin
+  // untouched, so Next must not normalise trailing slashes first. The main portfolio keeps the default.
+  skipTrailingSlashRedirect: process.env.PREVIEW_GATEWAY_ONLY === "1",
   async headers() {
     return [
       {

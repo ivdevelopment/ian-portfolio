@@ -102,6 +102,18 @@ describe("static configuration", () => {
     for (const no of ["www.ianverlinden.com", "ianverlinden.com", "evil.com", "a.b.ianverlinden.com"]) expect(re.test(no), no).toBe(false);
   });
 
+  it("skips Next's trailing-slash redirect on the gateway deployment only", async () => {
+    const load = async (flag: string | undefined) => {
+      vi.resetModules();
+      if (flag === undefined) vi.stubEnv("PREVIEW_GATEWAY_ONLY", "");
+      else vi.stubEnv("PREVIEW_GATEWAY_ONLY", flag);
+      return (await import("../next.config")).default;
+    };
+    expect((await load("1")).skipTrailingSlashRedirect).toBe(true);
+    expect((await load(undefined)).skipTrailingSlashRedirect).toBe(false);
+    expect((await load("0")).skipTrailingSlashRedirect).toBe(false);
+  });
+
   it("uses the same host pattern to keep the portfolio's CSP and headers off preview hosts", () => {
     const next = readFileSync("next.config.ts", "utf8");
     const literal = `missing: [{ type: "host", value: "${HOST_PATTERN.replace(/\\/g, "\\\\")}" }]`;

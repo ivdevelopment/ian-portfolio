@@ -33,12 +33,18 @@ export type RewriteContext = {
 const swapOrigin = (value: string, from: string, to: string) =>
   value.split(from).join(to).split(from.replace("://", ":\\/\\/")).join(to.replace("://", ":\\/\\/"));
 
+/** A single- or multi-range "bytes=" header. Anything else is ignored, as RFC 9110 allows for an invalid Range. */
+const RANGE_HEADER = /^bytes=\s*\d*\s*-\s*\d*(\s*,\s*\d*\s*-\s*\d*){0,15}$/i;
+
 export function buildUpstreamHeaders(request: Headers, ctx: RewriteContext): Record<string, string> {
   const out: Record<string, string> = {};
   for (const name of FORWARD_REQUEST_HEADERS) {
     const value = request.get(name);
     if (value) out[name] = value;
   }
+  // A malformed Range is dropped (the full resource is served); If-Range is meaningless without one.
+  if (out.range && (out.range.length > 200 || !RANGE_HEADER.test(out.range))) delete out.range;
+  if (!out.range) delete out["if-range"];
   const origin = request.get("origin");
   if (origin) out.origin = swapOrigin(origin, ctx.previewOrigin, ctx.targetOrigin);
   const referer = request.get("referer");
@@ -87,7 +93,7 @@ const HOP_BY_HOP = new Set([
 const DROP_RESPONSE_HEADERS = new Set([
   ...HOP_BY_HOP, "set-cookie", "content-length", "server", "x-powered-by", "via", "alt-svc",
   "strict-transport-security", "public-key-pins", "report-to", "nel", "cache-control", "expires",
-  "pragma", "age", "etag", "last-modified", "vary", "cdn-cache-control", "vercel-cdn-cache-control",
+  "pragma", "age", "vary", "cdn-cache-control", "vercel-cdn-cache-control",
   "cloudflare-cdn-cache-control", "x-robots-tag", "x-frame-options",
 ]);
 
