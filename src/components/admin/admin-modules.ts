@@ -1,4 +1,5 @@
 import {
+  FileSignature,
   FileText,
   FolderKanban,
   Globe,
@@ -43,6 +44,13 @@ export const adminModules: AdminModule[] = [
     description: "Website-sales CRM: prospects, follow-ups and activity.",
     icon: Users,
     href: "/admin/prospects",
+  },
+  {
+    id: "quotes",
+    label: "Quotes",
+    description: "Offertes: build a quote, generate the PDF and track the answer.",
+    icon: FileSignature,
+    href: "/admin/quotes",
   },
   {
     id: "previews",

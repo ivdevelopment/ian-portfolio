@@ -35,8 +35,11 @@ describe.skipIf(!enabled)("quotes", () => {
   let outsider: SupabaseClient;
   const userIds: string[] = [];
 
+  // Every quote a test makes is remembered here, so cleanup never depends on a name a test may have blanked.
+  const made: string[] = [];
   const wipe = async () => {
     await service.from("quotes").delete().like("client_name", `${TAG}%`);
+    if (made.length) await service.from("quotes").delete().in("id", made.splice(0));
     await service.from("prospects").delete().like("company_name", `${TAG}%`);
     await service.from("quote_item_templates").delete().like("name", `${TAG}%`);
     await service.from("quote_counters").delete().in("year", YEARS);
@@ -46,6 +49,7 @@ describe.skipIf(!enabled)("quotes", () => {
     const { quote, items } = toRpcPayload(values);
     const res = await admin.rpc("create_quote", { p_quote: quote as never, p_items: items as never });
     expect(res.error).toBeNull();
+    made.push(res.data as string);
     return res.data as string;
   }
   const row = async (id: string) => (await service.from("quotes").select("*").eq("id", id).single()).data!;
@@ -57,9 +61,9 @@ describe.skipIf(!enabled)("quotes", () => {
     const users = await service.auth.admin.listUsers({ page: 1, perPage: 1000 });
     for (const u of users.data!.users.filter((u) => u.email?.startsWith(TAG))) await service.auth.admin.deleteUser(u.id);
     for (const account of [ADMIN, OUTSIDER]) {
-      const made = await service.auth.admin.createUser({ ...account, email_confirm: true });
-      expect(made.error).toBeNull();
-      userIds.push(made.data.user!.id);
+      const createdUser = await service.auth.admin.createUser({ ...account, email_confirm: true });
+      expect(createdUser.error).toBeNull();
+      userIds.push(createdUser.data.user!.id);
     }
     expect((await service.from("admin_users").insert({ user_id: userIds[0] })).error).toBeNull();
     admin = createClient(url, anonKey, opts);
@@ -396,6 +400,7 @@ describe.skipIf(!enabled)("quotes", () => {
       for (const s of ["ready", "sent", "rejected"]) await setStatus(id, s, s === "rejected" ? { status_note: "no" } : {});
       const copy = await admin.rpc("duplicate_quote", { p_id: id });
       expect(copy.error).toBeNull();
+      made.push(copy.data as string);
       const [a, b] = [await row(id), await row(copy.data as string)];
       expect(b.quote_number).not.toBe(a.quote_number);
       expect([b.status, b.sent_at, b.accepted_at, b.rejected_at, b.status_note]).toEqual(["draft", null, null, null, null]);
