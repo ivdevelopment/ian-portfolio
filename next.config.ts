@@ -57,6 +57,10 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   cacheComponents: true,
+  // The quote PDF embeds Geist; its font files are read at runtime, so they must be part of that route's serverless bundle.
+  outputFileTracingIncludes: {
+    "/admin/quotes/[id]/pdf": ["./node_modules/geist/dist/fonts/geist-sans/Geist-Regular.ttf", "./node_modules/geist/dist/fonts/geist-sans/Geist-Medium.ttf", "./node_modules/geist/dist/fonts/geist-sans/Geist-SemiBold.ttf"],
+  },
   poweredByHeader: false,
   // Dedicated gateway deployment only: the client's own URL behaviour (/foo vs /foo/) must reach its origin
   // untouched, so Next must not normalise trailing slashes first. The main portfolio keeps the default.

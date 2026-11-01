@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^6.0.2",
+    "@pdf-lib/fontkit": "1.1.1",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.118.0",
     "@vercel/analytics": "^2.0.1",
@@ -35,6 +36,7 @@
     "motion": "^14.7.1",
     "next": "16.4.3",
     "nodemailer": "^10.3.1",
+    "pdf-lib": "1.17.1",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-hook-form": "^7.91.0",
@@ -49,6 +51,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.3",
+    "pdfjs-dist": "4.10.38",
     "supabase": "^2.122.0",
     "tailwindcss": "^4",
     "typescript": "^5",

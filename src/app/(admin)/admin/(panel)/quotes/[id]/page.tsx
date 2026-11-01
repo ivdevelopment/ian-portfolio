@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { QuoteDetailActions, type DetailProspect } from "@/components/admin/quote-detail-actions";
+import { QuotePdfButtons } from "@/components/admin/quote-pdf-buttons";
 import { QuoteStatusBadge, QuoteTotalsBlock } from "@/components/admin/quote-ui";
 import { AdminPageHeader, Panel, formatDateTime } from "@/components/admin/ui";
 import { daysUntilExpiry, effectiveStatus } from "@/lib/quotes/constants";
@@ -45,6 +46,7 @@ export default async function QuoteDetailPage({ params }: PageProps<"/admin/quot
           language={quote.language}
           projectId={quote.projectId}
           issues={readinessIssues(formFromQuote(quote))}
+          links={<QuotePdfButtons id={quote.id} />}
         />
       </div>
 
