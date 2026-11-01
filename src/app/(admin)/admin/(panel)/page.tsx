@@ -90,9 +90,14 @@ export default async function AdminDashboardPage() {
         className="mt-6"
         title="Sales follow-ups"
         actions={
-          <Link href="/admin/prospects" className="text-xs text-muted hover:text-ink">
-            View prospects
-          </Link>
+          <span className="flex gap-3 text-xs">
+            <Link href="/admin/prospects/kanban" className="text-muted hover:text-ink">
+              Open pipeline
+            </Link>
+            <Link href="/admin/prospects?view=list" className="text-muted hover:text-ink">
+              View prospects
+            </Link>
+          </span>
         }
       >
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">

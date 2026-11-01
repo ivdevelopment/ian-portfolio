@@ -158,6 +158,35 @@ describe.skipIf(!enabled)("preview access tracking", () => {
     expect(await notes(other.data!.id)).toEqual([]);
   });
 
+  it("lets the board filter prospects by their preview's viewed state in one query", async () => {
+    const viewedId = await make("kb-viewed");
+    const unviewedId = await make("kb-unviewed");
+    await service.from("prospects").insert([
+      { company_name: `${TAG} kb viewed`, linked_preview_id: viewedId },
+      { company_name: `${TAG} kb unviewed`, linked_preview_id: unviewedId },
+      { company_name: `${TAG} kb nopreview` },
+    ]);
+    await unlock("kb-viewed");
+
+    const select = "company_name, linked_preview:client_previews!linked_preview_id!inner(subdomain, successful_access_count)";
+    const viewed = await admin.from("prospects").select(select).like("company_name", `${TAG} kb%`).gt("linked_preview.successful_access_count", 0);
+    expect(viewed.error).toBeNull();
+    expect(viewed.data!.map((r) => r.company_name)).toEqual([`${TAG} kb viewed`]);
+    const unviewed = await admin.from("prospects").select(select).like("company_name", `${TAG} kb%`).eq("linked_preview.successful_access_count", 0);
+    expect(unviewed.data!.map((r) => r.company_name)).toEqual([`${TAG} kb unviewed`]);
+
+    // The board's own query (left join): everything, with the preview state attached to the prospects that have one.
+    const board = await admin.from("prospects").select("company_name, linked_preview:client_previews!linked_preview_id(successful_access_count)").like("company_name", `${TAG} kb%`);
+    expect(board.data).toHaveLength(3);
+  });
+
+  it("a status change made from the board writes the normal status activity", async () => {
+    const p = await admin.from("prospects").insert({ company_name: `${TAG} drag`, status: "replied" }).select("id").single();
+    expect((await admin.from("prospects").update({ status: "concept_sent" }).eq("id", p.data!.id)).error).toBeNull();
+    const log = await admin.from("prospect_activities").select("type, metadata").eq("prospect_id", p.data!.id).eq("type", "status_changed");
+    expect(log.data).toEqual([{ type: "status_changed", metadata: { from: "replied", to: "concept_sent" } }]);
+  });
+
   it("deleting a preview removes its tracking only, not the prospect", async () => {
     const id = await make("del");
     const p = await service.from("prospects").insert({ company_name: `${TAG} survivor`, linked_preview_id: id }).select("id").single();

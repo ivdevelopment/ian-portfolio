@@ -32,6 +32,8 @@ export type ProspectFilters = {
   replied: boolean;
   preview: boolean;
   project: boolean;
+  /** Linked preview opened ('yes') or never opened ('no'); either implies a linked preview. */
+  viewed: "yes" | "no" | null;
   sort: SortKey;
   dir: "asc" | "desc";
   page: number;
@@ -47,6 +49,7 @@ export const DEFAULT_FILTERS: ProspectFilters = {
   replied: false,
   preview: false,
   project: false,
+  viewed: null,
   sort: "created",
   dir: "desc",
   page: 1,
@@ -77,6 +80,7 @@ export function parseFilters(params: RawParams): ProspectFilters {
     replied: pick(params, "replied") === "1",
     preview: pick(params, "preview") === "1",
     project: pick(params, "project") === "1",
+    viewed: pick(params, "viewed") === "1" ? "yes" : pick(params, "viewed") === "0" ? "no" : null,
     sort,
     dir: pick(params, "dir") === "asc" ? "asc" : pick(params, "dir") === "desc" ? "desc" : defaultDir(sort),
     page: Number.isFinite(page) && page >= 1 ? Math.min(page, 100_000) : 1,
@@ -100,6 +104,7 @@ export function filtersToParams(f: ProspectFilters): URLSearchParams {
   if (f.replied) p.set("replied", "1");
   if (f.preview) p.set("preview", "1");
   if (f.project) p.set("project", "1");
+  if (f.viewed) p.set("viewed", f.viewed === "yes" ? "1" : "0");
   if (f.sort !== DEFAULT_FILTERS.sort || f.dir !== defaultDir(f.sort)) {
     p.set("sort", f.sort);
     p.set("dir", f.dir);
@@ -110,7 +115,7 @@ export function filtersToParams(f: ProspectFilters): URLSearchParams {
 }
 
 export function hasActiveFilters(f: ProspectFilters): boolean {
-  return Boolean(f.q || f.status || f.sector || f.priority || f.followup || f.replied || f.preview || f.project);
+  return Boolean(f.q || f.status || f.sector || f.priority || f.followup || f.replied || f.preview || f.project || f.viewed);
 }
 
 /**
@@ -157,6 +162,9 @@ export function applyProspectFilters<T extends FilterBuilder<T>>(query: T, f: Pr
   if (f.replied) q = q.in("status", REPLIED_STATUSES);
   if (f.preview) q = q.not("linked_preview_id", "is", null);
   if (f.project) q = q.not("linked_project_id", "is", null);
+  // Needs the preview embedded with !inner (see queries.ts), so a prospect without a preview is excluded.
+  if (f.viewed === "yes") q = q.gt("linked_preview.successful_access_count", 0);
+  if (f.viewed === "no") q = q.eq("linked_preview.successful_access_count", 0);
 
   if (f.followup) {
     if (f.followup === "none") return q.is("next_follow_up_on", null);

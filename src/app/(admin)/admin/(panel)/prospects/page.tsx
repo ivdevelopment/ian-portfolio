@@ -1,14 +1,23 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { ViewToggle } from "@/components/admin/prospect-board-filters";
 import { ProspectList } from "@/components/admin/prospect-list";
 import { AdminPageHeader } from "@/components/admin/ui";
 import { ButtonLink } from "@/components/ui/button";
 import { brusselsToday } from "@/lib/prospects/dates";
-import { parseFilters } from "@/lib/prospects/filters";
+import { filtersToParams, parseFilters } from "@/lib/prospects/filters";
 import { formatEur } from "@/lib/prospects/money";
 import { getSummary, listProspects, listSectors } from "@/lib/prospects/queries";
 
 export default async function AdminProspectsPage({ searchParams }: PageProps<"/admin/prospects">) {
-  const filters = parseFilters(await searchParams);
+  const rawParams = await searchParams;
+  const filters = parseFilters(rawParams);
+  // Open in the view you used last (an explicit ?view=list always wins).
+  if (rawParams.view !== "list" && (await cookies()).get("prospects_view")?.value === "kanban") {
+    const q = filtersToParams(filters).toString();
+    redirect(`/admin/prospects/kanban${q ? `?${q}` : ""}`);
+  }
   const today = brusselsToday();
 
   const [{ rows, total }, summary, sectors] = await Promise.all([listProspects(filters, today), getSummary(today), listSectors()]);
@@ -39,6 +48,7 @@ export default async function AdminProspectsPage({ searchParams }: PageProps<"/a
         description="Your website-sales pipeline: who you contacted, who replied and what to do next."
         actions={
           <>
+            <ViewToggle current="list" query={filtersToParams(filters).toString()} />
             <ButtonLink href="/admin/prospects/import" variant="secondary" size="sm" icon="none">
               Import
             </ButtonLink>

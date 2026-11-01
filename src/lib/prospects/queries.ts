@@ -2,6 +2,7 @@ import "server-only";
 
 import { requireAdmin } from "@/lib/auth";
 import { SORT_COLUMNS } from "./constants";
+import { toBoardCard, type BoardCard } from "./board";
 import { brusselsToday, endOfWeek } from "./dates";
 import { applyProspectFilters, type FilterBuilder, type ProspectFilters } from "./filters";
 import type { ActivityRecord, ProspectRecord, ProspectSummary } from "./types";
@@ -10,6 +11,11 @@ import type { ActivityRecord, ProspectRecord, ProspectSummary } from "./types";
 export const LIST_COLUMNS =
   "id, company_name, sector, city, website_url, email, contact_name, phone, status, priority, first_contact_on, last_contact_on, next_follow_up_on, estimated_value_eur, quote_value_eur, contact_delivery_status, source, linked_project_id, linked_preview_id, legacy_ref, last_activity_on, last_activity_title, created_at, updated_at";
 export const FULL_COLUMNS = `${LIST_COLUMNS}, notes`;
+
+/** Embeds the linked preview. `!inner` (only prospects that have one) is required to filter on its access state. */
+const PREVIEW_EMBED = "linked_preview:client_previews!linked_preview_id";
+const PREVIEW_FIELDS = "(subdomain, first_accessed_at, last_accessed_at, successful_access_count)";
+const previewEmbed = (filters: Pick<ProspectFilters, "viewed">) => `${PREVIEW_EMBED}${filters.viewed ? "!inner" : ""}${PREVIEW_FIELDS}`;
 
 /** The slice of the query builder used here; the typed Supabase builder is cast to it (filters are column-name strings). */
 interface Query extends FilterBuilder<Query> {
@@ -28,7 +34,8 @@ export type ProspectListResult = { rows: Array<Omit<ProspectRecord, "notes">>; t
 
 export async function listProspects(filters: ProspectFilters, today = brusselsToday()): Promise<ProspectListResult> {
   const { supabase } = await requireAdmin();
-  const base = supabase.from("prospects").select(LIST_COLUMNS, { count: "exact" }) as unknown as Query;
+  const columns = filters.viewed ? `${LIST_COLUMNS}, ${previewEmbed(filters)}` : LIST_COLUMNS;
+  const base = supabase.from("prospects").select(columns, { count: "exact" }) as unknown as Query;
   const from = (filters.page - 1) * filters.per;
   const query = applyProspectFilters(base, filters, today)
     // Blank values (no follow-up, no amount) always sort last instead of pretending to be the smallest.
@@ -44,7 +51,7 @@ export async function listProspects(filters: ProspectFilters, today = brusselsTo
 export const EXPORT_LIMIT = 10_000;
 export async function listProspectsForExport(filters: ProspectFilters, today = brusselsToday()): Promise<ProspectRecord[]> {
   const { supabase } = await requireAdmin();
-  const base = supabase.from("prospects").select(FULL_COLUMNS) as unknown as Query;
+  const base = supabase.from("prospects").select(filters.viewed ? `${FULL_COLUMNS}, ${previewEmbed(filters)}` : FULL_COLUMNS) as unknown as Query;
   const { data, error } = await applyProspectFilters(base, filters, today)
     .order(SORT_COLUMNS[filters.sort], { ascending: filters.dir === "asc", nullsFirst: false })
     .order("created_at", { ascending: false })
@@ -175,4 +182,18 @@ export async function listComparable(): Promise<Array<Pick<ProspectRecord, "id" 
   const { data, error } = await supabase.from("prospects").select("id, company_name, email, website_url").limit(20000);
   if (error) fail("duplicate check", error);
   return (data ?? []) as Array<Pick<ProspectRecord, "id" | "company_name" | "email" | "website_url">>;
+}
+
+/** Everything the board needs in ONE query (prospects + their linked preview), capped; never one query per card. */
+export const BOARD_LIMIT = 1000;
+const BOARD_COLUMNS =
+  "id, company_name, sector, city, email, website_url, status, priority, next_follow_up_on, estimated_value_eur, last_activity_on";
+
+export async function listBoardCards(filters: ProspectFilters, today = brusselsToday()): Promise<{ cards: BoardCard[]; total: number }> {
+  const { supabase } = await requireAdmin();
+  const base = supabase.from("prospects").select(`${BOARD_COLUMNS}, ${previewEmbed(filters)}`, { count: "exact" }) as unknown as Query;
+  const { data, error, count } = await applyProspectFilters(base, filters, today).order("company_name", { ascending: true }).limit(BOARD_LIMIT);
+  if (error) fail("board", error);
+  const cards = ((data ?? []) as unknown as Array<Parameters<typeof toBoardCard>[0]>).map(toBoardCard);
+  return { cards, total: count ?? cards.length };
 }

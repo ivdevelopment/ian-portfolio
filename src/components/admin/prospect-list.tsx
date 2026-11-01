@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { AdminSelect } from "./admin-select";
 import { ConfirmDialog } from "./confirm-dialog";
 import { ExportButton, ExportDialog } from "./prospect-export-dialog";
+import { PREVIEW_OPTIONS, previewChoice, previewPatch } from "./prospect-board-filters";
 import { DeliveryBadge, FollowUpCell, PriorityBadge, ProspectStatusBadge, iconButton } from "./prospect-ui";
 import { EmptyState, adminInput } from "./ui";
 
@@ -151,7 +152,7 @@ export function ProspectList({ rows, total, filters, sectors, today }: Props) {
           </div>
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
+        <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-7">
           <AdminSelect id="f-status" value={filters.status ?? ALL} onChange={(v) => go({ status: v === ALL ? null : (v as ProspectFilters["status"]) })} options={STATUS_OPTIONS} />
           <AdminSelect
             id="f-sector"
@@ -161,6 +162,7 @@ export function ProspectList({ rows, total, filters, sectors, today }: Props) {
           />
           <AdminSelect id="f-priority" value={filters.priority ?? ALL} onChange={(v) => go({ priority: v === ALL ? null : (v as ProspectFilters["priority"]) })} options={PRIORITY_OPTIONS} />
           <AdminSelect id="f-followup" value={filters.followup ?? ALL} onChange={(v) => go({ followup: v === ALL ? null : (v as ProspectFilters["followup"]) })} options={FOLLOW_UP_OPTIONS} />
+          <AdminSelect id="f-preview" value={previewChoice(filters)} onChange={(v) => go(previewPatch(v as Parameters<typeof previewPatch>[0]))} options={PREVIEW_OPTIONS} />
           <AdminSelect id="f-sort" value={filters.sort} onChange={(v) => go({ sort: v as SortKey, dir: defaultDir(v as SortKey) })} options={SORT_OPTIONS} />
           <AdminSelect id="f-per" value={String(filters.per)} onChange={(v) => go({ per: Number(v) as ProspectFilters["per"] })} options={PER_PAGE_OPTIONS} />
         </div>
@@ -169,7 +171,6 @@ export function ProspectList({ rows, total, filters, sectors, today }: Props) {
           {(
             [
               ["replied", "Has replied"],
-              ["preview", "Has preview"],
               ["project", "Has project"],
             ] as const
           ).map(([key, label]) => (
