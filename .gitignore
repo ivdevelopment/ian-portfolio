@@ -50,3 +50,6 @@ supabase/.branches/
 
 # one-time prospect migration data (real business contacts: never committed)
 scripts/prospects-legacy/data/
+
+# Zoho client hand-off (never committed)
+.zoho-client.env
