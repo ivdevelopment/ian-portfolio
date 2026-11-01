@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 import { zohoDisconnectAction, zohoDryRunAction, zohoSyncNowAction } from "@/app/(admin)/admin/(panel)/settings/integrations/actions";
 import { Button, ButtonLink } from "@/components/ui/button";
 import type { SyncReport } from "@/lib/mail/zoho/sync";
+import { formatBrusselsDateTime } from "@/lib/preview/access-activity";
 import { ConfirmDialog } from "./confirm-dialog";
 
 export type PanelConnection = { account: string; lastSync: string | null; needsReconnect: boolean } | null;
@@ -93,7 +94,7 @@ export function ZohoPanel({ connection, lastRun }: { connection: PanelConnection
               <ul data-testid="unmatched" className="mt-1 list-disc space-y-0.5 pl-5">
                 {report.unmatchedDetail.map((m, i) => (
                   <li key={i}>
-                    {m.direction} · {m.sent_at.slice(0, 10)} · from {m.from} → {[...m.to, ...m.cc].join(", ") || "—"} · {m.subject ?? "(no subject)"}
+                    {m.direction} · {formatBrusselsDateTime(m.sent_at)} ({m.sent_at}) · from {m.from} → {[...m.to, ...m.cc].join(", ") || "—"} · {m.subject ?? "(no subject)"}
                     {m.candidate ? ` · candidate: ${m.candidate.company} (${m.candidate.reason}${m.candidate.hasEmail ? "; already has an email" : "; no email yet"})` : " · no candidate"}
                   </li>
                 ))}
