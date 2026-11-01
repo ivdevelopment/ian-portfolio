@@ -57,7 +57,7 @@ export type SyncReport = {
   /** Matched OUTGOING messages per provider folder (names when the folder list could be read). */
   outgoingByFolder: Record<string, number>;
   /** For the prospects given in `watch`: how many outgoing messages to them exist, and in which folders. */
-  watched: Array<{ prospect_id: string; company?: string; outgoing: number; incoming: number; folders: string[] }>;
+  watched: Array<{ prospect_id: string; company?: string; outgoing: number; incoming: number; folders: string[]; outgoingSample?: { messageId: string; folderId: string }; delivery?: string | null }>;
   /** A small sample of matches (dry run), for review before anything is stored. */
   preview: Array<{ prospect_id: string; direction: "incoming" | "outgoing"; subject: string | null; sent_at: string }>;
 };
@@ -96,7 +96,7 @@ export async function runSync(options: SyncOptions): Promise<SyncReport> {
   const index = buildProspectIndex(prospects);
   const ambiguousAddresses = findAmbiguousAddresses(prospects);
   const report = emptyReport(dryRun ? "dry_run" : "sync", from);
-  const watchedMap = new Map<string, { prospect_id: string; outgoing: number; incoming: number; folders: Set<string> }>();
+  const watchedMap = new Map<string, { prospect_id: string; outgoing: number; incoming: number; folders: Set<string>; outgoingSample?: { messageId: string; folderId: string } }>();
   const seen = new Set<string>();
 
   const pages = client.searchAll(accountId, `fromDate:${zohoSearchDate(from)}`, { maxMessages: options.maxMessages });
@@ -150,6 +150,7 @@ export async function runSync(options: SyncOptions): Promise<SyncReport> {
       if (options.watch?.has(prospectId)) {
         const w = watchedMap.get(prospectId) ?? { prospect_id: prospectId, outgoing: 0, incoming: 0, folders: new Set<string>() };
         w[record.direction]++;
+        if (record.direction === "outgoing" && !w.outgoingSample && record.folder_id) w.outgoingSample = { messageId: record.provider_message_id, folderId: record.folder_id };
         w.folders.add((record.folder_id && options.folderNames?.get(record.folder_id)) || record.folder_id || "unknown");
         watchedMap.set(prospectId, w);
       }
@@ -171,6 +172,7 @@ export async function runSync(options: SyncOptions): Promise<SyncReport> {
     }
   }
   report.watched = [...watchedMap.values()].map((w) => ({ ...w, folders: [...w.folders].sort() }));
+  report.watched.sort((a, b) => a.prospect_id.localeCompare(b.prospect_id));
   return report;
 }
 

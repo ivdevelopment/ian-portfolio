@@ -151,7 +151,19 @@ export async function syncNow(config: ZohoConfig, opts: { dryRun: boolean; windo
       from,
       dryRun: opts.dryRun,
     });
-    if (opts.dryRun) report.capabilities = await probeCapabilities(client, conn.provider_account_id, from, report, folders);
+    if (opts.dryRun) {
+      report.capabilities = await probeCapabilities(client, conn.provider_account_id, from, report, folders);
+      // For prospects whose notes say "only seen in Drafts": read ONE outgoing message each (metadata only) and report Zoho's own delivery status.
+      for (const w of report.watched.slice(0, 40)) {
+        if (!w.outgoingSample) continue;
+        try {
+          const d = await client.getMessageDetails(conn.provider_account_id, w.outgoingSample.folderId, w.outgoingSample.messageId);
+          w.delivery = d.mailDeliveryStatus === undefined || d.mailDeliveryStatus === null ? null : String(d.mailDeliveryStatus);
+        } catch {
+          w.delivery = null;
+        }
+      }
+    }
   } catch (error) {
     const auth = error instanceof ZohoError && error.kind === "auth";
     if (auth) await supabase.from("mail_connections").update({ status: "needs_reconnect" }).eq("id", conn.id);

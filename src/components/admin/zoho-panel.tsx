@@ -104,7 +104,7 @@ export function ZohoPanel({ connection, lastRun }: { connection: PanelConnection
               <ul className="mt-1 list-disc space-y-0.5 pl-5">
                 {report.watched.map((w) => (
                   <li key={w.prospect_id}>
-                    {w.company ?? w.prospect_id}: {w.outgoing} outgoing, {w.incoming} incoming{w.folders.length ? ` · folders: ${w.folders.join(", ")}` : ""}
+                    {w.company ?? w.prospect_id}: {w.outgoing} outgoing, {w.incoming} incoming{w.folders.length ? ` · folders: ${w.folders.join(", ")}` : ""}{w.delivery !== undefined ? ` · mailDeliveryStatus: ${w.delivery ?? "n/a"}` : ""}
                   </li>
                 ))}
               </ul>

@@ -356,10 +356,11 @@ describe("sync", () => {
     const report = await run(fakeClient([page]), store, { dryRun: true, prospects: people, watch: new Set(["vault", "geert"]), folderNames: new Map([["11", "Sent"]]) });
     expect(report).toMatchObject({ checked: 6, unique: 4, duplicateIds: 1, incoming: 3, outgoing: 1, matched: 2, unmatched: 1, ambiguous: 1, skippedUnusable: 1, stored: 0 });
     expect(report.outgoingByFolder).toEqual({ Sent: 1 });
+    // Sorted by prospect; the outgoing sample is what the dry run later reads to report Zoho's delivery status.
     expect(report.watched).toEqual([
       { prospect_id: "geert", outgoing: 0, incoming: 1, folders: ["unknown"] },
-      { prospect_id: "vault", outgoing: 1, incoming: 0, folders: ["Sent"] },
-    ].sort((x, y) => report.watched.findIndex((w) => w.prospect_id === x.prospect_id) - report.watched.findIndex((w) => w.prospect_id === y.prospect_id)));
+      { prospect_id: "vault", outgoing: 1, incoming: 0, folders: ["Sent"], outgoingSample: { messageId: "2", folderId: "11" } },
+    ]);
   });
 
   it("records the page sizes Zoho returned and a sample message for the read probe", async () => {
