@@ -74,3 +74,15 @@ If exactly one migrated "Geert Kips" prospect and one preview with subdomain `ge
 ## Not built (extension points)
 
 Zoho Mail sync and sent / reply detection, email templates and scheduled outreach, lead scoring, a Kanban board, quote generator, invoicing, customer portal. The schema leaves room: `prospect_activities.metadata` (jsonb) can hold message ids; `contact_delivery_status` can be fed by mail sync; `source` and `legacy_ref` already identify where a record came from. Email automation is deliberately out of scope: the CRM tracks outreach, it does not send it.
+
+## Kanban view (`/admin/prospects/kanban`)
+
+A second view over the same prospects: **List | Kanban** toggle (the last view is remembered in a cookie; `?view=list` always wins). Columns are the existing statuses, so there is no second pipeline. Default columns: New, Ready to contact, Contacted, Replied, Interested, Concept sent, Quote sent, Won; the other six (Researching, Follow-up due, Meeting planned, Lost, Not interested, No response) sit under "More columns" (your choice is remembered, and hidden columns that hold prospects are flagged).
+
+- **Moving:** drag a card to another column, or use the card's `⋯` menu → *Move to…* (keyboard operable: ↑/↓/Home/End, Enter, Esc). A move calls the same server action as every other status change, so the normal status activity is written. The card moves immediately and goes back, with an error, if the save fails. Moves are announced in a live region.
+- **Cards** show company, sector/city, follow-up (Overdue n days / Today / Tomorrow / date, Brussels time), estimate, non-normal priority and the linked preview's state (Preview viewed / Not viewed yet, read from the preview). Menu: Open, Move to…, Set follow-up, Add note, Open preview, Send email.
+- **Order in a column:** overdue first (oldest first), then nearest follow-up, then priority, then most recent activity. No manual ordering is stored.
+- **Counts and value:** per column; the value counts only estimates that exist.
+- **Filters** are the list's (search, status, sector, priority, follow-up) plus a preview filter (has preview / viewed / not viewed yet), shared through the URL.
+- **Narrow screens** (< 768px) show a stage selector with one column at a time; wider screens scroll horizontally.
+- **Data:** one query for the board (prospects with their linked preview embedded, capped at 1,000); no per-card queries and no timelines.
