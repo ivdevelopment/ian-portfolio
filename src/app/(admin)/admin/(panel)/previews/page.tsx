@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { AdminPageHeader, Badge, EmptyState, formatDate, formatDateTime } from "@/components/admin/ui";
+import { AdminPageHeader, Badge, EmptyState, formatDate } from "@/components/admin/ui";
+import { formatBrusselsDateTime, summarizeAccess } from "@/lib/preview/access-activity";
 import { PreviewRowActions } from "@/components/admin/preview-row-actions";
 import { ButtonLink } from "@/components/ui/button";
 import { listPreviews } from "@/lib/cms/preview-queries";
@@ -48,6 +49,7 @@ export default async function AdminPreviewsPage() {
           {previews.map((p, i) => {
             const state = previewState(p, now);
             const badge = STATE_BADGE[state];
+            const access = summarizeAccess(p);
             const domain = domains[i];
             const url = `https://${p.subdomain}.${baseDomain}`;
             let targetHost = "";
@@ -81,20 +83,24 @@ export default async function AdminPreviewsPage() {
                   )}
                 </div>
 
-                <dl className="grid grid-cols-3 gap-x-4 text-xs xl:w-72">
+                <dl className="grid grid-cols-4 gap-x-4 text-xs xl:w-96">
                   <div>
-                    <dt className="text-subtle">Expires</dt>
-                    <dd className="mt-0.5 text-muted">{p.expires_at ? formatDate(p.expires_at) : "Never"}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-subtle">Last opened</dt>
-                    <dd className="mt-0.5 text-muted" title={p.last_accessed_at ? formatDateTime(p.last_accessed_at) : undefined}>
-                      {p.last_accessed_at ? formatDate(p.last_accessed_at) : "Never"}
+                    <dt className="text-subtle">Access</dt>
+                    <dd className="mt-0.5">
+                      <Badge tone={access.viewed ? "success" : "neutral"}>{access.label}</Badge>
                     </dd>
+                  </div>
+                  <div className="col-span-2">
+                    <dt className="text-subtle">Last viewed</dt>
+                    <dd className="mt-0.5 text-muted">{access.viewed ? formatBrusselsDateTime(access.last) : "—"}</dd>
                   </div>
                   <div>
                     <dt className="text-subtle">Views</dt>
-                    <dd className="mt-0.5 text-muted">{p.access_count}</dd>
+                    <dd className="mt-0.5 text-muted" title="Successful access-code unlocks">{access.count}</dd>
+                  </div>
+                  <div className="col-span-4">
+                    <dt className="sr-only">Expires</dt>
+                    <dd className="text-subtle">Expires: {p.expires_at ? formatDate(p.expires_at) : "never"}</dd>
                   </div>
                 </dl>
 

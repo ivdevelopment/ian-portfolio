@@ -39,14 +39,14 @@ export type Database = {
                   ]
                 },"client_previews": {
                   Row: {
-                    "access_code_hash": string,"access_count": number,"active": boolean,"client_name": string,"created_at": string,"expires_at": string | null,"id": string,"last_accessed_at": string | null,"notes": string | null,"project_name": string,"session_ttl_hours": number,"session_version": number,"subdomain": string,"target_url": string,"updated_at": string,"upstream_auth_type": string,"upstream_header_name": string | null,"upstream_secret_ref": string | null
+                    "access_code_hash": string,"access_count": number,"active": boolean,"client_name": string,"created_at": string,"expires_at": string | null,"first_accessed_at": string | null,"id": string,"last_accessed_at": string | null,"notes": string | null,"project_name": string,"session_ttl_hours": number,"session_version": number,"subdomain": string,"successful_access_count": number,"target_url": string,"updated_at": string,"upstream_auth_type": string,"upstream_header_name": string | null,"upstream_secret_ref": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "access_code_hash": string,"access_count"?: number,"active"?: boolean,"client_name": string,"created_at"?: string,"expires_at"?: string | null,"id"?: string,"last_accessed_at"?: string | null,"notes"?: string | null,"project_name": string,"session_ttl_hours"?: number,"session_version"?: number,"subdomain": string,"target_url": string,"updated_at"?: string,"upstream_auth_type"?: string,"upstream_header_name"?: string | null,"upstream_secret_ref"?: string | null
+                    "access_code_hash": string,"access_count"?: number,"active"?: boolean,"client_name": string,"created_at"?: string,"expires_at"?: string | null,"first_accessed_at"?: string | null,"id"?: string,"last_accessed_at"?: string | null,"notes"?: string | null,"project_name": string,"session_ttl_hours"?: number,"session_version"?: number,"subdomain": string,"successful_access_count"?: number,"target_url": string,"updated_at"?: string,"upstream_auth_type"?: string,"upstream_header_name"?: string | null,"upstream_secret_ref"?: string | null
                   }
                   Update: {
-                    "access_code_hash"?: string,"access_count"?: number,"active"?: boolean,"client_name"?: string,"created_at"?: string,"expires_at"?: string | null,"id"?: string,"last_accessed_at"?: string | null,"notes"?: string | null,"project_name"?: string,"session_ttl_hours"?: number,"session_version"?: number,"subdomain"?: string,"target_url"?: string,"updated_at"?: string,"upstream_auth_type"?: string,"upstream_header_name"?: string | null,"upstream_secret_ref"?: string | null
+                    "access_code_hash"?: string,"access_count"?: number,"active"?: boolean,"client_name"?: string,"created_at"?: string,"expires_at"?: string | null,"first_accessed_at"?: string | null,"id"?: string,"last_accessed_at"?: string | null,"notes"?: string | null,"project_name"?: string,"session_ttl_hours"?: number,"session_version"?: number,"subdomain"?: string,"successful_access_count"?: number,"target_url"?: string,"updated_at"?: string,"upstream_auth_type"?: string,"upstream_header_name"?: string | null,"upstream_secret_ref"?: string | null
                   }
                   Relationships: [
                     

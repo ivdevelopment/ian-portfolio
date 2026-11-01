@@ -130,14 +130,23 @@ export async function listSectors(): Promise<string[]> {
   return [...new Set((data ?? []).map((r) => r.sector as string))].sort((a, b) => a.localeCompare(b));
 }
 
-export type LinkedPreview = { id: string; client_name: string; subdomain: string; active: boolean; expires_at: string | null };
+export type LinkedPreview = {
+  id: string;
+  client_name: string;
+  subdomain: string;
+  active: boolean;
+  expires_at: string | null;
+  first_accessed_at: string | null;
+  last_accessed_at: string | null;
+  successful_access_count: number;
+};
 export type LinkedProject = { id: string; title: string; slug: string; published: boolean };
 
 export async function getLinked(prospect: Pick<ProspectRecord, "linked_preview_id" | "linked_project_id">) {
   const { supabase } = await requireAdmin();
   const [preview, project] = await Promise.all([
     prospect.linked_preview_id
-      ? supabase.from("client_previews").select("id, client_name, subdomain, active, expires_at").eq("id", prospect.linked_preview_id).maybeSingle()
+      ? supabase.from("client_previews").select("id, client_name, subdomain, active, expires_at, first_accessed_at, last_accessed_at, successful_access_count").eq("id", prospect.linked_preview_id).maybeSingle()
       : null,
     prospect.linked_project_id
       ? supabase.from("projects").select("id, title, slug, published").eq("id", prospect.linked_project_id).maybeSingle()

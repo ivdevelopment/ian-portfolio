@@ -543,6 +543,36 @@ describe("upstream failures never leak details", () => {
   });
 });
 
+describe("access tracking only happens at unlock", () => {
+  it("never calls the unlock (verify) path for refreshes, assets or requests on an existing session", async () => {
+    const { deps, db } = setup();
+    const cookie = cookieFor(db);
+    for (const path of ["/", "/about", "/_next/static/a.js", "/img/hero.webp", "/?x=1"]) {
+      await handleGatewayRequest(req(path, { headers: { cookie } }), deps);
+    }
+    expect(db.verifyCalls).toBe(0);
+    expect(db.logins).toBe(0);
+  });
+
+  it("calls it exactly once per login attempt, and a wrong code is not a login", async () => {
+    const { deps, db } = setup();
+    const login = (code: string) =>
+      handleGatewayRequest(
+        new Request(`https://${HOST}${GATEWAY_PREFIX}/__preview/login`, {
+          method: "POST",
+          headers: { host: HOST, origin: `https://${HOST}`, "content-type": "application/x-www-form-urlencoded" },
+          body: `code=${code}&next=/`,
+        }),
+        deps,
+      );
+    expect((await login("WRONG-CODE-0000")).status).toBe(401);
+    expect(db.logins).toBe(0);
+    expect((await login(CODE)).status).toBe(303);
+    expect(db.logins).toBe(1);
+    expect(db.verifyCalls).toBe(2);
+  });
+});
+
 describe("revocation is immediate (no state cache)", () => {
   const authed = async (deps: GatewayDeps, db: FakeDb) => (await handleGatewayRequest(req("/", { headers: { cookie: cookieFor(db) } }), deps)).status;
 

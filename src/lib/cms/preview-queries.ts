@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/auth";
 
 /** Every column EXCEPT the access-code hash (which no API role may read). */
 export const PREVIEW_COLUMNS =
-  "id, client_name, project_name, subdomain, target_url, active, expires_at, session_ttl_hours, session_version, last_accessed_at, access_count, notes, created_at, updated_at";
+  "id, client_name, project_name, subdomain, target_url, active, expires_at, session_ttl_hours, session_version, first_accessed_at, last_accessed_at, successful_access_count, notes, created_at, updated_at";
 
 export type PreviewRow = {
   id: string;
@@ -16,8 +16,9 @@ export type PreviewRow = {
   expires_at: string | null;
   session_ttl_hours: number;
   session_version: number;
+  first_accessed_at: string | null;
   last_accessed_at: string | null;
-  access_count: number;
+  successful_access_count: number;
   notes: string | null;
   created_at: string;
   updated_at: string;

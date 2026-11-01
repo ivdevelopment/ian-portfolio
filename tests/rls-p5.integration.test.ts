@@ -122,7 +122,7 @@ describe.skipIf(!enabled)("P5 client previews", () => {
   describe("who can read or write the table", () => {
     it("lets admins read every column EXCEPT the hash, and never anyone else", async () => {
       const id = await make("cols");
-      const ok = await admin.from("client_previews").select("id, client_name, subdomain, target_url, active, session_version, access_count").eq("id", id).single();
+      const ok = await admin.from("client_previews").select("id, client_name, subdomain, target_url, active, session_version, successful_access_count").eq("id", id).single();
       expect(ok.error).toBeNull();
       expect((await admin.from("client_previews").select("access_code_hash").eq("id", id)).error).not.toBeNull();
       expect((await admin.from("client_previews").select("*").eq("id", id)).error).not.toBeNull();
@@ -137,7 +137,7 @@ describe.skipIf(!enabled)("P5 client previews", () => {
       expect((await admin.from("client_previews").update({ client_name: "Renamed", notes: "n" }).eq("id", id)).error).toBeNull();
       expect((await admin.from("client_previews").update({ access_code_hash: "x" }).eq("id", id)).error).not.toBeNull();
       expect((await admin.from("client_previews").update({ session_version: 99 }).eq("id", id)).error).not.toBeNull();
-      expect((await admin.from("client_previews").update({ access_count: 99 }).eq("id", id)).error).not.toBeNull();
+      expect((await admin.from("client_previews").update({ successful_access_count: 99 }).eq("id", id)).error).not.toBeNull();
     });
 
     it("blocks anonymous and non-admin writes, deletes and direct inserts", async () => {
@@ -206,8 +206,8 @@ describe.skipIf(!enabled)("P5 client previews", () => {
       expect(wrong.data).toEqual({ result: "denied" });
       const ok = await verify("verify", CODE);
       expect(ok.data).toMatchObject({ result: "ok", id, session_version: 1 });
-      const { data } = await service.from("client_previews").select("access_count, last_accessed_at").eq("id", id).single();
-      expect(data!.access_count).toBe(1);
+      const { data } = await service.from("client_previews").select("successful_access_count, last_accessed_at").eq("id", id).single();
+      expect(data!.successful_access_count).toBe(1);
       expect(data!.last_accessed_at).not.toBeNull();
       expect((await verify("nope", CODE)).data).toEqual({ result: "missing" });
     });

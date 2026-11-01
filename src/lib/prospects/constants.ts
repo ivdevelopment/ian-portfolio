@@ -114,6 +114,7 @@ export const ACTIVITY_TYPES = [
   "follow_up_done",
   "preview_linked",
   "preview_unlinked",
+  "preview_viewed",
   "project_linked",
   "project_created",
   "won",

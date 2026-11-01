@@ -4,6 +4,7 @@ import { OpenLink, ProspectActions } from "@/components/admin/prospect-detail-ac
 import { ProspectNotes } from "@/components/admin/prospect-notes";
 import { DeliveryBadge, FollowUpCell, PriorityBadge, ProspectStatusBadge } from "@/components/admin/prospect-ui";
 import { Badge, EmptyState, Panel, formatDate } from "@/components/admin/ui";
+import { describeAccess, summarizeAccess } from "@/lib/preview/access-activity";
 import { previewState } from "@/lib/preview/expiry";
 import { getPreviewConfig } from "@/lib/preview/config";
 import { activityHeading } from "@/lib/prospects/events";
@@ -127,6 +128,7 @@ export default async function ProspectDetailPage({ params }: PageProps<"/admin/p
               {linked.preview && previewUrl ? (
                 <div className="mt-1">
                   <p className="font-medium">{linked.preview.subdomain}.{baseDomain}</p>
+                  <p className={"mt-1 text-xs " + (summarizeAccess(linked.preview).viewed ? "text-ink" : "text-subtle")}>{describeAccess(linked.preview)}</p>
                   <div className="mt-1 flex flex-wrap items-center gap-2">
                     <Badge tone={previewBadge === "active" ? "success" : previewBadge === "expired" ? "danger" : "neutral"}>
                       {previewBadge === "active" ? "Active" : previewBadge === "expired" ? "Expired" : "Disabled"}
