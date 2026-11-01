@@ -3,6 +3,7 @@ import { isAdminPath } from "@/lib/auth-routes";
 import { LOCALE_COOKIE } from "@/i18n/config";
 import { decideLocaleRoute } from "@/i18n/routing";
 import { isCrmHost, isCrmTreePath } from "@/lib/crm/host";
+import { legacyCrmRedirect, legacyRedirectsEnabled } from "@/lib/crm/legacy-redirects";
 import { getPreviewConfig } from "@/lib/preview/config";
 import { GATEWAY_PREFIX } from "@/lib/preview/gateway";
 import { parsePreviewHost } from "@/lib/preview/hostname";
@@ -46,6 +47,12 @@ export async function proxy(request: NextRequest) {
   }
   // On every other host the CRM tree does not exist.
   if (isCrmTreePath(pathname)) return notFound();
+
+  // Retired CRM screens of the website admin (switched on after the CRM is verified; see src/lib/crm/legacy-redirects.ts).
+  if (isAdminPath(pathname) && legacyRedirectsEnabled() && (request.method === "GET" || request.method === "HEAD")) {
+    const target = legacyCrmRedirect(pathname, search);
+    if (target) return NextResponse.redirect(target, 307);
+  }
 
   if (isAdminPath(pathname)) return updateSession(request);
 

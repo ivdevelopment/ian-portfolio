@@ -220,3 +220,73 @@ describe("CRM navigation", () => {
     expect(isActiveCrmPath("/quotes", "/quotes/abc/edit")).toBe(true);
   });
 });
+
+import { legacyCrmPath, legacyCrmRedirect, legacyRedirectsEnabled } from "@/lib/crm/legacy-redirects";
+import { adminModules } from "@/components/admin/admin-modules";
+
+describe("legacy CRM routes in the website admin", () => {
+  const id = "43dfaeac-817d-43e1-a5a1-f240db8fa0a7";
+
+  it("maps every retired CRM screen to its CRM equivalent", () => {
+    expect(legacyCrmPath("/admin/prospects")).toBe("/prospects");
+    expect(legacyCrmPath("/admin/prospects/kanban")).toBe("/pipeline");
+    expect(legacyCrmPath("/admin/prospects/new")).toBe("/prospects/new");
+    expect(legacyCrmPath("/admin/prospects/import")).toBe("/prospects/import");
+    expect(legacyCrmPath(`/admin/prospects/${id}`)).toBe(`/prospects/${id}`);
+    expect(legacyCrmPath(`/admin/prospects/${id}/edit`)).toBe(`/prospects/${id}/edit`);
+    expect(legacyCrmPath("/admin/quotes")).toBe("/quotes");
+    expect(legacyCrmPath("/admin/quotes/new")).toBe("/quotes/new");
+    expect(legacyCrmPath("/admin/quotes/templates")).toBe("/quotes/templates");
+    expect(legacyCrmPath(`/admin/quotes/${id}`)).toBe(`/quotes/${id}`);
+    expect(legacyCrmPath(`/admin/quotes/${id}/pdf`)).toBe(`/quotes/${id}/pdf`);
+    expect(legacyCrmPath("/admin/settings/quotes")).toBe("/settings");
+    expect(legacyCrmPath("/admin/quotes/")).toBe("/quotes");
+  });
+
+  it("leaves website administration (and the handlers/connection pages that stay) alone", () => {
+    for (const path of ["/admin", "/admin/projects", "/admin/previews", "/admin/reviews", "/admin/inquiries", "/admin/media", "/admin/pages", "/admin/settings", "/admin/settings/integrations", "/admin/settings/integrations/zoho/connect", "/admin/prospects/export", "/admin/prospects/import/api", "/admin/prospects/not-an-id", "/admin/quotes/not-an-id"]) {
+      expect(legacyCrmPath(path), path).toBeNull();
+    }
+  });
+
+  it("redirects to the CRM host with the query string, and the target is not itself a legacy path (no loops)", () => {
+    const target = legacyCrmRedirect("/admin/prospects", "?status=interested&q=garage", {});
+    expect(target).toBe("https://crm.ianverlinden.com/prospects?status=interested&q=garage");
+    expect(legacyCrmPath(new URL(target!).pathname)).toBeNull();
+    expect(legacyCrmRedirect("/admin/projects", "", {})).toBeNull();
+  });
+
+  it("is switched off unless CRM_LEGACY_REDIRECTS=1", () => {
+    expect(legacyRedirectsEnabled({})).toBe(false);
+    expect(legacyRedirectsEnabled({ CRM_LEGACY_REDIRECTS: "0" })).toBe(false);
+    expect(legacyRedirectsEnabled({ CRM_LEGACY_REDIRECTS: "1" })).toBe(true);
+  });
+
+  it("the proxy redirects retired screens only when switched on, and only for GET", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "http://127.0.0.1:55321");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "anon");
+    const off = await call("https://ianverlinden.com/admin/quotes", "ianverlinden.com");
+    expect(off.headers.get("location")).toBe("https://ianverlinden.com/admin/login");
+    vi.stubEnv("CRM_LEGACY_REDIRECTS", "1");
+    const on = await call("https://ianverlinden.com/admin/quotes?status=sent", "ianverlinden.com");
+    expect(on.status).toBe(307);
+    expect(on.headers.get("location")).toBe("https://crm.ianverlinden.com/quotes?status=sent");
+    const stays = await call("https://ianverlinden.com/admin/projects", "ianverlinden.com");
+    expect(stays.headers.get("location")).toBe("https://ianverlinden.com/admin/login");
+    const post = await proxy(new NextRequest("https://ianverlinden.com/admin/quotes", { method: "POST", headers: { host: "ianverlinden.com" } }));
+    expect(post.headers.get("location")?.includes("crm.ianverlinden.com")).toBeFalsy();
+  });
+});
+
+describe("website admin navigation", () => {
+  it("no longer lists the CRM screens, and offers Open CRM", () => {
+    const ids = adminModules.map((m) => m.id);
+    expect(ids).not.toContain("prospects");
+    expect(ids).not.toContain("quotes");
+    expect(ids).toEqual(["dashboard", "projects", "previews", "reviews", "inquiries", "media", "pages", "settings", "crm"]);
+    const crm = adminModules.find((m) => m.id === "crm")!;
+    expect(crm.external).toBe(true);
+    expect(crm.href).toBe("https://crm.ianverlinden.com");
+    expect(adminModules.find((m) => m.id === "projects")!.label).toBe("Portfolio");
+  });
+});
