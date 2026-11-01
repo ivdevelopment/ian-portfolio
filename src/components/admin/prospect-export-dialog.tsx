@@ -1,5 +1,6 @@
 "use client";
 
+import { useAppPaths } from "@/lib/crm/paths-context";
 import { useState } from "react";
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,7 @@ export function ExportDialog({
   selectedIds: string[];
   filtersActive: boolean;
 }) {
+  const P = useAppPaths();
   const [format, setFormat] = useState<ExportFormat>("xlsx");
   const [scope, setScope] = useState<Scope>(selectedIds.length > 0 ? "selected" : filtersActive ? "filtered" : "all");
   const [withActivities, setWithActivities] = useState(true);
@@ -47,7 +49,7 @@ export function ExportDialog({
     setPending(true);
     setError(null);
     try {
-      const response = await fetch("/admin/prospects/export", {
+      const response = await fetch(P.prospectExport, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({

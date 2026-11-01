@@ -1,5 +1,6 @@
 "use client";
 
+import { useAppPaths } from "@/lib/crm/paths-context";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Copy, Pencil } from "lucide-react";
@@ -57,6 +58,7 @@ export function QuoteDetailActions({
   /** Extra buttons rendered by the page (PDF preview/download). */
   links?: React.ReactNode;
 }) {
+  const P = useAppPaths();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   // Which action is running. Only one at a time: a second click (or a second status transition) while one is in flight is ignored.
@@ -136,7 +138,7 @@ export function QuoteDetailActions({
     <>
       <div className="flex flex-wrap items-center gap-2" data-testid="quote-actions" aria-busy={pending}>
         {editable && (
-          <ButtonLink href={`/admin/quotes/${id}/edit`} size="sm" variant="secondary" icon="none">
+          <ButtonLink href={P.quoteEdit(id)} size="sm" variant="secondary" icon="none">
             <Pencil aria-hidden className="size-4" />
             Edit
           </ButtonLink>
@@ -163,7 +165,7 @@ export function QuoteDetailActions({
               "duplicate",
               async () => {
                 const result = await duplicateQuoteAction(id);
-                if (result.ok) router.push(`/admin/quotes/${result.id}/edit`);
+                if (result.ok) router.push(P.quoteEdit(result.id));
                 return result;
               },
             )
@@ -250,7 +252,7 @@ export function QuoteDetailActions({
         onConfirm={() =>
           run("delete", async () => {
             const result = await deleteQuoteAction(id);
-            if (result.ok) router.push("/admin/quotes");
+            if (result.ok) router.push(P.quotes);
             return result;
           })
         }
@@ -285,7 +287,7 @@ export function QuoteDetailActions({
         onConfirm={() =>
           run("project", async () => {
             const result = await createProjectFromQuoteAction(id);
-            if (result.ok) router.push(`/admin/projects/${result.projectId}/edit`);
+            if (result.ok) router.push(P.website.projectEdit(result.projectId));
             return result;
           })
         }

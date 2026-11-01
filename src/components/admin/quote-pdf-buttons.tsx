@@ -1,5 +1,6 @@
 "use client";
 
+import { useAppPaths } from "@/lib/crm/paths-context";
 import { useState } from "react";
 import { Download, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,8 @@ export function fileNameFromDisposition(header: string | null, fallback: string)
  * signed-in-only route: there is no stored file and no shareable link.
  */
 export function QuotePdfButtons({ id }: { id: string }) {
-  const url = `/admin/quotes/${id}/pdf`;
+  const P = useAppPaths();
+  const url = P.quotePdf(id);
   const { pending, run } = usePendingAction();
   const [error, setError] = useState<string | null>(null);
 

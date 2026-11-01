@@ -1,5 +1,6 @@
 "use client";
 
+import { useAppPaths } from "@/lib/crm/paths-context";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -32,6 +33,7 @@ const COLUMNS: Array<{ sort: QuoteSort | null; label: string; align?: "right" }>
 
 /** Filters live in the URL, so a filtered list can be bookmarked, shared and survives a refresh. */
 export function QuoteList({ rows, total, filters, prospectName }: { rows: QuoteWithProspect[]; total: number; filters: QuoteFilters; prospectName: string | null }) {
+  const P = useAppPaths();
   const router = useRouter();
   const pathname = usePathname();
   const [q, setQ] = useState(filters.q);
@@ -128,7 +130,7 @@ export function QuoteList({ rows, total, filters, prospectName }: { rows: QuoteW
         <EmptyState>
           {hasFilters ? "No quotes match these filters." : "No quotes yet."}{" "}
           {!hasFilters && (
-            <Link href="/admin/quotes/new" className="text-ink underline underline-offset-4">
+            <Link href={P.quoteNew()} className="text-ink underline underline-offset-4">
               Create the first one
             </Link>
           )}
@@ -159,7 +161,7 @@ export function QuoteList({ rows, total, filters, prospectName }: { rows: QuoteW
                 {rows.map((r) => (
                   <tr key={r.id} className="border-b border-line/60 last:border-0 hover:bg-glass/60">
                     <td className="px-3 py-2.5">
-                      <Link href={`/admin/quotes/${r.id}`} className="font-medium text-ink hover:underline">
+                      <Link href={P.quote(r.id)} className="font-medium text-ink hover:underline">
                         {r.number}
                       </Link>
                       <div className="max-w-[16rem] truncate text-xs text-muted">{r.title ?? "Untitled"}</div>
@@ -170,7 +172,7 @@ export function QuoteList({ rows, total, filters, prospectName }: { rows: QuoteW
                     </td>
                     <td className="px-3 py-2.5">
                       {r.prospect ? (
-                        <Link href={`/admin/prospects/${r.prospect.id}`} className="hover:underline">
+                        <Link href={P.prospect(r.prospect.id)} className="hover:underline">
                           {r.prospect.companyName}
                         </Link>
                       ) : (
@@ -198,7 +200,7 @@ export function QuoteList({ rows, total, filters, prospectName }: { rows: QuoteW
               <li key={r.id} className="rounded-card border border-line bg-glass p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <Link href={`/admin/quotes/${r.id}`} className="font-medium hover:underline">
+                    <Link href={P.quote(r.id)} className="font-medium hover:underline">
                       {r.number}
                     </Link>
                     <p className="truncate text-sm text-muted">{r.title ?? "Untitled"}</p>
@@ -226,7 +228,7 @@ export function QuoteList({ rows, total, filters, prospectName }: { rows: QuoteW
                     <div className="col-span-2">
                       <dt className="text-xs text-muted">Prospect</dt>
                       <dd>
-                        <Link href={`/admin/prospects/${r.prospect.id}`} className="hover:underline">
+                        <Link href={P.prospect(r.prospect.id)} className="hover:underline">
                           {r.prospect.companyName}
                         </Link>
                       </dd>
@@ -266,14 +268,15 @@ export function QuoteList({ rows, total, filters, prospectName }: { rows: QuoteW
 }
 
 function RowActions({ row }: { row: QuoteWithProspect }) {
+  const P = useAppPaths();
   const link = "text-sm text-muted underline-offset-4 hover:text-ink hover:underline";
   return (
     <span className="inline-flex items-center gap-3">
-      <Link href={`/admin/quotes/${row.id}`} className={link}>
+      <Link href={P.quote(row.id)} className={link}>
         View
       </Link>
       {(row.status === "draft" || row.status === "ready") && (
-        <Link href={`/admin/quotes/${row.id}/edit`} className={link}>
+        <Link href={P.quoteEdit(row.id)} className={link}>
           Edit
         </Link>
       )}

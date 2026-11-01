@@ -1,5 +1,6 @@
 "use client";
 
+import { useAppPaths } from "@/lib/crm/paths-context";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -59,6 +60,7 @@ type Props = {
 };
 
 export function ProspectList({ rows, total, filters, sectors, today }: Props) {
+  const P = useAppPaths();
   const router = useRouter();
   const pathname = usePathname();
   const [navigating, startNavigation] = useTransition();
@@ -269,7 +271,7 @@ export function ProspectList({ rows, total, filters, sectors, today }: Props) {
                       <input type="checkbox" aria-label={`Select ${r.company_name}`} className="size-4 accent-[var(--color-accent-strong)]" checked={selected.has(r.id)} onChange={() => toggle(r.id)} />
                     </td>
                     <td className="max-w-64 px-3 py-3">
-                      <Link href={`/admin/prospects/${r.id}`} className="block truncate font-medium hover:text-accent">
+                      <Link href={P.prospect(r.id)} className="block truncate font-medium hover:text-accent">
                         {r.company_name}
                       </Link>
                       {r.email && <span className="block truncate text-xs text-subtle">{r.email}</span>}
@@ -315,7 +317,7 @@ export function ProspectList({ rows, total, filters, sectors, today }: Props) {
                 <div className="flex items-start gap-3">
                   <input type="checkbox" aria-label={`Select ${r.company_name}`} className="mt-1 size-4 accent-[var(--color-accent-strong)]" checked={selected.has(r.id)} onChange={() => toggle(r.id)} />
                   <div className="min-w-0 flex-1">
-                    <Link href={`/admin/prospects/${r.id}`} className="block truncate font-medium hover:text-accent">
+                    <Link href={P.prospect(r.id)} className="block truncate font-medium hover:text-accent">
                       {r.company_name}
                     </Link>
                     <p className="truncate text-xs text-subtle">{[r.sector, r.city].filter(Boolean).join(" · ") || "—"}</p>
@@ -394,12 +396,13 @@ function Th({ label, sortKey, filters, onSort, align }: { label: string; sortKey
 }
 
 function RowActions({ row, onDelete }: { row: ListRow; onDelete: () => void }) {
+  const P = useAppPaths();
   return (
     <div className="flex items-center justify-end gap-1.5">
-      <Link href={`/admin/prospects/${row.id}`} className={iconButton} aria-label={`Open ${row.company_name}`} title="Open">
+      <Link href={P.prospect(row.id)} className={iconButton} aria-label={`Open ${row.company_name}`} title="Open">
         <ExternalLink aria-hidden className="size-4" />
       </Link>
-      <Link href={`/admin/prospects/${row.id}/edit`} className={iconButton} aria-label={`Edit ${row.company_name}`} title="Edit">
+      <Link href={P.prospectEdit(row.id)} className={iconButton} aria-label={`Edit ${row.company_name}`} title="Edit">
         <Pencil aria-hidden className="size-4" />
       </Link>
       <button type="button" className={cn(iconButton, "hover:border-danger/50 hover:text-danger")} aria-label={`Delete ${row.company_name}`} title="Delete" onClick={onDelete}>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useAppPaths } from "@/lib/crm/paths-context";
 import Link from "next/link";
 import { useState } from "react";
 import { AlertTriangle, CheckCircle2, FileUp } from "lucide-react";
@@ -18,6 +19,7 @@ const NONE = "__none";
  * step and nothing is stored in between. Duplicates are skipped unless you tick "Import anyway": never merged.
  */
 export function ProspectImport() {
+  const P = useAppPaths();
   const [file, setFile] = useState<File | null>(null);
   const [parsed, setParsed] = useState<Parsed | null>(null);
   const [mapping, setMapping] = useState<ColumnMapping>({});
@@ -36,7 +38,7 @@ export function ProspectImport() {
       form.set("file", file);
       form.set("step", step);
       for (const [k, v] of Object.entries(extra)) form.set(k, v);
-      const response = await fetch("/admin/prospects/import/api", { method: "POST", body: form });
+      const response = await fetch(P.prospectImportApi, { method: "POST", body: form });
       const body = (await response.json().catch(() => null)) as (T & { error?: string }) | null;
       if (!response.ok || !body) throw new Error(body?.error ?? "That step failed. Please try again.");
       return body;
@@ -108,7 +110,7 @@ export function ProspectImport() {
           </details>
         )}
         <div className="mt-5 flex gap-2">
-          <ButtonLink href="/admin/prospects" size="sm" icon="none">
+          <ButtonLink href={P.prospects} size="sm" icon="none">
             View prospects
           </ButtonLink>
           <Button size="sm" variant="secondary" icon="none" onClick={reset}>
@@ -286,7 +288,7 @@ export function ProspectImport() {
       )}
 
       <p className="text-xs text-subtle">
-        Imports are recorded (rows parsed, imported, skipped, duplicates). <Link href="/admin/prospects" className="text-accent hover:underline">Back to prospects</Link>
+        Imports are recorded (rows parsed, imported, skipped, duplicates). <Link href={P.prospects} className="text-accent hover:underline">Back to prospects</Link>
       </p>
     </div>
   );

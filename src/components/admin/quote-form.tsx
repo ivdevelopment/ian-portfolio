@@ -1,5 +1,6 @@
 "use client";
 
+import { useAppPaths } from "@/lib/crm/paths-context";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
@@ -55,6 +56,7 @@ export function QuoteForm({
   templates: QuoteTemplateRecord[];
   prospects: ProspectOption[];
 }) {
+  const P = useAppPaths();
   const router = useRouter();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const stamp = useRef<string | null>(updatedAt ?? null);
@@ -74,7 +76,7 @@ export function QuoteForm({
           setErrors(result.fieldErrors ?? {});
           return { ok: false, error: result.error };
         }
-        router.push(`/admin/quotes/${result.id}`);
+        router.push(P.quote(result.id));
         return { ok: true };
       }
       const result = await updateQuoteAction(id!, draft, stamp.current);

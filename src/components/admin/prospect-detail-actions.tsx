@@ -1,5 +1,6 @@
 "use client";
 
+import { useAppPaths } from "@/lib/crm/paths-context";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -51,6 +52,7 @@ export function ProspectActions({
   previews: Array<{ id: string; label: string }>;
   projects: Array<{ id: string; label: string }>;
 }) {
+  const P = useAppPaths();
   const router = useRouter();
   const [dialog, setDialog] = useState<Dialog>(null);
   const [isPending, startTransition] = useTransition();
@@ -87,7 +89,7 @@ export function ProspectActions({
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
-        <ButtonLink href={`/admin/prospects/${prospect.id}/edit`} variant="secondary" size="sm" icon="none" className={small}>
+        <ButtonLink href={P.prospectEdit(prospect.id)} variant="secondary" size="sm" icon="none" className={small}>
           <Pencil aria-hidden className="size-4" /> Edit
         </ButtonLink>
         <Button size="sm" variant="secondary" icon="none" className={small} onClick={() => setDialog("activity")}>
@@ -96,7 +98,7 @@ export function ProspectActions({
         <Button size="sm" variant="secondary" icon="none" className={small} onClick={() => setDialog("followup")}>
           <CalendarClock aria-hidden className="size-4" /> Set follow-up
         </Button>
-        <ButtonLink href={`/admin/quotes/new?prospect=${prospect.id}`} variant="secondary" size="sm" icon="none" className={small}>
+        <ButtonLink href={P.quoteNew(prospect.id)} variant="secondary" size="sm" icon="none" className={small}>
           <FileSignature aria-hidden className="size-4" /> Create quote
         </ButtonLink>
         <Button size="sm" icon="none" className={small} onClick={() => setDialog("convert")} disabled={prospect.hasProject}>
@@ -183,7 +185,7 @@ export function ProspectActions({
               const result = await convertToProjectAction(prospect.id);
               if (!result.ok) return setError(result.error);
               setDialog(null);
-              router.push(`/admin/projects/${result.projectId}/edit`);
+              router.push(P.website.projectEdit(result.projectId));
             } catch {
               setError(NETWORK_ERROR);
             } finally {
@@ -211,7 +213,7 @@ export function ProspectActions({
             try {
               const result = await deleteProspectAction(prospect.id);
               if (!result.ok) return setError(result.error);
-              router.push("/admin/prospects");
+              router.push(P.prospects);
               router.refresh();
             } catch {
               setError(NETWORK_ERROR);

@@ -45,7 +45,7 @@ function ConnectButton({ label, variant, disabled }: { label: string; variant?: 
 export type PanelConnection = { account: string; lastSync: string | null; needsReconnect: boolean } | null;
 
 /** Connect / check / sync / disconnect for Zoho Mail. Tokens never reach the browser: every button calls the server. */
-export function ZohoPanel({ connection, lastRun }: { connection: PanelConnection; lastRun: Pick<SyncReport, "checked" | "matched" | "stored" | "errors"> & { mode: string; at: string } | null }) {
+export function ZohoPanel({ connection, lastRun, manageHref }: { connection: PanelConnection; manageHref?: string; lastRun: Pick<SyncReport, "checked" | "matched" | "stored" | "errors"> & { mode: string; at: string } | null }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState<"dry" | "sync" | null>(null);
@@ -72,6 +72,17 @@ export function ZohoPanel({ connection, lastRun }: { connection: PanelConnection
     });
   };
 
+  if (!connection && manageHref) {
+    return (
+      <p className="text-sm text-muted">
+        Zoho Mail is not connected.{" "}
+        <a href={manageHref} className="text-accent underline-offset-4 hover:underline">
+          Connect it in the website admin
+        </a>
+        .
+      </p>
+    );
+  }
   if (!connection) {
     return (
       <div className="flex flex-wrap items-center gap-3">
@@ -90,10 +101,18 @@ export function ZohoPanel({ connection, lastRun }: { connection: PanelConnection
         <Button size="sm" icon="none" disabled={pending || connection.needsReconnect || busy === "dry"} pending={busy === "sync"} pendingLabel="Syncing…" onClick={() => run("sync")}>
           Sync now
         </Button>
-        <ConnectButton label="Reconnect" variant="secondary" disabled={busy !== null} />
-        <Button size="sm" variant="secondary" icon="none" className="text-danger" disabled={pending || busy !== null} onClick={() => setConfirmDisconnect(true)}>
-          Disconnect
-        </Button>
+        {manageHref ? (
+          <a href={manageHref} className="text-sm text-muted underline-offset-4 hover:text-ink hover:underline">
+            Manage connection in the website admin ↗
+          </a>
+        ) : (
+          <>
+            <ConnectButton label="Reconnect" variant="secondary" disabled={busy !== null} />
+            <Button size="sm" variant="secondary" icon="none" className="text-danger" disabled={pending || busy !== null} onClick={() => setConfirmDisconnect(true)}>
+              Disconnect
+            </Button>
+          </>
+        )}
       </div>
       {busy && (
         <p role="status" className="mt-3 text-sm text-muted">

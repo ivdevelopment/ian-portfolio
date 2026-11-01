@@ -12,10 +12,14 @@ export type MailRow = {
   sent_at: string;
 };
 
+/** A moment in the life of the prospect's client preview (read from the preview record, never stored as a CRM activity). */
+export type PreviewEvent = { id: string; at: string; title: string; detail: string | null };
+
 export type TimelineItem =
   | { kind: "activity"; key: string; day: string; sortAt: string; activity: ActivityRecord }
   | { kind: "email"; key: string; day: string; sortAt: string; mail: MailRow }
-  | { kind: "quote"; key: string; day: string; sortAt: string; quote: ProspectQuoteEvent };
+  | { kind: "quote"; key: string; day: string; sortAt: string; quote: ProspectQuoteEvent }
+  | { kind: "preview"; key: string; day: string; sortAt: string; preview: PreviewEvent };
 
 /** Brussels calendar day of an instant. */
 export function brusselsDay(iso: string): string {
@@ -37,11 +41,12 @@ export function activitySortKey(a: Pick<ActivityRecord, "occurred_on" | "occurre
  * One timeline, newest first, rendered from separate sources: CRM activities, synced mail and quote events. Mail and quote
  * events are never copied into `prospect_activities`; they are read where they live and link back to it.
  */
-export function mergeTimeline(activities: readonly ActivityRecord[], mail: readonly MailRow[], quotes: readonly ProspectQuoteEvent[] = []): TimelineItem[] {
+export function mergeTimeline(activities: readonly ActivityRecord[], mail: readonly MailRow[], quotes: readonly ProspectQuoteEvent[] = [], previews: readonly PreviewEvent[] = []): TimelineItem[] {
   const items: TimelineItem[] = [
     ...activities.map((a): TimelineItem => ({ kind: "activity", key: `a:${a.id}`, day: a.occurred_on, sortAt: activitySortKey(a), activity: a })),
     ...mail.map((m): TimelineItem => ({ kind: "email", key: `m:${m.id}`, day: brusselsDay(m.sent_at), sortAt: m.sent_at, mail: m })),
     ...quotes.map((e): TimelineItem => ({ kind: "quote", key: `q:${e.id}`, day: brusselsDay(e.createdAt), sortAt: e.createdAt, quote: e })),
+    ...previews.map((e): TimelineItem => ({ kind: "preview", key: `p:${e.id}`, day: brusselsDay(e.at), sortAt: e.at, preview: e })),
   ];
   // Newest day first; within a day newest first (a mail has an exact time, activities fall back to when they were logged).
   return items.sort((a, b) => (a.day !== b.day ? (a.day > b.day ? -1 : 1) : a.sortAt > b.sortAt ? -1 : a.sortAt < b.sortAt ? 1 : 0));

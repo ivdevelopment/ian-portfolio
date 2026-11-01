@@ -9,6 +9,7 @@ import { FOLLOW_UP_FILTERS, FOLLOW_UP_FILTER_LABELS, filtersToParams, hasActiveF
 import { rememberPreference } from "@/lib/prospects/preference-cookie";
 import { Spinner } from "@/components/ui/loading";
 import { startNavigationProgress } from "@/components/ui/navigation-progress";
+import { useAppPaths } from "@/lib/crm/paths-context";
 import { cn } from "@/lib/utils";
 import { AdminSelect } from "./admin-select";
 import { adminInput } from "./ui";
@@ -18,18 +19,19 @@ const VIEW_COOKIE = "prospects_view";
 
 /** List | Kanban. The choice is remembered (cookie) so /admin/prospects opens in the view you last used. */
 export function ViewToggle({ current, query }: { current: "list" | "kanban"; query: string }) {
+  const P = useAppPaths();
   const q = query ? `?${query}` : "";
   const remember = (view: string) => {
-    rememberPreference(VIEW_COOKIE, view);
+    rememberPreference(VIEW_COOKIE, view, P.kind === "crm" ? "/" : "/admin");
   };
   const base = "rounded-full px-4 py-1.5 text-sm transition-colors";
   return (
     <nav aria-label="Prospect view" className="inline-flex rounded-full border border-line bg-glass p-1">
-      <Link href={`/admin/prospects${q ? `${q}&view=list` : "?view=list"}`} aria-current={current === "list" ? "page" : undefined} onClick={() => remember("list")} className={cn(base, current === "list" ? "bg-accent-strong text-white" : "text-muted hover:text-ink")}>
+      <Link href={`${P.prospects}${q ? `${q}&view=list` : "?view=list"}`} aria-current={current === "list" ? "page" : undefined} onClick={() => remember("list")} className={cn(base, current === "list" ? "bg-accent-strong text-white" : "text-muted hover:text-ink")}>
         List
       </Link>
-      <Link href={`/admin/prospects/kanban${q}`} aria-current={current === "kanban" ? "page" : undefined} onClick={() => remember("kanban")} className={cn(base, current === "kanban" ? "bg-accent-strong text-white" : "text-muted hover:text-ink")}>
-        Kanban
+      <Link href={`${P.pipeline}${q}`} aria-current={current === "kanban" ? "page" : undefined} onClick={() => remember("kanban")} className={cn(base, current === "kanban" ? "bg-accent-strong text-white" : "text-muted hover:text-ink")}>
+        {P.kind === "crm" ? "Pipeline" : "Kanban"}
       </Link>
     </nav>
   );

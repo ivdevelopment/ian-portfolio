@@ -1,5 +1,6 @@
 "use client";
 
+import { useAppPaths } from "@/lib/crm/paths-context";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
@@ -38,6 +39,7 @@ type Props = {
  * status selector with one column at a time.
  */
 export function ProspectBoard({ cards: serverCards, today, visible: initialVisible, total, truncated, baseDomain }: Props) {
+  const P = useAppPaths();
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [overrides, setOverrides] = useState<Record<string, ProspectStatus>>({});
@@ -67,7 +69,7 @@ export function ProspectBoard({ cards: serverCards, today, visible: initialVisib
 
   const saveVisible = (next: ProspectStatus[]) => {
     setVisible(next);
-    rememberPreference(COLUMNS_COOKIE, next.join(","));
+    rememberPreference(COLUMNS_COOKIE, next.join(","), P.kind === "crm" ? "/" : "/admin");
   };
 
   const move = (id: string, to: ProspectStatus) => {
@@ -287,6 +289,7 @@ function Card({
   onFollowUp: () => void;
   onNote: () => void;
 }) {
+  const P = useAppPaths();
   const followUp = cardFollowUp(card.next_follow_up_on, today);
   const overdue = followUp?.state.kind === "overdue";
   const closed = card.status === "won" || card.status === "lost" || card.status === "not_interested" || card.status === "no_response";
@@ -311,7 +314,7 @@ function Card({
       <div className="flex items-start gap-1.5">
         <GripVertical aria-hidden className="mt-0.5 hidden size-4 shrink-0 cursor-grab text-subtle md:block" />
         <div className="min-w-0 flex-1">
-          <Link href={`/admin/prospects/${card.id}`} className="block truncate font-medium hover:text-accent" draggable={false}>
+          <Link href={P.prospect(card.id)} className="block truncate font-medium hover:text-accent" draggable={false}>
             {card.company_name}
           </Link>
           {(card.sector || card.city) && <p className="truncate text-xs text-subtle">{[card.sector, card.city].filter(Boolean).join(" · ")}</p>}
@@ -362,6 +365,7 @@ function CardMenu({
   onFollowUp: () => void;
   onNote: () => void;
 }) {
+  const P = useAppPaths();
   const [open, setOpen] = useState(false);
   const [moving, setMoving] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -445,7 +449,7 @@ function CardMenu({
             </>
           ) : (
             <>
-              <Link role="menuitem" href={`/admin/prospects/${card.id}`} className={itemClass}>
+              <Link role="menuitem" href={P.prospect(card.id)} className={itemClass}>
                 Open
               </Link>
               <button type="button" role="menuitem" className={itemClass} onClick={() => setMoving(true)}>

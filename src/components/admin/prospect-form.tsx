@@ -1,5 +1,6 @@
 "use client";
 
+import { useAppPaths } from "@/lib/crm/paths-context";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createProspectAction, updateProspectAction } from "@/app/(admin)/admin/(panel)/prospects/actions";
@@ -42,6 +43,7 @@ export function ProspectForm({
   /** Existing sectors, suggested while typing. */
   sectors?: string[];
 }) {
+  const P = useAppPaths();
   const router = useRouter();
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -59,7 +61,7 @@ export function ProspectForm({
         setErrors(result.fieldErrors ?? {});
         return { ok: false, error: result.error };
       }
-      if (mode === "create" && "id" in result) router.push(`/admin/prospects/${result.id}`);
+      if (mode === "create" && "id" in result) router.push(P.prospect(String(result.id)));
       return { ok: true };
     },
     () => router.refresh(),
