@@ -236,3 +236,52 @@ select optgroup {
   background-color: var(--color-elevated);
   color: var(--color-ink);
 }
+
+/* ------------------------------------------------------------------
+   Loading feedback (see src/components/ui/loading.tsx, navigation-progress.tsx)
+------------------------------------------------------------------- */
+.nav-progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 90;
+  height: 2px;
+  pointer-events: none;
+  opacity: 0;
+}
+.nav-progress > span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-accent-strong), var(--color-accent));
+  box-shadow: 0 0 8px var(--color-accent-soft);
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+/* Eases toward (not to) the end while the route loads, then snaps to full and fades when it lands. */
+.nav-progress[data-state="loading"] {
+  opacity: 1;
+}
+.nav-progress[data-state="loading"] > span {
+  transform: scaleX(0.85);
+  transition: transform 8s cubic-bezier(0.1, 0.6, 0.2, 1);
+}
+.nav-progress[data-state="done"] {
+  opacity: 0;
+  transition: opacity 0.35s ease 0.15s;
+}
+.nav-progress[data-state="done"] > span {
+  transform: scaleX(1);
+  transition: transform 0.2s ease-out;
+}
+/* Reduced motion: a still bar (no growing, no fade) is enough to say "working". */
+@media (prefers-reduced-motion: reduce) {
+  .nav-progress[data-state="loading"] > span {
+    transform: scaleX(1);
+    transition: none;
+  }
+  .nav-progress[data-state="loading"] {
+    opacity: 0.7;
+  }
+  .nav-progress[data-state="done"] {
+    transition: none;
+  }
+}

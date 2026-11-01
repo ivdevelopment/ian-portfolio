@@ -1,9 +1,11 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { QuoteDetailActions, type DetailProspect } from "@/components/admin/quote-detail-actions";
 import { QuotePdfButtons } from "@/components/admin/quote-pdf-buttons";
 import { QuoteStatusBadge, QuoteTotalsBlock } from "@/components/admin/quote-ui";
 import { AdminPageHeader, Panel, formatDateTime } from "@/components/admin/ui";
+import { SectionSkeleton } from "@/components/ui/loading";
 import { daysUntilExpiry, effectiveStatus } from "@/lib/quotes/constants";
 import { formFromQuote } from "@/lib/quotes/form";
 import { formatCents, formatPercent, formatQuantity } from "@/lib/quotes/money";
@@ -15,7 +17,7 @@ import type { ProspectStatus } from "@/lib/prospects/constants";
 
 export default async function QuoteDetailPage({ params }: PageProps<"/admin/quotes/[id]">) {
   const { id } = await params;
-  const [quote, activities] = await Promise.all([getQuote(id), listQuoteActivities(id)]);
+  const quote = await getQuote(id);
   if (!quote) notFound();
 
   const totals = quoteTotals(quote);
@@ -171,21 +173,9 @@ export default async function QuoteDetailPage({ params }: PageProps<"/admin/quot
             </ul>
           </Panel>
 
-          <Panel title="Activity">
-            {activities.length === 0 ? (
-              <p className="text-sm text-muted">Nothing yet.</p>
-            ) : (
-              <ol className="space-y-3">
-                {activities.map((a) => (
-                  <li key={a.id} className="text-sm">
-                    <div>{a.title}</div>
-                    {a.description && <div className="text-xs text-muted">{a.description}</div>}
-                    <div className="text-xs text-subtle">{formatDateTime(a.createdAt)}</div>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </Panel>
+          <Suspense fallback={<SectionSkeleton title="activity" lines={3} />}>
+            <QuoteActivity id={quote.id} />
+          </Suspense>
         </aside>
       </div>
     </>
@@ -198,5 +188,27 @@ function Item({ label, value, pre }: { label: string; value: string | null; pre?
       <dt className="text-xs text-muted">{label}</dt>
       <dd className={pre ? "whitespace-pre-line" : undefined}>{value || <span className="text-subtle">—</span>}</dd>
     </div>
+  );
+}
+
+/** The audit trail loads on its own so the quote itself is on screen first. */
+async function QuoteActivity({ id }: { id: string }) {
+  const activities = await listQuoteActivities(id);
+  return (
+      <Panel title="Activity">
+        {activities.length === 0 ? (
+          <p className="text-sm text-muted">Nothing yet.</p>
+        ) : (
+          <ol className="space-y-3">
+            {activities.map((a) => (
+              <li key={a.id} className="text-sm">
+                <div>{a.title}</div>
+                {a.description && <div className="text-xs text-muted">{a.description}</div>}
+                <div className="text-xs text-subtle">{formatDateTime(a.createdAt)}</div>
+              </li>
+            ))}
+          </ol>
+        )}
+      </Panel>
   );
 }

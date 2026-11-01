@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
 import "@/app/globals.css";
 import { MotionProvider } from "@/components/ui/motion-provider";
+import { NavigationProgress } from "@/components/ui/navigation-progress";
 
 export const metadata: Metadata = {
   title: { absolute: "Admin" },
@@ -18,6 +19,7 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
   return (
     <html lang="en" className={GeistSans.variable}>
       <body className="min-h-dvh">
+        <NavigationProgress />
         <MotionProvider>{children}</MotionProvider>
       </body>
     </html>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { OpenLink, ProspectActions } from "@/components/admin/prospect-detail-actions";
 import { ProspectNotes } from "@/components/admin/prospect-notes";
@@ -16,6 +17,8 @@ import { brusselsToday, formatDay } from "@/lib/prospects/dates";
 import { formatEur } from "@/lib/prospects/money";
 import { getLinked, getProspect, listActivities, listLinkableOptions } from "@/lib/prospects/queries";
 import { idSchema } from "@/lib/schemas/prospect";
+import { SectionSkeleton } from "@/components/ui/loading";
+import type { ProspectStatus } from "@/lib/prospects/constants";
 import { QuoteStatusBadge } from "@/components/admin/quote-ui";
 import { latestActiveQuote } from "@/lib/quotes/metrics";
 import { listQuoteEventsForProspect, listQuotesForProspect } from "@/lib/quotes/queries";
@@ -40,21 +43,11 @@ export default async function ProspectDetailPage({ params }: PageProps<"/admin/p
   if (!prospect) notFound();
 
   // The timeline and the link options are separate queries: the list page never loads them.
-  const [activities, linked, options, mail, quotes, quoteEvents] = await Promise.all([
-    listActivities(id),
-    getLinked(prospect),
-    listLinkableOptions(),
-    listProspectMail(id),
-    listQuotesForProspect(id),
-    listQuoteEventsForProspect(id),
-  ]);
-  const timeline = mergeTimeline(activities, mail, quoteEvents);
+  const [linked, options, quotes] = await Promise.all([getLinked(prospect), listLinkableOptions(), listQuotesForProspect(id)]);
   const activeQuote = latestActiveQuote(quotes);
   // The list query carries the stored header figures (no lines): net = subtotal - quote-level discount.
   const activeNet = activeQuote ? activeQuote.subtotalCents - activeQuote.discountCents : null;
   const manualValueCents = prospect.quote_value_eur === null ? null : Math.round(Number(prospect.quote_value_eur) * 100);
-  const reply = suggestReply(prospect.status, mail);
-  const latestMail = lastEmail(mail);
   const today = brusselsToday();
   const { baseDomain } = getPreviewConfig();
 
@@ -219,13 +212,30 @@ export default async function ProspectDetailPage({ params }: PageProps<"/admin/p
         </Panel>
       </div>
 
+      {/* The timeline and mail load on their own: the rest of the page is usable while they arrive. */}
+      <Suspense fallback={<SectionSkeleton title="activity" lines={6} />}>
+        <ActivitySections id={id} status={prospect.status} />
+      </Suspense>
+    </>
+  );
+}
+
+/** Mail, reply suggestion and the merged timeline: three separate reads, streamed in after the page shell. */
+async function ActivitySections({ id, status }: { id: string; status: ProspectStatus }) {
+  const [activities, mail, quoteEvents] = await Promise.all([listActivities(id), listProspectMail(id), listQuoteEventsForProspect(id)]);
+  const timeline = mergeTimeline(activities, mail, quoteEvents);
+  const reply = suggestReply(status, mail);
+  const latestMail = lastEmail(mail);
+
+  return (
+    <>
       {/* Only exists once Zoho Mail is enabled and has linked mail to this prospect. */}
       {mail.length > 0 && (
         <Panel title="Email" description="Mail to and from this address, read from Zoho Mail." className="mt-4">
           {reply && (
             <p className="mb-3 flex flex-wrap items-center gap-3 rounded-md border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-100">
               New reply detected{reply.mail.subject ? `: “${reply.mail.subject}”` : ""}. The status is still {reply.currentLabel}.
-              <MarkRepliedButton id={prospect.id} />
+              <MarkRepliedButton id={id} />
             </p>
           )}
           {latestMail && (

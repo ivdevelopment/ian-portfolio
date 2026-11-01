@@ -7,6 +7,7 @@ import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
 import { SiteAnalytics } from "@/components/layout/site-analytics";
 import { MotionProvider } from "@/components/ui/motion-provider";
+import { NavigationProgress } from "@/components/ui/navigation-progress";
 import { htmlLang, isLocale, locales, ogLocale } from "@/i18n/config";
 import { ogImageFor } from "@/lib/page-metadata";
 import { LocaleProvider } from "@/i18n/context";
@@ -60,6 +61,7 @@ export default async function RootLayout({ children, params }: LayoutProps<"/[lo
   return (
     <html lang={htmlLang[locale]} className={GeistSans.variable}>
       <body className="min-h-dvh">
+        <NavigationProgress />
         <MotionProvider>
           <LocaleProvider locale={locale} dict={dict}>
             <a

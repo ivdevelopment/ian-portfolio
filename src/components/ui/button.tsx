@@ -3,6 +3,7 @@
 import { LocaleLink } from "@/i18n/locale-link";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ButtonSpinner } from "./loading";
 
 type Variant = "primary" | "secondary" | "soft" | "ghost";
 type Size = "sm" | "md" | "lg";
@@ -98,6 +99,10 @@ export function ButtonLink({
 type ButtonProps = StyleProps &
   Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "className"> & {
     children: React.ReactNode;
+    /** While true the button is disabled (no second click), marked busy, and shows a spinner with `pendingLabel`. */
+    pending?: boolean;
+    /** What is happening, e.g. "Saving…". Defaults to the normal label. */
+    pendingLabel?: string;
   };
 
 export function Button({
@@ -107,15 +112,36 @@ export function Button({
   className,
   children,
   type = "button",
+  pending = false,
+  pendingLabel,
+  disabled,
   ...rest
 }: ButtonProps) {
   return (
     <button
       type={type}
       className={buttonClasses({ variant, size, className })}
+      disabled={disabled || pending}
+      aria-busy={pending || undefined}
       {...rest}
     >
-      {children}
+      {pendingLabel ? (
+        // Both labels share one grid cell, so the button keeps the width of the longer one and does not jump when the text changes.
+        <span className="inline-grid">
+          <span className={cn("col-start-1 row-start-1 inline-flex items-center justify-center gap-2", pending && "invisible")} aria-hidden={pending || undefined}>
+            {children}
+          </span>
+          <span className={cn("col-start-1 row-start-1 inline-flex items-center justify-center gap-2", !pending && "invisible")} aria-hidden={!pending || undefined}>
+            <ButtonSpinner />
+            {pendingLabel}
+          </span>
+        </span>
+      ) : (
+        <>
+          {pending && <ButtonSpinner />}
+          {children}
+        </>
+      )}
       <Icon kind={icon} />
     </button>
   );
