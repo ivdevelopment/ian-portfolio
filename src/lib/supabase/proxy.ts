@@ -8,15 +8,36 @@ import {
   decideAdminRoute,
   isSupabaseAuthCookie,
 } from "@/lib/auth-routes";
+import { CRM_APP_HEADER, toCrmTreePath } from "@/lib/crm/host";
+import { CRM_HOME, CRM_LOGIN, decideCrmRoute } from "@/lib/crm/auth-routes";
 import { getSupabaseEnv } from "./env";
+
+type Surface = "admin" | "crm";
 
 /**
  * Refreshes the Supabase session cookies and applies the first, cheap layer
- * of /admin protection. Every admin page and server action re-checks
- * authorisation against the database; this is not the only guard.
+ * of protection for one surface: the website admin (/admin/*) or the CRM host.
+ * Every page, server action and route handler re-checks authorisation against
+ * the database; this is not the only guard.
+ *
+ * For the CRM the (valid) request is rewritten to the internal /crm tree.
  */
-export async function updateSession(request: NextRequest) {
-  let response = NextResponse.next({ request });
+export async function updateSession(request: NextRequest, surface: Surface = "admin") {
+  const crm = surface === "crm";
+  const login = crm ? CRM_LOGIN : ADMIN_LOGIN;
+  const home = crm ? CRM_HOME : ADMIN_HOME;
+
+  /** The response that lets the request continue: as is for /admin, rewritten into the /crm tree for the CRM host. */
+  const proceed = () => {
+    if (!crm) return NextResponse.next({ request });
+    const headers = new Headers(request.headers);
+    headers.set(CRM_APP_HEADER, "1");
+    const target = request.nextUrl.clone();
+    target.pathname = toCrmTreePath(request.nextUrl.pathname);
+    return NextResponse.rewrite(target, { request: { headers } });
+  };
+
+  let response = proceed();
   const { url, anonKey } = getSupabaseEnv();
 
   const supabase = createServerClient<Database>(url, anonKey, {
@@ -24,7 +45,7 @@ export async function updateSession(request: NextRequest) {
       getAll: () => request.cookies.getAll(),
       setAll(cookiesToSet, headers) {
         for (const { name, value } of cookiesToSet) request.cookies.set(name, value);
-        response = NextResponse.next({ request });
+        response = proceed();
         for (const { name, value, options } of cookiesToSet) {
           response.cookies.set(name, value, options);
         }
@@ -47,11 +68,11 @@ export async function updateSession(request: NextRequest) {
     return redirect;
   };
 
-  // Password-recovery email link: exchange the one-time code for a session
+  // Password-recovery email link (website admin only): exchange the one-time code for a session
   // (PKCE), then continue to the page without the code in the URL.
   const { pathname, searchParams } = request.nextUrl;
   const recoveryCode = searchParams.get("code");
-  if (pathname === ADMIN_RESET_PASSWORD && recoveryCode) {
+  if (!crm && pathname === ADMIN_RESET_PASSWORD && recoveryCode) {
     const { error } = await supabase.auth.exchangeCodeForSession(recoveryCode);
     return redirectTo(error ? `${ADMIN_RESET_PASSWORD}?error=invalid` : ADMIN_RESET_PASSWORD);
   }
@@ -70,13 +91,13 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  const decision = decideAdminRoute(pathname, hasSession);
+  const decision = crm ? decideCrmRoute(pathname, hasSession) : decideAdminRoute(pathname, hasSession);
 
-  if (decision === "to-login") return redirectTo(ADMIN_LOGIN);
+  if (decision === "to-login") return redirectTo(login);
 
   if (decision === "check-admin-then-home") {
     const { data: isAdmin } = await supabase.rpc("is_admin");
-    if (isAdmin === true) return redirectTo(ADMIN_HOME);
+    if (isAdmin === true) return redirectTo(home);
   }
 
   return response;

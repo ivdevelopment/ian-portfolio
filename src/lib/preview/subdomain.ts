@@ -7,7 +7,7 @@ export const RESERVED_SUBDOMAINS: readonly string[] = [
   "dns", "ftp", "cpanel", "autodiscover", "autoconfig", "zmail", "en", "nl", "review",
   "reviews", "work", "contact", "about", "services", "app", "dashboard", "login", "preview",
   "previews", "gateway", "staging", "dev", "test", "cdn", "static", "assets", "media",
-  "status", "support", "help", "docs", "blog", "shop",
+  "status", "support", "help", "docs", "blog", "shop", "crm",
 ];
 
 /** One DNS label: lowercase letters, digits and inner hyphens, 1-63 characters. */

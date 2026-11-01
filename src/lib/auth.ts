@@ -4,6 +4,8 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ADMIN_LOGIN } from "@/lib/auth-routes";
+import { CRM_LOGIN } from "@/lib/crm/auth-routes";
+import { getAppKind } from "@/lib/crm/server-paths";
 
 export type AdminContext = {
   supabase: Awaited<ReturnType<typeof createClient>>;
@@ -29,9 +31,9 @@ export const getAdminContext = cache(async (): Promise<AdminContext | null> => {
   return { supabase, userId, email };
 });
 
-/** Page / layout guard. Redirects to the login page when not an admin. */
+/** Page / layout guard. Redirects to the login page of the surface the request is on (website admin or CRM) when not an admin. */
 export async function requireAdmin(): Promise<AdminContext> {
   const admin = await getAdminContext();
-  if (!admin) redirect(ADMIN_LOGIN);
+  if (!admin) redirect((await getAppKind()) === "crm" ? CRM_LOGIN : ADMIN_LOGIN);
   return admin;
 }

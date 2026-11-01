@@ -91,7 +91,7 @@ describe("dedicated gateway deployment (PREVIEW_GATEWAY_ONLY=1)", () => {
 });
 
 describe("static configuration", () => {
-  const HOST_PATTERN = "(?!www\\.)[a-z0-9-]+\\.(ianverlinden\\.com|localhost)";
+  const HOST_PATTERN = "(?!(?:www|crm)\\.)[a-z0-9-]+\\.(ianverlinden\\.com|localhost)";
 
   it("matches preview hosts only (and runs the proxy for the main site as before)", () => {
     const entries = proxyConfig.matcher as Array<string | { source: string; has?: Array<{ type: string; value: string }> }>;
@@ -99,7 +99,7 @@ describe("static configuration", () => {
     expect(hostRule.has![0]).toEqual({ type: "host", value: HOST_PATTERN });
     const re = new RegExp(`^${HOST_PATTERN}$`);
     for (const ok of ["geertkips.ianverlinden.com", "x.ianverlinden.com", "demo.localhost"]) expect(re.test(ok), ok).toBe(true);
-    for (const no of ["www.ianverlinden.com", "ianverlinden.com", "evil.com", "a.b.ianverlinden.com"]) expect(re.test(no), no).toBe(false);
+    for (const no of ["www.ianverlinden.com", "crm.ianverlinden.com", "ianverlinden.com", "evil.com", "a.b.ianverlinden.com"]) expect(re.test(no), no).toBe(false);
   });
 
   it("skips Next's trailing-slash redirect on the gateway deployment only", async () => {
