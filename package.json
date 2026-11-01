@@ -9,7 +9,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:rls": "node --env-file=.env.supabase-local node_modules/vitest/vitest.mjs run tests/rls.integration.test.ts tests/rls-p2.integration.test.ts tests/rls-p5.integration.test.ts tests/rls-p6.integration.test.ts tests/rls-preview-access.integration.test.ts",
+    "test:rls": "node --env-file=.env.supabase-local node_modules/vitest/vitest.mjs run tests/rls.integration.test.ts tests/rls-p2.integration.test.ts tests/rls-p5.integration.test.ts tests/rls-p6.integration.test.ts tests/rls-preview-access.integration.test.ts tests/rls-mail.integration.test.ts",
     "db:start": "supabase start -x imgproxy,postgres-meta,vector,studio,mailpit,realtime,logflare,edge-runtime",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",

@@ -65,6 +65,66 @@ export type Database = {
                   Relationships: [
                     
                   ]
+                },"mail_connections": {
+                  Row: {
+                    "account_email": string,"connected_at": string,"connected_by": string | null,"data_center": string,"id": string,"last_sync_at": string | null,"provider": string,"provider_account_id": string,"refresh_token_encrypted": string,"scopes": string,"status": string,"sync_from": string | null,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "account_email": string,"connected_at"?: string,"connected_by"?: string | null,"data_center": string,"id"?: string,"last_sync_at"?: string | null,"provider"?: string,"provider_account_id": string,"refresh_token_encrypted": string,"scopes": string,"status"?: string,"sync_from"?: string | null,"updated_at"?: string
+                  }
+                  Update: {
+                    "account_email"?: string,"connected_at"?: string,"connected_by"?: string | null,"data_center"?: string,"id"?: string,"last_sync_at"?: string | null,"provider"?: string,"provider_account_id"?: string,"refresh_token_encrypted"?: string,"scopes"?: string,"status"?: string,"sync_from"?: string | null,"updated_at"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"mail_messages": {
+                  Row: {
+                    "cc_addresses": (string)[],"connection_id": string,"direction": string,"folder_id": string | null,"from_address": string,"id": string,"prospect_id": string | null,"provider_message_id": string,"provider_thread_id": string | null,"sent_at": string,"snippet": string | null,"subject": string | null,"synced_at": string,"to_addresses": (string)[]
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "cc_addresses"?: (string)[],"connection_id": string,"direction": string,"folder_id"?: string | null,"from_address": string,"id"?: string,"prospect_id"?: string | null,"provider_message_id": string,"provider_thread_id"?: string | null,"sent_at": string,"snippet"?: string | null,"subject"?: string | null,"synced_at"?: string,"to_addresses"?: (string)[]
+                  }
+                  Update: {
+                    "cc_addresses"?: (string)[],"connection_id"?: string,"direction"?: string,"folder_id"?: string | null,"from_address"?: string,"id"?: string,"prospect_id"?: string | null,"provider_message_id"?: string,"provider_thread_id"?: string | null,"sent_at"?: string,"snippet"?: string | null,"subject"?: string | null,"synced_at"?: string,"to_addresses"?: (string)[]
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "mail_messages_connection_id_fkey"
+      columns: ["connection_id"]
+isOneToOne: false
+      referencedRelation: "mail_connections"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "mail_messages_prospect_id_fkey"
+      columns: ["prospect_id"]
+isOneToOne: false
+      referencedRelation: "prospects"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"mail_sync_runs": {
+                  Row: {
+                    "connection_id": string,"errors": NonNullable<Json>,"finished_at": string | null,"id": string,"messages_checked": number,"messages_matched": number,"messages_stored": number,"mode": string,"preview": NonNullable<Json>,"started_at": string,"window_from": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "connection_id": string,"errors"?: NonNullable<Json>,"finished_at"?: string | null,"id"?: string,"messages_checked"?: number,"messages_matched"?: number,"messages_stored"?: number,"mode": string,"preview"?: NonNullable<Json>,"started_at"?: string,"window_from"?: string | null
+                  }
+                  Update: {
+                    "connection_id"?: string,"errors"?: NonNullable<Json>,"finished_at"?: string | null,"id"?: string,"messages_checked"?: number,"messages_matched"?: number,"messages_stored"?: number,"mode"?: string,"preview"?: NonNullable<Json>,"started_at"?: string,"window_from"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "mail_sync_runs_connection_id_fkey"
+      columns: ["connection_id"]
+isOneToOne: false
+      referencedRelation: "mail_connections"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"preview_access_attempts": {
                   Row: {
                     "attempted_at": string,"id": number,"ip_hash": string,"preview_id": string

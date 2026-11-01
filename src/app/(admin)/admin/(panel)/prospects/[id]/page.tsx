@@ -7,6 +7,10 @@ import { Badge, EmptyState, Panel, formatDate } from "@/components/admin/ui";
 import { describeAccess, summarizeAccess } from "@/lib/preview/access-activity";
 import { previewState } from "@/lib/preview/expiry";
 import { getPreviewConfig } from "@/lib/preview/config";
+import { MarkRepliedButton } from "@/components/admin/prospect-mail";
+import { listProspectMail } from "@/lib/mail/zoho/service";
+import { lastEmail, mergeTimeline, suggestReply } from "@/lib/mail/timeline";
+import { formatBrusselsDateTime } from "@/lib/preview/access-activity";
 import { activityHeading } from "@/lib/prospects/events";
 import { brusselsToday, formatDay } from "@/lib/prospects/dates";
 import { formatEur } from "@/lib/prospects/money";
@@ -30,7 +34,10 @@ export default async function ProspectDetailPage({ params }: PageProps<"/admin/p
   if (!prospect) notFound();
 
   // The timeline and the link options are separate queries: the list page never loads them.
-  const [activities, linked, options] = await Promise.all([listActivities(id), getLinked(prospect), listLinkableOptions()]);
+  const [activities, linked, options, mail] = await Promise.all([listActivities(id), getLinked(prospect), listLinkableOptions(), listProspectMail(id)]);
+  const timeline = mergeTimeline(activities, mail);
+  const reply = suggestReply(prospect.status, mail);
+  const latestMail = lastEmail(mail);
   const today = brusselsToday();
   const { baseDomain } = getPreviewConfig();
 
@@ -165,15 +172,47 @@ export default async function ProspectDetailPage({ params }: PageProps<"/admin/p
         </Panel>
       </div>
 
+      {/* Only exists once Zoho Mail is enabled and has linked mail to this prospect. */}
+      {mail.length > 0 && (
+        <Panel title="Email" description="Mail to and from this address, read from Zoho Mail." className="mt-4">
+          {reply && (
+            <p className="mb-3 flex flex-wrap items-center gap-3 rounded-md border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-100">
+              New reply detected{reply.mail.subject ? `: “${reply.mail.subject}”` : ""}. The status is still {reply.currentLabel}.
+              <MarkRepliedButton id={prospect.id} />
+            </p>
+          )}
+          {latestMail && (
+            <p className="text-sm text-muted">
+              Last email: {formatBrusselsDateTime(latestMail.sent_at)} · {latestMail.direction === "incoming" ? "received" : "sent"}
+              {latestMail.subject ? ` · ${latestMail.subject}` : ""}
+            </p>
+          )}
+        </Panel>
+      )}
+
       <Panel title="Activity" description="Newest first." className="mt-4">
-        {activities.length === 0 ? (
+        {timeline.length === 0 ? (
           <EmptyState>No activity yet.</EmptyState>
         ) : (
           <ol className="relative space-y-5 border-l border-line pl-5">
-            {activities.map((a) => {
+            {timeline.map((item) => {
+              if (item.kind === "email") {
+                const m = item.mail;
+                return (
+                  <li key={item.key} className="relative">
+                    <span aria-hidden className="absolute -left-[1.62rem] top-1.5 size-2 rounded-full bg-sky-400" />
+                    <p className="text-xs text-subtle">{formatBrusselsDateTime(m.sent_at)}</p>
+                    <p className="text-sm font-medium">{m.direction === "incoming" ? "Email received" : "Email sent"}</p>
+                    {m.subject && <p className="text-sm">{m.subject}</p>}
+                    {/* Plain text only, rendered as text: mail HTML is never stored or displayed. */}
+                    {m.snippet && <p className="mt-0.5 text-sm text-muted">{m.snippet}</p>}
+                  </li>
+                );
+              }
+              const a = item.activity;
               const heading = activityHeading(a);
               return (
-                <li key={a.id} className="relative">
+                <li key={item.key} className="relative">
                   <span aria-hidden className="absolute -left-[1.62rem] top-1.5 size-2 rounded-full bg-accent" />
                   <p className="text-xs text-subtle" title={a.occurred_at ? formatDate(a.occurred_at) : undefined}>
                     {formatDay(a.occurred_on)}
