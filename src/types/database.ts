@@ -259,6 +259,120 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"quote_activities": {
+                  Row: {
+                    "created_at": string,"created_by": string | null,"description": string | null,"id": string,"metadata": NonNullable<Json>,"quote_id": string,"title": string,"type": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"created_by"?: string | null,"description"?: string | null,"id"?: string,"metadata"?: NonNullable<Json>,"quote_id": string,"title": string,"type": string
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by"?: string | null,"description"?: string | null,"id"?: string,"metadata"?: NonNullable<Json>,"quote_id"?: string,"title"?: string,"type"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "quote_activities_quote_id_fkey"
+      columns: ["quote_id"]
+isOneToOne: false
+      referencedRelation: "quotes"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"quote_counters": {
+                  Row: {
+                    "last_number": number,"year": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "last_number": number,"year": number
+                  }
+                  Update: {
+                    "last_number"?: number,"year"?: number
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"quote_item_templates": {
+                  Row: {
+                    "active": boolean,"created_at": string,"default_tax_rate": number,"default_unit": string | null,"default_unit_price": number | null,"description": string | null,"id": string,"name": string,"sort_order": number,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "active"?: boolean,"created_at"?: string,"default_tax_rate"?: number,"default_unit"?: string | null,"default_unit_price"?: number | null,"description"?: string | null,"id"?: string,"name": string,"sort_order"?: number,"updated_at"?: string
+                  }
+                  Update: {
+                    "active"?: boolean,"created_at"?: string,"default_tax_rate"?: number,"default_unit"?: string | null,"default_unit_price"?: number | null,"description"?: string | null,"id"?: string,"name"?: string,"sort_order"?: number,"updated_at"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"quote_items": {
+                  Row: {
+                    "created_at": string,"description": string | null,"discount_percent": number,"id": string,"line_subtotal": number,"line_tax": number,"line_total": number,"position": number,"quantity": number,"quote_discount_share": number,"quote_id": string,"tax_rate": number,"template_id": string | null,"title": string,"unit": string | null,"unit_price": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"description"?: string | null,"discount_percent"?: number,"id"?: string,"line_subtotal": number,"line_tax": number,"line_total": number,"position": number,"quantity": number,"quote_discount_share"?: number,"quote_id": string,"tax_rate"?: number,"template_id"?: string | null,"title": string,"unit"?: string | null,"unit_price": number
+                  }
+                  Update: {
+                    "created_at"?: string,"description"?: string | null,"discount_percent"?: number,"id"?: string,"line_subtotal"?: number,"line_tax"?: number,"line_total"?: number,"position"?: number,"quantity"?: number,"quote_discount_share"?: number,"quote_id"?: string,"tax_rate"?: number,"template_id"?: string | null,"title"?: string,"unit"?: string | null,"unit_price"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "quote_items_quote_id_fkey"
+      columns: ["quote_id"]
+isOneToOne: false
+      referencedRelation: "quotes"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "quote_items_template_id_fkey"
+      columns: ["template_id"]
+isOneToOne: false
+      referencedRelation: "quote_item_templates"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"quote_settings": {
+                  Row: {
+                    "business_address": string | null,"business_email": string | null,"business_iban": string | null,"business_name": string,"business_phone": string | null,"business_tagline": string | null,"business_vat_number": string | null,"business_website": string | null,"default_intro": string | null,"default_language": string,"default_tax_rate": number,"default_terms": string | null,"default_validity_days": number,"id": boolean,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_address"?: string | null,"business_email"?: string | null,"business_iban"?: string | null,"business_name"?: string,"business_phone"?: string | null,"business_tagline"?: string | null,"business_vat_number"?: string | null,"business_website"?: string | null,"default_intro"?: string | null,"default_language"?: string,"default_tax_rate"?: number,"default_terms"?: string | null,"default_validity_days"?: number,"id"?: boolean,"updated_at"?: string
+                  }
+                  Update: {
+                    "business_address"?: string | null,"business_email"?: string | null,"business_iban"?: string | null,"business_name"?: string,"business_phone"?: string | null,"business_tagline"?: string | null,"business_vat_number"?: string | null,"business_website"?: string | null,"default_intro"?: string | null,"default_language"?: string,"default_tax_rate"?: number,"default_terms"?: string | null,"default_validity_days"?: number,"id"?: boolean,"updated_at"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"quotes": {
+                  Row: {
+                    "accepted_at": string | null,"client_address": string | null,"client_company": string | null,"client_email": string | null,"client_name": string | null,"created_at": string,"currency": string,"discount_total": number,"discount_type": string,"discount_value": number,"id": string,"intro": string | null,"language": string,"notes": string | null,"project_id": string | null,"prospect_id": string | null,"quote_number": string,"rejected_at": string | null,"sent_at": string | null,"status": string,"status_note": string | null,"subtotal": number,"tax_total": number,"terms": string | null,"title": string | null,"total": number,"updated_at": string,"valid_until": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "accepted_at"?: string | null,"client_address"?: string | null,"client_company"?: string | null,"client_email"?: string | null,"client_name"?: string | null,"created_at"?: string,"currency"?: string,"discount_total"?: number,"discount_type"?: string,"discount_value"?: number,"id"?: string,"intro"?: string | null,"language"?: string,"notes"?: string | null,"project_id"?: string | null,"prospect_id"?: string | null,"quote_number": string,"rejected_at"?: string | null,"sent_at"?: string | null,"status"?: string,"status_note"?: string | null,"subtotal"?: number,"tax_total"?: number,"terms"?: string | null,"title"?: string | null,"total"?: number,"updated_at"?: string,"valid_until"?: string | null
+                  }
+                  Update: {
+                    "accepted_at"?: string | null,"client_address"?: string | null,"client_company"?: string | null,"client_email"?: string | null,"client_name"?: string | null,"created_at"?: string,"currency"?: string,"discount_total"?: number,"discount_type"?: string,"discount_value"?: number,"id"?: string,"intro"?: string | null,"language"?: string,"notes"?: string | null,"project_id"?: string | null,"prospect_id"?: string | null,"quote_number"?: string,"rejected_at"?: string | null,"sent_at"?: string | null,"status"?: string,"status_note"?: string | null,"subtotal"?: number,"tax_total"?: number,"terms"?: string | null,"title"?: string | null,"total"?: number,"updated_at"?: string,"valid_until"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "quotes_project_id_fkey"
+      columns: ["project_id"]
+isOneToOne: false
+      referencedRelation: "projects"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "quotes_prospect_id_fkey"
+      columns: ["prospect_id"]
+isOneToOne: false
+      referencedRelation: "prospects"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"review_invitations": {
                   Row: {
                     "client_name": string | null,"created_at": string,"created_by": string,"email": string | null,"expires_at": string,"id": string,"project_id": string | null,"review_id": string | null,"revoked_at": string | null,"token_hash": string,"used_at": string | null
@@ -387,8 +501,17 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            "create_client_preview":
+            "allocate_quote_number":
+{ Args: { "p_year": number }; Returns: string
+                           },
+"create_client_preview":
 { Args: { "p_client_name": string,"p_code": string,"p_expires_at": string,"p_notes": string,"p_project_name": string,"p_session_ttl_hours": number,"p_subdomain": string,"p_target_url": string }; Returns: string
+                           },
+"create_quote":
+{ Args: { "p_items": Json,"p_quote": Json }; Returns: string
+                           },
+"duplicate_quote":
+{ Args: { "p_id": string }; Returns: string
                            },
 "get_review_invitation":
 { Args: { "p_token_hash": string }; Returns: Json
@@ -404,6 +527,12 @@ isOneToOne: false
                            },
 "prospect_summary":
 { Args: { "p_today": string,"p_week_end": string }; Returns: Json
+                           },
+"quotes_assert_consistent":
+{ Args: { "p_quote_id": string }; Returns: undefined
+                           },
+"quotes_write_items":
+{ Args: { "p_items": Json,"p_quote_id": string }; Returns: undefined
                            },
 "reset_preview_access_code":
 { Args: { "p_code": string,"p_id": string }; Returns: undefined
@@ -422,6 +551,9 @@ isOneToOne: false
                            },
 "submit_review":
 { Args: { "p_company": string,"p_ip_hash"?: string,"p_name": string,"p_rating": number,"p_role": string,"p_text": string,"p_token_hash": string }; Returns: string
+                           },
+"update_quote":
+{ Args: { "p_expected_updated_at": string,"p_id": string,"p_items": Json,"p_quote": Json }; Returns: string
                            },
 "verify_preview_access":
 { Args: { "p_code": string,"p_ip_hash": string,"p_subdomain": string }; Returns: Json
