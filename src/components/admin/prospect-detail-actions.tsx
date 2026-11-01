@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { CalendarClock, Check, ExternalLink, Link2, Mail, MessageSquareReply, Pencil, Plus, Rocket, Send, ThumbsDown, Trash2, Trophy, Unlink } from "lucide-react";
+import { CalendarClock, Check, ExternalLink, FileSignature, Link2, Mail, MessageSquareReply, Pencil, Plus, Rocket, Send, ThumbsDown, Trash2, Trophy, Unlink } from "lucide-react";
 import {
   addActivityAction,
   completeFollowUpAction,
@@ -83,6 +83,9 @@ export function ProspectActions({
         <Button size="sm" variant="secondary" icon="none" className={small} onClick={() => setDialog("followup")}>
           <CalendarClock aria-hidden className="size-4" /> Set follow-up
         </Button>
+        <ButtonLink href={`/admin/quotes/new?prospect=${prospect.id}`} variant="secondary" size="sm" icon="none" className={small}>
+          <FileSignature aria-hidden className="size-4" /> Create quote
+        </ButtonLink>
         <Button size="sm" icon="none" className={small} onClick={() => setDialog("convert")} disabled={prospect.hasProject}>
           <Rocket aria-hidden className="size-4" /> Convert to project
         </Button>

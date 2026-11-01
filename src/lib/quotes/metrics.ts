@@ -40,3 +40,15 @@ export function summarizeQuotes(rows: readonly MetricRow[], today: string = brus
   }
   return out;
 }
+
+/**
+ * The prospect's most recent quote that still counts: ready, sent (within its validity) or accepted. Drafts, rejected, cancelled and
+ * expired quotes are ignored. Used to SHOW a quote total next to the prospect's own manual "quote value", never to overwrite it.
+ */
+export function latestActiveQuote<T extends { status: QuoteStatus; validUntil: string | null; createdAt: string }>(quotes: readonly T[], today: string = brusselsToday()): T | null {
+  const active = quotes.filter((q) => {
+    const status = effectiveStatus(q.status, q.validUntil, today);
+    return status === "ready" || status === "sent" || status === "accepted";
+  });
+  return [...active].sort((a, b) => (a.createdAt > b.createdAt ? -1 : a.createdAt < b.createdAt ? 1 : 0))[0] ?? null;
+}

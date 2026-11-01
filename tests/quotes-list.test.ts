@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { brusselsDayEndIso, brusselsDayStartIso, likePattern, parseQuoteFilters, quoteFiltersToParams, quoteSearchFilter } from "@/lib/quotes/filters";
 import { DEFAULT_SETTINGS, formFromQuote, itemFromTemplate, newQuoteForm } from "@/lib/quotes/form";
-import { summarizeQuotes } from "@/lib/quotes/metrics";
+import { mergeTimeline } from "@/lib/mail/timeline";
+import { latestActiveQuote, summarizeQuotes } from "@/lib/quotes/metrics";
 import { calculateForm, emptyItem, emptyQuoteForm } from "@/lib/quotes/schema";
 import { quoteTotals, storedTotalsMatch } from "@/lib/quotes/summary";
 import { toQuoteRecord, type QuoteItemRow, type QuoteRow } from "@/lib/quotes/types";
@@ -134,5 +135,26 @@ describe("new quote defaults", () => {
     expect(line).toMatchObject({ templateId: "t1", title: "SEO setup", description: "Basis SEO", quantity: "1", unit: "stuk", unitPrice: "450.00", taxRate: "21" });
     expect(emptyQuoteForm().items).toEqual([]);
     expect(emptyItem().taxRate).toBe("21");
+  });
+});
+
+describe("CRM integration", () => {
+  const event = (id: string, type: string, createdAt: string) => ({ id, quoteId: "q1", quoteNumber: "Q-2026-0001", type, title: type, createdAt });
+
+  it("merges quote events into the prospect timeline, newest first, without touching the other sources", () => {
+    const activity = { id: "a1", prospect_id: "p", type: "note", title: "Note", description: null, occurred_on: "2026-11-01", occurred_at: null, metadata: {}, created_at: "2026-11-01T08:00:00Z" } as never;
+    const items = mergeTimeline([activity], [], [event("e1", "created", "2026-11-01T12:00:00Z"), event("e2", "sent", "2026-11-03T12:00:00Z")]);
+    expect(items.map((i) => i.key)).toEqual(["q:e2", "q:e1", "a:a1"]);
+    expect(items[0]).toMatchObject({ kind: "quote", day: "2026-11-03" });
+    expect(mergeTimeline([activity], [])).toHaveLength(1);
+  });
+
+  it("the latest active quote ignores drafts, rejected, cancelled and expired ones", () => {
+    const q = (id: string, status: Parameters<typeof latestActiveQuote>[0][number]["status"], createdAt: string, validUntil: string | null = "2026-12-31") => ({ id, status, createdAt, validUntil });
+    expect(latestActiveQuote([q("a", "sent", "2026-10-01"), q("b", "draft", "2026-10-05"), q("c", "rejected", "2026-10-07")], "2026-11-01")?.id).toBe("a");
+    expect(latestActiveQuote([q("a", "accepted", "2026-10-01"), q("b", "sent", "2026-10-09")], "2026-11-01")?.id).toBe("b");
+    expect(latestActiveQuote([q("a", "sent", "2026-10-01", "2026-10-15")], "2026-11-01")).toBeNull();
+    expect(latestActiveQuote([q("a", "cancelled", "2026-10-01")], "2026-11-01")).toBeNull();
+    expect(latestActiveQuote([], "2026-11-01")).toBeNull();
   });
 });

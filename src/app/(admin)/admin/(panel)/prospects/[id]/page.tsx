@@ -16,6 +16,12 @@ import { brusselsToday, formatDay } from "@/lib/prospects/dates";
 import { formatEur } from "@/lib/prospects/money";
 import { getLinked, getProspect, listActivities, listLinkableOptions } from "@/lib/prospects/queries";
 import { idSchema } from "@/lib/schemas/prospect";
+import { QuoteStatusBadge } from "@/components/admin/quote-ui";
+import { latestActiveQuote } from "@/lib/quotes/metrics";
+import { listQuoteEventsForProspect, listQuotesForProspect } from "@/lib/quotes/queries";
+import { formatCents } from "@/lib/quotes/money";
+
+const QUOTE_EVENT_LABELS: Record<string, string> = { created: "Quote created", sent: "Quote sent", accepted: "Quote accepted", rejected: "Quote rejected", cancelled: "Quote cancelled" };
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -34,8 +40,19 @@ export default async function ProspectDetailPage({ params }: PageProps<"/admin/p
   if (!prospect) notFound();
 
   // The timeline and the link options are separate queries: the list page never loads them.
-  const [activities, linked, options, mail] = await Promise.all([listActivities(id), getLinked(prospect), listLinkableOptions(), listProspectMail(id)]);
-  const timeline = mergeTimeline(activities, mail);
+  const [activities, linked, options, mail, quotes, quoteEvents] = await Promise.all([
+    listActivities(id),
+    getLinked(prospect),
+    listLinkableOptions(),
+    listProspectMail(id),
+    listQuotesForProspect(id),
+    listQuoteEventsForProspect(id),
+  ]);
+  const timeline = mergeTimeline(activities, mail, quoteEvents);
+  const activeQuote = latestActiveQuote(quotes);
+  // The list query carries the stored header figures (no lines): net = subtotal - quote-level discount.
+  const activeNet = activeQuote ? activeQuote.subtotalCents - activeQuote.discountCents : null;
+  const manualValueCents = prospect.quote_value_eur === null ? null : Math.round(Number(prospect.quote_value_eur) * 100);
   const reply = suggestReply(prospect.status, mail);
   const latestMail = lastEmail(mail);
   const today = brusselsToday();
@@ -151,6 +168,36 @@ export default async function ProspectDetailPage({ params }: PageProps<"/admin/p
               )}
             </div>
             <div>
+              <p className="text-xs text-muted">Quotes</p>
+              {quotes.length === 0 ? (
+                <p className="mt-1 text-subtle">No quotes yet.</p>
+              ) : (
+                <ul className="mt-1 space-y-1.5">
+                  {quotes.slice(0, 5).map((q) => (
+                    <li key={q.id} className="flex flex-wrap items-center gap-2">
+                      <Link href={`/admin/quotes/${q.id}`} className="font-medium hover:text-accent">
+                        {q.number}
+                      </Link>
+                      <QuoteStatusBadge status={q.status} validUntil={q.validUntil} />
+                      <span className="text-xs text-muted tabular-nums">{formatCents(q.totalCents, q.currency, q.language)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {activeQuote && activeNet !== null && (
+                <p className="mt-2 text-xs text-muted">
+                  Latest active quote: {formatCents(activeNet, activeQuote.currency, activeQuote.language)} excl. VAT.
+                  {manualValueCents !== null && manualValueCents !== activeNet && (
+                    <> The quote value above ({formatCents(manualValueCents, activeQuote.currency, activeQuote.language)}) is entered by hand and is not changed automatically.</>
+                  )}
+                </p>
+              )}
+              <div className="mt-1.5 flex flex-wrap items-center gap-3">
+                <OpenLink href={`/admin/quotes/new?prospect=${prospect.id}`}>Create quote</OpenLink>
+                {quotes.length > 0 && <OpenLink href={`/admin/quotes?prospect=${prospect.id}`}>All quotes</OpenLink>}
+              </div>
+            </div>
+            <div>
               <p className="text-xs text-muted">Project</p>
               {linked.project ? (
                 <div className="mt-1">
@@ -206,6 +253,21 @@ export default async function ProspectDetailPage({ params }: PageProps<"/admin/p
                     {m.subject && <p className="text-sm">{m.subject}</p>}
                     {/* Plain text only, rendered as text: mail HTML is never stored or displayed. */}
                     {m.snippet && <p className="mt-0.5 text-sm text-muted">{m.snippet}</p>}
+                  </li>
+                );
+              }
+              if (item.kind === "quote") {
+                const e = item.quote;
+                return (
+                  <li key={item.key} className="relative">
+                    <span aria-hidden className="absolute -left-[1.62rem] top-1.5 size-2 rounded-full bg-violet-400" />
+                    <p className="text-xs text-subtle">{formatDay(item.day)}</p>
+                    <p className="text-sm font-medium">
+                      {QUOTE_EVENT_LABELS[e.type] ?? "Quote updated"}{" "}
+                      <Link href={`/admin/quotes/${e.quoteId}`} className="text-accent hover:underline">
+                        {e.quoteNumber}
+                      </Link>
+                    </p>
                   </li>
                 );
               }

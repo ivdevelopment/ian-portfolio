@@ -156,3 +156,6 @@ export function toQuoteRecord(row: QuoteRow, items: readonly QuoteItemRow[] = []
     items: [...items].sort((a, b) => a.position - b.position).map(toItemRecord),
   };
 }
+
+/** A quote event as it appears on a prospect's timeline: it points at the quote, nothing is copied into the CRM history. */
+export type ProspectQuoteEvent = { id: string; quoteId: string; quoteNumber: string; type: string; title: string; createdAt: string };

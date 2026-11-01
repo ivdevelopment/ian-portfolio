@@ -7,11 +7,13 @@ import { FollowUpCell, ProspectStatusBadge } from "@/components/admin/prospect-u
 import { brusselsToday } from "@/lib/prospects/dates";
 import { formatEur } from "@/lib/prospects/money";
 import { getSummary, listFollowUpQueue } from "@/lib/prospects/queries";
+import { formatCents } from "@/lib/quotes/money";
+import { getQuoteMetrics } from "@/lib/quotes/queries";
 
 export default async function AdminDashboardPage() {
   const { supabase } = await requireAdmin();
   const today = brusselsToday();
-  const [crm, queue] = await Promise.all([getSummary(today), listFollowUpQueue(4, today)]);
+  const [crm, queue, quotes] = await Promise.all([getSummary(today), listFollowUpQueue(4, today), getQuoteMetrics(today)]);
 
   const [total, published, newInquiries, recentProjects, recentInquiries, pendingReviews, publishedReviews, recentReviews] =
     await Promise.all([
@@ -139,6 +141,40 @@ export default async function AdminDashboardPage() {
             </ul>
           )}
         </div>
+      </Panel>
+
+      <Panel
+        className="mt-4"
+        title="Quotes"
+        actions={
+          <span className="flex gap-3 text-xs">
+            <Link href="/admin/quotes/new" className="text-muted hover:text-ink">
+              New quote
+            </Link>
+            <Link href="/admin/quotes" className="text-muted hover:text-ink">
+              View quotes
+            </Link>
+          </span>
+        }
+      >
+        <dl className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
+          <Link href="/admin/quotes?status=draft" className="rounded-md border border-line p-2.5 hover:border-line-strong">
+            <dd className="text-lg font-medium tabular-nums">{quotes.draft.count + quotes.ready.count}</dd>
+            <dt className="text-xs text-muted">Draft{quotes.ready.count > 0 ? ` (${quotes.ready.count} ready)` : ""}</dt>
+          </Link>
+          <Link href="/admin/quotes?status=sent" className="rounded-md border border-line p-2.5 hover:border-line-strong">
+            <dd className="text-lg font-medium tabular-nums">{quotes.sent.count}</dd>
+            <dt className="text-xs text-muted">Sent{quotes.expired.count > 0 ? ` (${quotes.expired.count} expired)` : ""}</dt>
+          </Link>
+          <Link href="/admin/quotes?status=accepted" className="rounded-md border border-line p-2.5 hover:border-line-strong">
+            <dd className="text-lg font-medium tabular-nums">{quotes.accepted.count}</dd>
+            <dt className="text-xs text-muted">Accepted{quotes.accepted.count > 0 ? ` · ${formatCents(quotes.accepted.netCents)}` : ""}</dt>
+          </Link>
+          <div className="rounded-md border border-line p-2.5">
+            <dd className="text-lg font-medium tabular-nums">{quotes.open.count > 0 ? formatCents(quotes.open.netCents) : "—"}</dd>
+            <dt className="text-xs text-muted">Open quoted value, excl. VAT</dt>
+          </div>
+        </dl>
       </Panel>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">

@@ -7,7 +7,7 @@ import { DEFAULT_SETTINGS } from "./form";
 import { brusselsDayEndIso, brusselsDayStartIso, likePattern, QUOTE_SORT_COLUMNS, quoteSearchFilter, type QuoteFilters } from "./filters";
 import { decimalToCents } from "./money";
 import { summarizeQuotes, type QuoteMetrics } from "./metrics";
-import { toQuoteRecord, type QuoteActivityRecord, type QuoteRow, type QuoteItemRow, type QuoteSettings, type QuoteTemplateRecord, type QuoteWithProspect } from "./types";
+import { toQuoteRecord, type ProspectQuoteEvent, type QuoteActivityRecord, type QuoteRow, type QuoteItemRow, type QuoteSettings, type QuoteTemplateRecord, type QuoteWithProspect } from "./types";
 
 function fail(what: string, error: { message: string }): never {
   console.error(`[admin] quotes ${what} failed:`, error.message);
@@ -76,8 +76,6 @@ export async function listQuotesForProspect(prospectId: string): Promise<QuoteWi
   if (error) fail("prospect quotes", error);
   return ((data ?? []) as unknown as Embedded[]).map(withProspect);
 }
-
-export type ProspectQuoteEvent = { id: string; quoteId: string; quoteNumber: string; type: string; title: string; createdAt: string };
 
 /** The few quote events that belong on a prospect's timeline (they link to the quote; nothing is copied). */
 export async function listQuoteEventsForProspect(prospectId: string): Promise<ProspectQuoteEvent[]> {
