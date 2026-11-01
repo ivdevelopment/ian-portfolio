@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { ArrowDown, ArrowUp, Search } from "lucide-react";
 import { Button, ButtonLink } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/loading";
+import { startNavigationProgress } from "@/components/ui/navigation-progress";
 import { QUOTE_STATUSES, QUOTE_STATUS_LABELS } from "@/lib/quotes/constants";
 import { quoteFiltersToParams, type QuoteFilters, type QuoteSort } from "@/lib/quotes/filters";
 import { formatCents } from "@/lib/quotes/money";
@@ -33,11 +35,13 @@ export function QuoteList({ rows, total, filters, prospectName }: { rows: QuoteW
   const router = useRouter();
   const pathname = usePathname();
   const [q, setQ] = useState(filters.q);
+  const [navigating, startNavigation] = useTransition();
 
   const go = (next: Partial<QuoteFilters>) => {
     const merged = { ...filters, ...next, page: next.page ?? 1 };
     const query = quoteFiltersToParams(merged).toString();
-    router.replace(query ? `${pathname}?${query}` : pathname);
+    startNavigationProgress();
+    startNavigation(() => router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false }));
   };
   const href = (next: Partial<QuoteFilters>) => {
     const query = quoteFiltersToParams({ ...filters, ...next }).toString();
@@ -73,8 +77,16 @@ export function QuoteList({ rows, total, filters, prospectName }: { rows: QuoteW
               onChange={(e) => setQ(e.target.value)}
               placeholder="Number, client, company, prospect, title"
               autoComplete="off"
-              className={cn(adminInput, "h-10 pl-9")}
+              className={cn(adminInput, "h-10 pl-9 pr-9")}
             />
+            <span role="status" className="absolute top-1/2 right-3 -translate-y-1/2 text-muted">
+              {navigating && (
+                <>
+                  <Spinner className="size-4" />
+                  <span className="sr-only">Updating results…</span>
+                </>
+              )}
+            </span>
           </div>
         </div>
         <div>
@@ -124,7 +136,7 @@ export function QuoteList({ rows, total, filters, prospectName }: { rows: QuoteW
       ) : (
         <>
           {/* Wide screens: a table. */}
-          <div className="hidden overflow-x-auto rounded-card border border-line xl:block">
+          <div aria-busy={navigating} className={cn("hidden overflow-x-auto rounded-card border border-line transition-opacity xl:block", navigating && "opacity-70")}>
             <table className="w-full min-w-[62rem] text-left text-sm">
               <caption className="sr-only">Quotes</caption>
               <thead className="border-b border-line bg-glass text-xs text-muted">
@@ -181,7 +193,7 @@ export function QuoteList({ rows, total, filters, prospectName }: { rows: QuoteW
           </div>
 
           {/* Narrower screens: cards. */}
-          <ul className="space-y-3 xl:hidden">
+          <ul aria-busy={navigating} className={cn("space-y-3 transition-opacity xl:hidden", navigating && "opacity-70")}>
             {rows.map((r) => (
               <li key={r.id} className="rounded-card border border-line bg-glass p-4">
                 <div className="flex items-start justify-between gap-3">

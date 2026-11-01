@@ -7,7 +7,8 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["tests/**/*.test.ts"],
+    // *.test.tsx files are component tests and opt in to jsdom with `// @vitest-environment jsdom`.
+    include: ["tests/**/*.test.{ts,tsx}"],
     testTimeout: 20000,
   },
 });

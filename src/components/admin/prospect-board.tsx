@@ -6,6 +6,7 @@ import { useEffect, useId, useMemo, useRef, useState, useTransition } from "reac
 import { CalendarClock, Eye, EyeOff, GripVertical, MoreHorizontal, StickyNote } from "lucide-react";
 import { addActivityAction, setFollowUpAction, setStatusAction } from "@/app/(admin)/admin/(panel)/prospects/actions";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/loading";
 import { PRIORITY_LABELS, PRIORITY_TONES, PROSPECT_STATUSES, STATUS_LABELS, type ProspectStatus } from "@/lib/prospects/constants";
 import { BOARD_DEFAULT_COLUMNS, cardFollowUp, groupBoard, applyOverrides, type BoardCard } from "@/lib/prospects/board";
 import { FOLLOW_UP_PRESETS, addDays, formatDay } from "@/lib/prospects/dates";
@@ -13,6 +14,7 @@ import { rememberPreference } from "@/lib/prospects/preference-cookie";
 import { formatEur } from "@/lib/prospects/money";
 import { cn } from "@/lib/utils";
 import { ConfirmDialog } from "./confirm-dialog";
+import { NETWORK_ERROR } from "./use-action-runner";
 import { Field } from "./form-bits";
 import { Badge, EmptyState, adminInput } from "./ui";
 
@@ -39,6 +41,8 @@ export function ProspectBoard({ cards: serverCards, today, visible: initialVisib
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [overrides, setOverrides] = useState<Record<string, ProspectStatus>>({});
+  // Cards whose move is still being saved: they show a small spinner and cannot be moved again until it settles.
+  const [saving, setSaving] = useState<Set<string>>(() => new Set());
   const [seen, setSeen] = useState(serverCards);
   const [visible, setVisible] = useState<ProspectStatus[]>(initialVisible);
   const [dragId, setDragId] = useState<string | null>(null);
@@ -68,14 +72,20 @@ export function ProspectBoard({ cards: serverCards, today, visible: initialVisib
 
   const move = (id: string, to: ProspectStatus) => {
     const card = cards.find((c) => c.id === id);
-    if (!card || card.status === to) return;
+    if (!card || card.status === to || saving.has(id)) return;
     const from = card.status;
     setError(null);
+    setSaving((set) => new Set(set).add(id));
     setOverrides((o) => ({ ...o, [id]: to }));
     setAnnounce(`Moved ${card.company_name} to ${STATUS_LABELS[to]}.`);
     startTransition(async () => {
       // A dropped connection throws instead of returning a result: treat it like any failed save.
       const result = await setStatusAction(id, to).catch(() => ({ ok: false as const, error: "The connection was lost." }));
+      setSaving((set) => {
+        const next = new Set(set);
+        next.delete(id);
+        return next;
+      });
       if (!result.ok) {
         // Roll back: with no override the card is exactly where the database still has it.
         setOverrides((o) => {
@@ -208,6 +218,7 @@ export function ProspectBoard({ cards: serverCards, today, visible: initialVisib
                           today={today}
                           baseDomain={baseDomain}
                           dragging={dragId === card.id}
+                          saving={saving.has(card.id)}
                           onDragStart={() => setDragId(card.id)}
                           onDragEnd={() => {
                             setDragId(null);
@@ -257,6 +268,7 @@ function Card({
   today,
   baseDomain,
   dragging,
+  saving,
   onDragStart,
   onDragEnd,
   onMove,
@@ -267,6 +279,8 @@ function Card({
   today: string;
   baseDomain: string;
   dragging: boolean;
+  /** This card's move is being saved. */
+  saving: boolean;
   onDragStart: () => void;
   onDragEnd: () => void;
   onMove: (to: ProspectStatus) => void;
@@ -279,7 +293,8 @@ function Card({
 
   return (
     <article
-      draggable
+      draggable={!saving}
+      aria-busy={saving || undefined}
       onDragStart={(e) => {
         e.dataTransfer.setData("text/plain", card.id);
         e.dataTransfer.effectAllowed = "move";
@@ -290,6 +305,7 @@ function Card({
         "group rounded-md border bg-elevated/60 p-2.5 text-sm transition-opacity",
         overdue && !closed ? "border-danger/50" : "border-line hover:border-line-strong",
         dragging && "opacity-40",
+        saving && "border-accent/40",
       )}
     >
       <div className="flex items-start gap-1.5">
@@ -300,6 +316,12 @@ function Card({
           </Link>
           {(card.sector || card.city) && <p className="truncate text-xs text-subtle">{[card.sector, card.city].filter(Boolean).join(" · ")}</p>}
         </div>
+        {saving && (
+          <span role="status" className="mt-0.5 text-muted">
+            <Spinner className="size-3.5" />
+            <span className="sr-only">Saving move…</span>
+          </span>
+        )}
         <CardMenu card={card} baseDomain={baseDomain} onMove={onMove} onFollowUp={onFollowUp} onNote={onNote} />
       </div>
 
@@ -461,10 +483,15 @@ function FollowUpDialog({ open, card, today, onClose, onDone }: { open: boolean;
   const save = (day: string | null) => {
     if (!card) return;
     setError(null);
+    if (pending) return;
     startTransition(async () => {
-      const result = await setFollowUpAction(card.id, day);
-      if (!result.ok) return setError(result.error);
-      onDone();
+      try {
+        const result = await setFollowUpAction(card.id, day);
+        if (!result.ok) return setError(result.error);
+        onDone();
+      } catch {
+        setError(NETWORK_ERROR);
+      }
     });
   };
   return (
@@ -504,10 +531,15 @@ function NoteDialog({ open, card, onClose, onDone }: { open: boolean; card: Boar
       onConfirm={() => {
         if (!card || !text.trim()) return setError("Write something first.");
         setError(null);
+        if (pending) return;
         startTransition(async () => {
-          const result = await addActivityAction(card.id, { type: "note", title: "Note", description: text.trim() });
-          if (!result.ok) return setError(result.error);
-          onDone();
+          try {
+            const result = await addActivityAction(card.id, { type: "note", title: "Note", description: text.trim() });
+            if (!result.ok) return setError(result.error);
+            onDone();
+          } catch {
+            setError(NETWORK_ERROR);
+          }
         });
       }}
     >

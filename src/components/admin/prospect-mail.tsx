@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { quickAction } from "@/app/(admin)/admin/(panel)/prospects/actions";
 import { Button } from "@/components/ui/button";
+import { NETWORK_ERROR } from "./use-action-runner";
 
 /** Applies the suggestion with the existing "Reply received" action: nothing changes unless this is clicked. */
 export function MarkRepliedButton({ id }: { id: string }) {
@@ -15,14 +16,20 @@ export function MarkRepliedButton({ id }: { id: string }) {
       <Button
         size="sm"
         icon="none"
-        disabled={pending}
-        onClick={() =>
+        pending={pending}
+        pendingLabel="Marking as replied…"
+        onClick={() => {
+          setError(null);
           start(async () => {
-            const result = await quickAction(id, "reply_received");
-            if (!result.ok) return setError(result.error);
-            router.refresh();
-          })
-        }
+            try {
+              const result = await quickAction(id, "reply_received");
+              if (!result.ok) return setError(result.error);
+              router.refresh();
+            } catch {
+              setError(NETWORK_ERROR);
+            }
+          });
+        }}
       >
         Mark as Replied
       </Button>

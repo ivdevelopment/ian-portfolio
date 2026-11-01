@@ -81,7 +81,7 @@ export function ExportDialog({
   };
 
   return (
-    <ConfirmDialog open={open} title="Export prospects" confirmLabel="Download" tone="primary" pending={pending} error={error} onConfirm={() => void run()} onClose={onClose}>
+    <ConfirmDialog open={open} title="Export prospects" confirmLabel="Download" pendingLabel="Preparing export…" tone="primary" pending={pending} error={error} onConfirm={() => void run()} onClose={onClose}>
       <fieldset className="mt-1 space-y-2">
         <legend className="mb-1 text-xs font-medium text-muted">Format</legend>
         {EXPORT_FORMATS.map((f) => (

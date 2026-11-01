@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ImagePlus, Loader2, Trash2 } from "lucide-react";
+import { ImagePlus, Trash2 } from "lucide-react";
+import { Spinner } from "@/components/ui/loading";
 import { resolveMediaUrl } from "@/lib/cms/mappers";
 import { checkUpload, formatBytes } from "@/lib/media-rules";
 import { createBrowserSupabase } from "@/lib/supabase/browser";
@@ -111,7 +112,7 @@ export function ImageField({
               onClick={() => input.current?.click()}
               className="inline-flex h-8 items-center gap-1.5 rounded-md border border-line px-3 text-xs text-muted transition-colors hover:border-line-strong hover:bg-glass-strong hover:text-ink disabled:opacity-50"
             >
-              {busy ? <Loader2 aria-hidden className="size-3.5 animate-spin" /> : <ImagePlus aria-hidden className="size-3.5" />}
+              {busy ? <Spinner className="size-3.5" /> : <ImagePlus aria-hidden className="size-3.5" />}
               {busy ? `Uploading ${Math.round(progress * 100)}%` : value ? "Replace" : "Upload"}
             </button>
             {allowRemove && value && !busy && (

@@ -2,11 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Loader2 } from "lucide-react";
 import { updateInquiryStatusAction } from "@/app/(admin)/admin/(panel)/inquiries/actions";
+import { Spinner } from "@/components/ui/loading";
 import { INQUIRY_STATUSES, type InquiryStatus } from "@/lib/schemas/inquiry";
 import { INQUIRY_STATUS_LABELS } from "./inquiry-status";
 import { adminInput } from "./ui";
+import { NETWORK_ERROR } from "./use-action-runner";
 
 export function InquiryStatusSelect({ id, status }: { id: string; status: InquiryStatus }) {
   const router = useRouter();
@@ -24,6 +25,7 @@ export function InquiryStatusSelect({ id, status }: { id: string; status: Inquir
           id="inquiry-status"
           value={value}
           disabled={pending}
+          aria-busy={pending || undefined}
           className={`${adminInput} h-9 w-auto`}
           onChange={(e) => {
             const next = e.target.value as InquiryStatus;
@@ -31,13 +33,18 @@ export function InquiryStatusSelect({ id, status }: { id: string; status: Inquir
             setValue(next);
             setError(null);
             startTransition(async () => {
-              const result = await updateInquiryStatusAction(id, next);
-              if (!result.ok) {
+              try {
+                const result = await updateInquiryStatusAction(id, next);
+                if (!result.ok) {
+                  setValue(previous);
+                  setError(result.error);
+                  return;
+                }
+                router.refresh();
+              } catch {
                 setValue(previous);
-                setError(result.error);
-                return;
+                setError(NETWORK_ERROR);
               }
-              router.refresh();
             });
           }}
         >
@@ -47,7 +54,15 @@ export function InquiryStatusSelect({ id, status }: { id: string; status: Inquir
             </option>
           ))}
         </select>
-        {pending && <Loader2 aria-label="Saving" className="size-4 animate-spin text-muted" />}
+        {/* Reserved width, so the row does not move when the spinner appears. */}
+        <span className="inline-flex min-w-16 items-center gap-1.5 text-xs text-muted" role="status">
+          {pending && (
+            <>
+              <Spinner className="size-3.5" />
+              Saving…
+            </>
+          )}
+        </span>
       </div>
       {error && (
         <p role="alert" className="mt-1.5 text-xs text-danger">

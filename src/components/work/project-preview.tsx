@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { motion } from "motion/react";
-import { ExternalLink, Loader2, Play } from "lucide-react";
+import { ExternalLink, Play } from "lucide-react";
+import { Spinner } from "@/components/ui/loading";
 import { ButtonLink } from "@/components/ui/button";
 import type { Project, ProjectMedia } from "@/types/project";
 import { useDictionary } from "@/i18n/context";
@@ -111,7 +112,7 @@ export function ProjectPreview({
               >
                 {frameState === "loading" ? (
                   <>
-                    <Loader2 aria-hidden className="size-6 animate-spin text-accent" />
+                    <Spinner className="size-6 text-accent" />
                     <p className="text-sm text-muted">{t.loading}</p>
                   </>
                 ) : (

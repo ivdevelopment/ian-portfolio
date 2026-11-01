@@ -7,6 +7,8 @@ import { Search, X } from "lucide-react";
 import { PRIORITY_LABELS, PROSPECT_PRIORITIES, PROSPECT_STATUSES, STATUS_LABELS } from "@/lib/prospects/constants";
 import { FOLLOW_UP_FILTERS, FOLLOW_UP_FILTER_LABELS, filtersToParams, hasActiveFilters, type ProspectFilters } from "@/lib/prospects/filters";
 import { rememberPreference } from "@/lib/prospects/preference-cookie";
+import { Spinner } from "@/components/ui/loading";
+import { startNavigationProgress } from "@/components/ui/navigation-progress";
 import { cn } from "@/lib/utils";
 import { AdminSelect } from "./admin-select";
 import { adminInput } from "./ui";
@@ -50,11 +52,12 @@ export const PREVIEW_OPTIONS = [
 export function BoardFilterBar({ filters, sectors }: { filters: ProspectFilters; sectors: string[] }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [, startNavigation] = useTransition();
+  const [navigating, startNavigation] = useTransition();
   const [search, setSearch] = useState(filters.q);
 
   const go = (next: Partial<ProspectFilters>) => {
     const params = filtersToParams({ ...filters, ...next, page: 1 }).toString();
+    startNavigationProgress();
     startNavigation(() => router.replace(params ? `${pathname}?${params}` : pathname, { scroll: false }));
   };
 
@@ -74,7 +77,15 @@ export function BoardFilterBar({ filters, sectors }: { filters: ProspectFilters;
     <div className="rounded-card border border-line bg-glass p-3">
       <div className="relative">
         <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-subtle" />
-        <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search company, email, contact, sector, city, website…" aria-label="Search prospects" className={cn(adminInput, "h-10 pl-9")} />
+        <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search company, email, contact, sector, city, website…" aria-label="Search prospects" className={cn(adminInput, "h-10 pl-9 pr-9")} />
+        <span role="status" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted">
+          {navigating && (
+            <>
+              <Spinner className="size-4" />
+              <span className="sr-only">Updating the board…</span>
+            </>
+          )}
+        </span>
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-5">
         <AdminSelect id="b-status" value={filters.status ?? ALL} onChange={(v) => go({ status: v === ALL ? null : (v as ProspectFilters["status"]) })} options={[{ value: ALL, label: "All statuses" }, ...PROSPECT_STATUSES.map((s) => ({ value: s, label: STATUS_LABELS[s] }))]} />

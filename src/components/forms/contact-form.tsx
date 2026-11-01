@@ -233,10 +233,11 @@ export function ContactForm() {
             type="submit"
             size="lg"
             icon="arrow"
-            disabled={isSubmitting}
+            pending={isSubmitting}
+            pendingLabel={f.sending}
             className="mt-6 w-full sm:ml-auto sm:w-auto"
           >
-            {isSubmitting ? f.sending : f.send}
+            {f.send}
           </Button>
         </div>
       </div>

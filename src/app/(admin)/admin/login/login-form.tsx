@@ -2,7 +2,6 @@
 
 import { useActionState } from "react";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
 import { ADMIN_FORGOT_PASSWORD } from "@/lib/auth-routes";
 import { signInAction, type LoginState } from "./actions";
 import { adminInput } from "@/components/admin/ui";
@@ -50,14 +49,8 @@ export function LoginForm() {
         </p>
       )}
 
-      <Button type="submit" size="lg" className="w-full" disabled={pending}>
-        {pending ? (
-          <>
-            <Loader2 aria-hidden className="size-4 animate-spin" /> Signing in…
-          </>
-        ) : (
-          "Sign in"
-        )}
+      <Button type="submit" size="lg" className="w-full" pending={pending} pendingLabel="Signing in…">
+        Sign in
       </Button>
       <p className="text-center text-sm">
         <Link

@@ -1,51 +1,31 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { Check, Copy, ExternalLink, KeyRound, Pencil, Power, PowerOff, RefreshCw, Trash2 } from "lucide-react";
-import {
-  deletePreviewAction,
-  resetPreviewCodeAction,
-  setPreviewActiveAction,
-  type PreviewActionResult,
-} from "@/app/(admin)/admin/(panel)/previews/actions";
+import { deletePreviewAction, resetPreviewCodeAction, setPreviewActiveAction, type PreviewActionResult } from "@/app/(admin)/admin/(panel)/previews/actions";
 import { generateAccessCode } from "@/lib/preview/access-code";
 import { ConfirmDialog } from "./confirm-dialog";
+import { IconButton } from "./icon-button";
+import { useActionRunner } from "./use-action-runner";
 import { PreviewSecretDialog } from "./preview-secret-dialog";
 import { adminInput } from "./ui";
 import { cn } from "@/lib/utils";
 
-const iconButton =
-  "inline-flex size-8 items-center justify-center rounded-md border border-line text-muted transition-colors " +
-  "hover:border-line-strong hover:bg-glass-strong hover:text-ink disabled:opacity-50";
+import { iconButtonClass as iconButton } from "./icon-button";
 
 type Row = { id: string; clientName: string; active: boolean; url: string };
 
 /** Open, copy link, reset code, disable/enable, edit and delete (destructive ones ask first). */
 export function PreviewRowActions({ preview, hideEdit }: { preview: Row; hideEdit?: boolean }) {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
-  const [message, setMessage] = useState<string | null>(null);
+  const { run, active, pending, error, setError } = useActionRunner();
   const [dialog, setDialog] = useState<"reset" | "disable" | "delete" | null>(null);
-  const [dialogError, setDialogError] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [secret, setSecret] = useState<string | null>(null);
-
-  const run = (action: () => Promise<PreviewActionResult>, onOk?: (r: PreviewActionResult) => void) => {
-    setMessage(null);
-    setDialogError(null);
-    startTransition(async () => {
-      const result = await action();
-      if (!result.ok) {
-        if (dialog) setDialogError(result.error);
-        else setMessage(result.error);
-        return;
-      }
-      onOk?.(result);
-      router.refresh();
-    });
-  };
+  // Only THIS preview's row is busy: the rest of the page stays usable.
+  const dialogError = dialog ? error : null;
+  const message = dialog ? null : error;
+  const dialogBusy = (key: string) => active === key;
 
   return (
     <div className="flex flex-col items-end gap-1.5">
@@ -61,22 +41,26 @@ export function PreviewRowActions({ preview, hideEdit }: { preview: Row; hideEdi
           title="Reset access code"
           onClick={() => {
             setCode(generateAccessCode(preview.clientName));
-            setDialogError(null);
+            setError(null);
             setDialog("reset");
           }}
         >
           <KeyRound aria-hidden className="size-4" />
         </button>
-        <button
-          type="button"
-          className={iconButton}
+        <IconButton
+          busy={active === "enable"}
           disabled={pending}
           aria-label={preview.active ? `Disable ${preview.clientName} preview` : `Enable ${preview.clientName} preview`}
           title={preview.active ? "Disable" : "Enable"}
-          onClick={() => (preview.active ? setDialog("disable") : run(() => setPreviewActiveAction(preview.id, true)))}
+          onClick={() => {
+            if (preview.active) {
+              setError(null);
+              setDialog("disable");
+            } else run("enable", () => setPreviewActiveAction(preview.id, true));
+          }}
         >
           {preview.active ? <PowerOff aria-hidden className="size-4" /> : <Power aria-hidden className="size-4" />}
-        </button>
+        </IconButton>
         {!hideEdit && (
           <Link href={`/admin/previews/${preview.id}/edit`} className={iconButton} aria-label={`Edit ${preview.clientName} preview`} title="Edit">
             <Pencil aria-hidden className="size-4" />
@@ -88,13 +72,18 @@ export function PreviewRowActions({ preview, hideEdit }: { preview: Row; hideEdi
           aria-label={`Delete ${preview.clientName} preview`}
           title="Delete"
           onClick={() => {
-            setDialogError(null);
+            setError(null);
             setDialog("delete");
           }}
         >
           <Trash2 aria-hidden className="size-4" />
         </button>
       </div>
+      {active === "enable" && (
+        <p role="status" className="max-w-56 text-right text-xs text-muted">
+          Enabling…
+        </p>
+      )}
       {message && (
         <p role="alert" className="max-w-56 text-right text-xs text-danger">
           {message}
@@ -105,10 +94,11 @@ export function PreviewRowActions({ preview, hideEdit }: { preview: Row; hideEdi
         open={dialog === "disable"}
         title={`Disable ${preview.clientName}'s preview?`}
         confirmLabel="Disable"
-        pending={pending}
+        pendingLabel="Disabling…"
+        pending={dialogBusy("disable")}
         error={dialogError}
         onClose={() => setDialog(null)}
-        onConfirm={() => run(() => setPreviewActiveAction(preview.id, false), () => setDialog(null))}
+        onConfirm={() => run("disable", () => setPreviewActiveAction(preview.id, false), () => setDialog(null))}
       >
         Everyone is locked out immediately, including visitors who already entered the code. Visitors see
         &ldquo;not available&rdquo;. After re-enabling they must enter the code again.
@@ -118,10 +108,10 @@ export function PreviewRowActions({ preview, hideEdit }: { preview: Row; hideEdi
         open={dialog === "delete"}
         title={`Delete ${preview.clientName}'s preview?`}
         confirmLabel="Delete preview"
-        pending={pending}
+        pending={dialogBusy("delete")}
         error={dialogError}
         onClose={() => setDialog(null)}
-        onConfirm={() => run(() => deletePreviewAction(preview.id), () => setDialog(null))}
+        onConfirm={() => run("delete", () => deletePreviewAction(preview.id), () => setDialog(null))}
       >
         The preview address stops working and its code is gone. The client&apos;s own website and deployment are not
         touched.
@@ -131,12 +121,14 @@ export function PreviewRowActions({ preview, hideEdit }: { preview: Row; hideEdi
         open={dialog === "reset"}
         title="Reset access code"
         confirmLabel="Reset code"
-        pending={pending}
+        pendingLabel="Resetting code…"
+        pending={dialogBusy("reset")}
         error={dialogError}
         onClose={() => setDialog(null)}
         onConfirm={() =>
           run(
-            () => resetPreviewCodeAction(preview.id, code),
+            "reset",
+            (): Promise<PreviewActionResult> => resetPreviewCodeAction(preview.id, code),
             (r) => {
               setDialog(null);
               if (r.ok && "code" in r) setSecret(String(r.code));

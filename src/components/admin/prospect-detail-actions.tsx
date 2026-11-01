@@ -22,6 +22,7 @@ import type { QuickAction } from "@/lib/prospects/events";
 import { cn } from "@/lib/utils";
 import { AdminSelect } from "./admin-select";
 import { ConfirmDialog } from "./confirm-dialog";
+import { NETWORK_ERROR } from "./use-action-runner";
 import { Field } from "./form-bits";
 import { adminInput } from "./ui";
 
@@ -52,23 +53,35 @@ export function ProspectActions({
 }) {
   const router = useRouter();
   const [dialog, setDialog] = useState<Dialog>(null);
-  const [pending, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
+  const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const pending = busy !== null || isPending;
 
-  const run = (action: () => Promise<ProspectActionResult>, then?: () => void, success?: string) => {
+  /** One action at a time; always ends pending (success, validation error or a thrown network error). */
+  const run = (action: () => Promise<ProspectActionResult>, then?: () => void, success?: string, key = "dialog") => {
+    if (pending) return;
+    setBusy(key);
     setError(null);
     setNote(null);
     startTransition(async () => {
-      const result = await action();
-      if (!result.ok) return setError(result.error);
-      if (success) setNote(success);
-      then?.();
-      setDialog(null);
-      router.refresh();
+      try {
+        const result = await action();
+        if (!result.ok) return setError(result.error);
+        if (success) setNote(success);
+        then?.();
+        setDialog(null);
+        router.refresh();
+      } catch {
+        setError(NETWORK_ERROR);
+      } finally {
+        setBusy(null);
+      }
     });
   };
-  const quick = (action: QuickAction, label: string) => run(() => quickAction(prospect.id, action), undefined, label);
+  const quick = (action: QuickAction, label: string) => run(() => quickAction(prospect.id, action), undefined, label, `quick:${action}`);
+  const quickProps = (action: QuickAction, pendingText: string) => ({ pending: busy === `quick:${action}`, pendingLabel: pendingText, disabled: pending });
 
   const small = "gap-1.5";
   return (
@@ -92,16 +105,16 @@ export function ProspectActions({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" variant="secondary" icon="none" className={small} disabled={pending} onClick={() => quick("mark_contacted", "Marked as contacted.")}>
+        <Button size="sm" variant="secondary" icon="none" className={small} {...quickProps("mark_contacted", "Marking contacted…")} onClick={() => quick("mark_contacted", "Marked as contacted.")}>
           <Send aria-hidden className="size-4" /> Mark contacted
         </Button>
-        <Button size="sm" variant="secondary" icon="none" className={small} disabled={pending} onClick={() => quick("reply_received", "Reply recorded.")}>
+        <Button size="sm" variant="secondary" icon="none" className={small} {...quickProps("reply_received", "Recording reply…")} onClick={() => quick("reply_received", "Reply recorded.")}>
           <MessageSquareReply aria-hidden className="size-4" /> Reply received
         </Button>
-        <Button size="sm" variant="secondary" icon="none" className={small} disabled={pending || prospect.status === "won"} onClick={() => quick("mark_won", "Marked as won.")}>
+        <Button size="sm" variant="secondary" icon="none" className={small} {...quickProps("mark_won", "Marking won…")} disabled={pending || prospect.status === "won"} onClick={() => quick("mark_won", "Marked as won.")}>
           <Trophy aria-hidden className="size-4" /> Mark won
         </Button>
-        <Button size="sm" variant="secondary" icon="none" className={small} disabled={pending || prospect.status === "lost"} onClick={() => quick("mark_lost", "Marked as lost.")}>
+        <Button size="sm" variant="secondary" icon="none" className={small} {...quickProps("mark_lost", "Marking lost…")} disabled={pending || prospect.status === "lost"} onClick={() => quick("mark_lost", "Marked as lost.")}>
           <ThumbsDown aria-hidden className="size-4" /> Mark lost
         </Button>
         {prospect.website && (
@@ -156,17 +169,26 @@ export function ProspectActions({
         open={dialog === "convert"}
         title={`Convert ${prospect.name} to a project?`}
         confirmLabel="Convert"
+        pendingLabel="Converting to project…"
         tone="primary"
-        pending={pending}
+        pending={busy === "convert"}
         error={dialog === "convert" ? error : null}
         onClose={() => setDialog(null)}
         onConfirm={() => {
           setError(null);
+          if (pending) return;
+          setBusy("convert");
           startTransition(async () => {
-            const result = await convertToProjectAction(prospect.id);
-            if (!result.ok) return setError(result.error);
-            setDialog(null);
-            router.push(`/admin/projects/${result.projectId}/edit`);
+            try {
+              const result = await convertToProjectAction(prospect.id);
+              if (!result.ok) return setError(result.error);
+              setDialog(null);
+              router.push(`/admin/projects/${result.projectId}/edit`);
+            } catch {
+              setError(NETWORK_ERROR);
+            } finally {
+              setBusy(null);
+            }
           });
         }}
       >
@@ -177,16 +199,25 @@ export function ProspectActions({
         open={dialog === "delete"}
         title={`Delete ${prospect.name}?`}
         confirmLabel="Delete"
-        pending={pending}
+        pendingLabel="Deleting prospect…"
+        pending={busy === "delete"}
         error={dialog === "delete" ? error : null}
         onClose={() => setDialog(null)}
         onConfirm={() => {
           setError(null);
+          if (pending) return;
+          setBusy("delete");
           startTransition(async () => {
-            const result = await deleteProspectAction(prospect.id);
-            if (!result.ok) return setError(result.error);
-            router.push("/admin/prospects");
-            router.refresh();
+            try {
+              const result = await deleteProspectAction(prospect.id);
+              if (!result.ok) return setError(result.error);
+              router.push("/admin/prospects");
+              router.refresh();
+            } catch {
+              setError(NETWORK_ERROR);
+            } finally {
+              setBusy(null);
+            }
           });
         }}
       >

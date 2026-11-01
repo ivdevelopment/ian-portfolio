@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { LogOut } from "lucide-react";
 import { siteConfig } from "@/config/site";
 import { signOutAction } from "@/app/(admin)/admin/login/actions";
 import { AdminNav } from "./admin-nav";
+import { SignOutButton } from "./sign-out-button";
 
 /** Chrome for the signed-in admin area: sidebar, account and sign-out. */
 export function AdminShell({
@@ -34,13 +34,7 @@ export function AdminShell({
             </p>
           )}
           <form action={signOutAction} className="mt-2">
-            <button
-              type="submit"
-              className="inline-flex items-center gap-2 text-sm text-muted transition-colors hover:text-ink"
-            >
-              <LogOut aria-hidden className="size-4" />
-              Sign out
-            </button>
+            <SignOutButton variant="sidebar" />
           </form>
         </div>
       </aside>
@@ -48,9 +42,7 @@ export function AdminShell({
       <div className="min-w-0 px-4 py-6 sm:px-8 md:py-8">
         <div className="mx-auto max-w-6xl">{children}</div>
         <form action={signOutAction} className="mt-10 md:hidden">
-          <button type="submit" className="text-sm text-muted underline-offset-4 hover:underline">
-            Sign out
-          </button>
+          <SignOutButton variant="inline" />
         </form>
       </div>
     </div>

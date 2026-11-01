@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Loader2, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { createPreviewAction, updatePreviewAction } from "@/app/(admin)/admin/(panel)/previews/actions";
 import { Button } from "@/components/ui/button";
 import { generateAccessCode } from "@/lib/preview/access-code";
@@ -292,9 +292,8 @@ export function PreviewForm({
               {formError}
             </p>
           )}
-          <Button size="sm" onClick={() => void create()} disabled={creatingNow}>
-            {creatingNow && <Loader2 aria-hidden className="size-4 animate-spin" />}
-            {creatingNow ? "Creating…" : "Create preview"}
+          <Button size="sm" onClick={() => void create()} pending={creatingNow} pendingLabel="Creating preview…">
+            Create preview
           </Button>
         </div>
       ) : (

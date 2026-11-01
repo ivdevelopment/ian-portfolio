@@ -1,13 +1,46 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
-import { Loader2 } from "lucide-react";
+import { useEffect, useState, useTransition } from "react";
 import { zohoDisconnectAction, zohoDryRunAction, zohoSyncNowAction } from "@/app/(admin)/admin/(panel)/settings/integrations/actions";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import type { SyncReport } from "@/lib/mail/zoho/sync";
 import { formatBrusselsDateTime } from "@/lib/preview/access-activity";
 import { ConfirmDialog } from "./confirm-dialog";
+
+const CONNECT_URL = "/admin/settings/integrations/zoho/connect";
+
+/**
+ * Starts the Zoho sign-in. This is a full page navigation to our connect route (which then redirects to Zoho), so the button says
+ * "Connecting…" and cannot be clicked twice; if the person comes back with the browser's back button the button is reset.
+ */
+function ConnectButton({ label, variant, disabled }: { label: string; variant?: "secondary"; disabled?: boolean }) {
+  const [connecting, setConnecting] = useState(false);
+  useEffect(() => {
+    const reset = () => setConnecting(false);
+    window.addEventListener("pageshow", reset);
+    return () => window.removeEventListener("pageshow", reset);
+  }, []);
+  return (
+    <Button
+      size="sm"
+      variant={variant}
+      icon="none"
+      disabled={disabled}
+      pending={connecting}
+      pendingLabel="Connecting to Zoho…"
+      onClick={() => {
+        setConnecting(true);
+        // A plain anchor click is a full page load (this is a route handler that redirects to Zoho, not a Next page).
+        const link = document.createElement("a");
+        link.href = CONNECT_URL;
+        link.click();
+      }}
+    >
+      {label}
+    </Button>
+  );
+}
 
 export type PanelConnection = { account: string; lastSync: string | null; needsReconnect: boolean } | null;
 
@@ -21,23 +54,28 @@ export function ZohoPanel({ connection, lastRun }: { connection: PanelConnection
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
 
   const run = (kind: "dry" | "sync") => {
+    if (busy) return; // one run at a time: a second click while one is in flight does nothing
     setBusy(kind);
     setError(null);
     startTransition(async () => {
-      const result = await (kind === "dry" ? zohoDryRunAction() : zohoSyncNowAction());
-      setBusy(null);
-      if (!result.ok) return setError(result.error);
-      setReport(result.report ?? null);
-      router.refresh();
+      try {
+        const result = await (kind === "dry" ? zohoDryRunAction() : zohoSyncNowAction());
+        if (!result.ok) return setError(result.error);
+        setReport(result.report ?? null);
+        router.refresh();
+      } catch {
+        // Network or server failure: the buttons must come back and say so.
+        setError(kind === "sync" ? "The sync could not be completed. Check your connection and try again." : "The mailbox check could not be completed. Try again.");
+      } finally {
+        setBusy(null);
+      }
     });
   };
 
   if (!connection) {
     return (
       <div className="flex flex-wrap items-center gap-3">
-        <ButtonLink href="/admin/settings/integrations/zoho/connect" size="sm" icon="none">
-          Connect Zoho Mail
-        </ButtonLink>
+        <ConnectButton label="Connect Zoho Mail" />
         <p className="text-xs text-subtle">Read-only access to find mail to and from your prospects. Nothing is synced until you press Sync now.</p>
       </div>
     );
@@ -45,22 +83,23 @@ export function ZohoPanel({ connection, lastRun }: { connection: PanelConnection
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" variant="secondary" icon="none" disabled={pending} onClick={() => run("dry")}>
-          {busy === "dry" && <Loader2 aria-hidden className="size-4 animate-spin" />}
+      <div className="flex flex-wrap items-center gap-2" aria-busy={busy !== null}>
+        <Button size="sm" variant="secondary" icon="none" disabled={pending || busy === "sync"} pending={busy === "dry"} pendingLabel="Checking mailbox…" onClick={() => run("dry")}>
           Check mailbox (dry run)
         </Button>
-        <Button size="sm" icon="none" disabled={pending || connection.needsReconnect} onClick={() => run("sync")}>
-          {busy === "sync" && <Loader2 aria-hidden className="size-4 animate-spin" />}
+        <Button size="sm" icon="none" disabled={pending || connection.needsReconnect || busy === "dry"} pending={busy === "sync"} pendingLabel="Syncing…" onClick={() => run("sync")}>
           Sync now
         </Button>
-        <ButtonLink href="/admin/settings/integrations/zoho/connect" size="sm" variant="secondary" icon="none">
-          Reconnect
-        </ButtonLink>
-        <Button size="sm" variant="secondary" icon="none" className="text-danger" disabled={pending} onClick={() => setConfirmDisconnect(true)}>
+        <ConnectButton label="Reconnect" variant="secondary" disabled={busy !== null} />
+        <Button size="sm" variant="secondary" icon="none" className="text-danger" disabled={pending || busy !== null} onClick={() => setConfirmDisconnect(true)}>
           Disconnect
         </Button>
       </div>
+      {busy && (
+        <p role="status" className="mt-3 text-sm text-muted">
+          {busy === "sync" ? "Syncing Zoho Mail. This can take a minute; the connection status above stays as it is." : "Checking the mailbox without storing anything…"}
+        </p>
+      )}
       {error && (
         <p role="alert" className="mt-3 text-sm text-danger">
           {error}

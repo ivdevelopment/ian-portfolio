@@ -18,6 +18,7 @@ import { formatCents } from "@/lib/quotes/money";
 import { isClosed, STATUS_LABELS, type ProspectStatus } from "@/lib/prospects/constants";
 import { cn } from "@/lib/utils";
 import { ConfirmDialog } from "./confirm-dialog";
+import { NETWORK_ERROR } from "./use-action-runner";
 import { adminInput } from "./ui";
 
 export type DetailProspect = { id: string; companyName: string; status: ProspectStatus; quoteValueCents: number | null };
@@ -57,7 +58,10 @@ export function QuoteDetailActions({
   links?: React.ReactNode;
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
+  // Which action is running. Only one at a time: a second click (or a second status transition) while one is in flight is ignored.
+  const [busy, setBusy] = useState<string | null>(null);
+  const pending = busy !== null || isPending;
   const [dialog, setDialog] = useState<Dialog>(null);
   const [suggestion, setSuggestion] = useState<Suggestion>(null);
   const [error, setError] = useState<string | null>(null);
@@ -74,18 +78,28 @@ export function QuoteDetailActions({
     setNote("");
   };
 
-  const run = (work: () => Promise<{ ok: boolean; error?: string }>, after?: () => void) =>
+  const run = (key: string, work: () => Promise<{ ok: boolean; error?: string }>, after?: () => void) => {
+    if (pending) return;
+    setBusy(key);
+    setError(null);
     startTransition(async () => {
-      setError(null);
-      const result = await work();
-      if (!result.ok) return setError(result.error ?? "That didn't work.");
-      close();
-      after?.();
-      router.refresh();
+      try {
+        const result = await work();
+        if (!result.ok) return setError(result.error ?? "That didn't work.");
+        close();
+        after?.();
+        router.refresh();
+      } catch {
+        // Network or server failure: the buttons come back and the dialog says what happened.
+        setError(NETWORK_ERROR);
+      } finally {
+        setBusy(null);
+      }
     });
+  };
 
   const changeStatus = (to: QuoteStatus, extra: { note?: string; validUntil?: string } = {}, after?: () => void) =>
-    run(() => changeQuoteStatusAction(id, { to, ...extra }), after);
+    run(`status:${to}`, () => changeQuoteStatusAction(id, { to, ...extra }), after);
 
   /** After "sent" / "accepted": offer (not apply) the matching change on the linked prospect. */
   const offerProspectChange = (kind: "sent" | "accepted") => {
@@ -99,6 +113,7 @@ export function QuoteDetailActions({
   const applySuggestion = () => {
     if (!prospect || !suggestion) return;
     run(
+      "suggestion",
       async () => {
         const moved = await setProspectStatusAction(prospect.id, suggestion.kind === "sent" ? "quote_sent" : "won");
         if (!moved.ok) return moved;
@@ -119,7 +134,7 @@ export function QuoteDetailActions({
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2" data-testid="quote-actions">
+      <div className="flex flex-wrap items-center gap-2" data-testid="quote-actions" aria-busy={pending}>
         {editable && (
           <ButtonLink href={`/admin/quotes/${id}/edit`} size="sm" variant="secondary" icon="none">
             <Pencil aria-hidden className="size-4" />
@@ -141,8 +156,11 @@ export function QuoteDetailActions({
           variant="secondary"
           icon="none"
           disabled={pending}
+          pending={busy === "duplicate"}
+          pendingLabel="Duplicating…"
           onClick={() =>
             run(
+              "duplicate",
               async () => {
                 const result = await duplicateQuoteAction(id);
                 if (result.ok) router.push(`/admin/quotes/${result.id}/edit`);
@@ -164,16 +182,21 @@ export function QuoteDetailActions({
           ))}
         </ul>
       )}
+      {pending && !dialog && !suggestion && busy === "duplicate" && (
+        <p role="status" className="mt-3 text-sm text-muted">
+          Duplicating {number}…
+        </p>
+      )}
       {error && !dialog && !suggestion && (
         <p role="alert" className="mt-3 text-sm text-danger">
           {error}
         </p>
       )}
 
-      <ConfirmDialog open={dialog === "ready"} tone="primary" title="Mark as ready to send?" confirmLabel="Mark ready" pending={pending} error={error} onClose={close} onConfirm={() => changeStatus("ready")}>
+      <ConfirmDialog open={dialog === "ready"} tone="primary" title="Mark as ready to send?" confirmLabel="Mark ready" pendingLabel="Marking as ready…" pending={busy === "status:ready"} error={error} onClose={close} onConfirm={() => changeStatus("ready")}>
         {number} will be locked for review. You can still edit it while it is ready, or move it back to draft.
       </ConfirmDialog>
-      <ConfirmDialog open={dialog === "draft"} tone="primary" title="Move back to draft?" confirmLabel="Back to draft" pending={pending} error={error} onClose={close} onConfirm={() => changeStatus("draft")}>
+      <ConfirmDialog open={dialog === "draft"} tone="primary" title="Move back to draft?" confirmLabel="Back to draft" pendingLabel="Moving to draft…" pending={busy === "status:draft"} error={error} onClose={close} onConfirm={() => changeStatus("draft")}>
         {number} returns to the draft state.
       </ConfirmDialog>
       <ConfirmDialog
@@ -181,7 +204,8 @@ export function QuoteDetailActions({
         tone="primary"
         title="Mark as sent?"
         confirmLabel="Mark sent"
-        pending={pending}
+        pendingLabel="Marking as sent…"
+        pending={busy === "status:sent"}
         error={error}
         onClose={close}
         onConfirm={() => changeStatus("sent", {}, () => offerProspectChange("sent"))}
@@ -193,21 +217,22 @@ export function QuoteDetailActions({
         tone="primary"
         title="Mark as accepted?"
         confirmLabel="Mark accepted"
-        pending={pending}
+        pendingLabel="Marking as accepted…"
+        pending={busy === "status:accepted"}
         error={error}
         onClose={close}
         onConfirm={() => changeStatus("accepted", {}, () => offerProspectChange("accepted"))}
       >
         The client accepted {number}. It becomes read-only; you can then create a project from it.
       </ConfirmDialog>
-      <ConfirmDialog open={dialog === "rejected"} title="Mark as rejected?" confirmLabel="Mark rejected" pending={pending} error={error} onClose={close} onConfirm={() => changeStatus("rejected", { note })}>
+      <ConfirmDialog open={dialog === "rejected"} title="Mark as rejected?" confirmLabel="Mark rejected" pendingLabel="Marking as rejected…" pending={busy === "status:rejected"} error={error} onClose={close} onConfirm={() => changeStatus("rejected", { note })}>
         <p>{number} stays in your records; nothing is deleted.</p>
         <label htmlFor="reject-note" className="mt-3 mb-1.5 block text-xs font-medium text-muted">
           Reason (optional)
         </label>
         <textarea id="reject-note" rows={3} value={note} maxLength={2000} onChange={(e) => setNote(e.target.value)} className={cn(adminInput, "py-2")} />
       </ConfirmDialog>
-      <ConfirmDialog open={dialog === "cancelled"} title="Cancel this quote?" confirmLabel="Cancel quote" pending={pending} error={error} onClose={close} onConfirm={() => changeStatus("cancelled", { note })}>
+      <ConfirmDialog open={dialog === "cancelled"} title="Cancel this quote?" confirmLabel="Cancel quote" pendingLabel="Cancelling quote…" pending={busy === "status:cancelled"} error={error} onClose={close} onConfirm={() => changeStatus("cancelled", { note })}>
         <p>{number} is kept but can no longer be used. This cannot be undone; duplicate it to start again.</p>
         <label htmlFor="cancel-note" className="mt-3 mb-1.5 block text-xs font-medium text-muted">
           Reason (optional)
@@ -218,11 +243,12 @@ export function QuoteDetailActions({
         open={dialog === "delete"}
         title="Delete this draft?"
         confirmLabel="Delete draft"
-        pending={pending}
+        pendingLabel="Deleting draft…"
+        pending={busy === "delete"}
         error={error}
         onClose={close}
         onConfirm={() =>
-          run(async () => {
+          run("delete", async () => {
             const result = await deleteQuoteAction(id);
             if (result.ok) router.push("/admin/quotes");
             return result;
@@ -236,10 +262,11 @@ export function QuoteDetailActions({
         tone="primary"
         title={status === "expired" ? "Reopen as sent" : "Extend validity"}
         confirmLabel={status === "expired" ? "Reopen" : "Save date"}
-        pending={pending}
+        pendingLabel={status === "expired" ? "Reopening…" : "Saving date…"}
+        pending={busy === "status:sent" || busy === "extend"}
         error={error}
         onClose={close}
-        onConfirm={() => (status === "expired" ? changeStatus("sent", { validUntil: day }) : run(() => extendValidityAction(id, day)))}
+        onConfirm={() => (status === "expired" ? changeStatus("sent", { validUntil: day }) : run("extend", () => extendValidityAction(id, day)))}
       >
         <label htmlFor="extend-day" className="mb-1.5 block text-xs font-medium text-muted">
           Valid until
@@ -251,11 +278,12 @@ export function QuoteDetailActions({
         tone="primary"
         title="Create a project from this quote?"
         confirmLabel="Create project"
-        pending={pending}
+        pendingLabel="Creating project…"
+        pending={busy === "project"}
         error={error}
         onClose={close}
         onConfirm={() =>
-          run(async () => {
+          run("project", async () => {
             const result = await createProjectFromQuoteAction(id);
             if (result.ok) router.push(`/admin/projects/${result.projectId}/edit`);
             return result;
@@ -270,7 +298,8 @@ export function QuoteDetailActions({
         tone="primary"
         title={suggestion?.kind === "sent" ? "Move the prospect to “Quote sent”?" : "Mark the prospect as won?"}
         confirmLabel={suggestion?.kind === "sent" ? "Move prospect" : "Mark won"}
-        pending={pending}
+        pendingLabel={suggestion?.kind === "sent" ? "Moving prospect…" : "Marking won…"}
+        pending={busy === "suggestion"}
         error={error}
         onClose={() => {
           setSuggestion(null);

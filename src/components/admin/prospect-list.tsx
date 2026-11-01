@@ -6,6 +6,8 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ArrowDown, ArrowUp, ExternalLink, Pencil, Search, Trash2, X } from "lucide-react";
 import { bulkDeleteAction, bulkUpdateAction, deleteProspectAction } from "@/app/(admin)/admin/(panel)/prospects/actions";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/loading";
+import { startNavigationProgress } from "@/components/ui/navigation-progress";
 import {
   PAGE_SIZES,
   PRIORITY_LABELS,
@@ -25,6 +27,7 @@ import { ExportButton, ExportDialog } from "./prospect-export-dialog";
 import { PREVIEW_OPTIONS, previewChoice, previewPatch } from "./prospect-board-filters";
 import { DeliveryBadge, FollowUpCell, PriorityBadge, ProspectStatusBadge, iconButton } from "./prospect-ui";
 import { EmptyState, adminInput } from "./ui";
+import { NETWORK_ERROR } from "./use-action-runner";
 
 export type ListRow = Omit<ProspectRecord, "notes">;
 
@@ -74,6 +77,7 @@ export function ProspectList({ rows, total, filters, sectors, today }: Props) {
   const go = (next: Partial<ProspectFilters>, resetPage = true) => {
     const merged = { ...filters, ...next, page: resetPage ? 1 : (next.page ?? filters.page) };
     const params = filtersToParams(merged).toString();
+    startNavigationProgress();
     startNavigation(() => router.replace(params ? `${pathname}?${params}` : pathname, { scroll: false }));
   };
 
@@ -111,25 +115,36 @@ export function ProspectList({ rows, total, filters, sectors, today }: Props) {
 
   const runDelete = () => {
     if (!confirm) return;
+    if (busy) return;
     setConfirmError(null);
     startAction(async () => {
-      const result = confirm.kind === "row" ? await deleteProspectAction(confirm.id!) : await bulkDeleteAction(ids);
-      if (!result.ok) return setConfirmError(result.error);
-      setConfirm(null);
-      setSelected(new Set());
-      setMessage(confirm.kind === "bulk" && "count" in result ? `Deleted ${result.count} prospects.` : "Prospect deleted.");
-      router.refresh();
+      try {
+        const result = confirm.kind === "row" ? await deleteProspectAction(confirm.id!) : await bulkDeleteAction(ids);
+        if (!result.ok) return setConfirmError(result.error);
+        setConfirm(null);
+        setSelected(new Set());
+        setMessage(confirm.kind === "bulk" && "count" in result ? `Deleted ${result.count} prospects.` : "Prospect deleted.");
+        router.refresh();
+      } catch {
+        setConfirmError(NETWORK_ERROR);
+      }
     });
   };
 
-  const runBulk = (change: Parameters<typeof bulkUpdateAction>[1], doneLabel: string) =>
+  const runBulk = (change: Parameters<typeof bulkUpdateAction>[1], doneLabel: string) => {
+    if (busy) return;
     startAction(async () => {
       setMessage(null);
-      const result = await bulkUpdateAction(ids, change);
-      if (!result.ok) return setMessage(result.error);
-      setMessage(`${doneLabel} (${result.count}).`);
-      router.refresh();
+      try {
+        const result = await bulkUpdateAction(ids, change);
+        if (!result.ok) return setMessage(result.error);
+        setMessage(`${doneLabel} (${result.count}).`);
+        router.refresh();
+      } catch {
+        setMessage(NETWORK_ERROR);
+      }
     });
+  };
 
   return (
     <div className="space-y-3">
@@ -144,8 +159,17 @@ export function ProspectList({ rows, total, filters, sectors, today }: Props) {
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search company, email, contact, sector, city, website…"
               aria-label="Search prospects"
-              className={cn(adminInput, "h-10 pl-9")}
+              className={cn(adminInput, "h-10 pl-9 pr-9")}
             />
+            {/* Results stay on screen (dimmed) while the filtered list loads; this says so. */}
+            <span role="status" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted">
+              {navigating && (
+                <>
+                  <Spinner className="size-4" />
+                  <span className="sr-only">Updating results…</span>
+                </>
+              )}
+            </span>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <ExportButton onClick={() => setExportOpen(true)} />
@@ -220,7 +244,7 @@ export function ProspectList({ rows, total, filters, sectors, today }: Props) {
       ) : (
         <>
           {/* Desktop table */}
-          <div className={cn("hidden overflow-x-auto rounded-card border border-line bg-glass xl:block", navigating && "opacity-70")}>
+          <div aria-busy={navigating} className={cn("hidden overflow-x-auto rounded-card border border-line bg-glass transition-opacity xl:block", navigating && "opacity-70")}>
             <table className="w-full min-w-[62rem] text-left text-sm">
               <thead className="border-b border-line text-xs text-subtle">
                 <tr>
@@ -285,7 +309,7 @@ export function ProspectList({ rows, total, filters, sectors, today }: Props) {
           </div>
 
           {/* Mobile and tablet cards */}
-          <ul className={cn("space-y-2 xl:hidden", navigating && "opacity-70")}>
+          <ul aria-busy={navigating} className={cn("space-y-2 transition-opacity xl:hidden", navigating && "opacity-70")}>
             {rows.map((r) => (
               <li key={r.id} className={cn("rounded-card border border-line bg-glass p-3", selected.has(r.id) && "border-accent/50")}>
                 <div className="flex items-start gap-3">
@@ -411,6 +435,12 @@ function BulkBar({
     <div className="glass-strong rounded-card p-3" role="region" aria-label="Bulk actions">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
         <p className="text-sm font-medium">{count} selected</p>
+        {busy && (
+          <p role="status" className="inline-flex items-center gap-2 text-sm text-muted">
+            <Spinner className="size-4" />
+            Updating {count} {count === 1 ? "prospect" : "prospects"}…
+          </p>
+        )}
         <div className="flex items-center gap-2">
           <div className="w-44">
             <AdminSelect id="bulk-status" value={status} onChange={setStatus} options={STATUS_OPTIONS.slice(1)} />

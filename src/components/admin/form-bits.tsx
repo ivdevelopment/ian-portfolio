@@ -3,8 +3,9 @@
 import { useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useState } from "react";
 import type { FieldErrors, FieldPath, FieldValues, UseFormReturn } from "react-hook-form";
-import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { pendingLabel } from "@/lib/pending-label";
 import { cn } from "@/lib/utils";
 
 /**
@@ -104,11 +105,14 @@ export function SaveBar({
   status,
   dirty,
   label = "Save changes",
+  pendingLabel: pendingText,
   onSave,
 }: {
   status: SaveStatus;
   dirty?: boolean;
   label?: string;
+  /** Shown while saving; derived from `label` ("Create quote" -> "Creating quote…") when omitted. */
+  pendingLabel?: string;
   onSave: () => void;
 }) {
   const saving = status.kind === "saving";
@@ -129,6 +133,7 @@ export function SaveBar({
   return (
     <div className="glass-strong sticky bottom-3 z-10 mt-4 flex items-center justify-end gap-3 rounded-card px-4 py-2.5">
       <div aria-live="polite" className="min-h-5 text-sm">
+        {saving && <span className="sr-only">{pendingText ?? pendingLabel(label)}</span>}
         {status.kind === "error" && (
           <span role="alert" className="inline-flex items-center gap-2 text-danger">
             <AlertCircle aria-hidden className="size-4" />
@@ -143,9 +148,8 @@ export function SaveBar({
           </span>
         )}
       </div>
-      <Button onClick={onSave} disabled={saving || clean} size="sm">
-        {saving && <Loader2 aria-hidden className="size-4 animate-spin" />}
-        {saving ? "Saving…" : label}
+      <Button onClick={onSave} disabled={clean} pending={saving} pendingLabel={pendingText ?? pendingLabel(label)} size="sm">
+        {label}
       </Button>
     </div>
   );

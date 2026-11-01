@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CheckCircle2, Loader2, TriangleAlert } from "lucide-react";
+import { CheckCircle2, TriangleAlert } from "lucide-react";
 import { useDictionary, useLocale } from "@/i18n/context";
 import { createPublicReviewSchema, type PublicReviewValues, type ReviewSubmitResult } from "@/lib/schemas/review";
 import { cn } from "@/lib/utils";
@@ -247,9 +247,8 @@ export function ReviewForm({ token, clientName, projectTitle, projectThumbnail }
         </div>
       )}
 
-      <Button type="submit" size="lg" icon="arrow" disabled={isSubmitting} className="mt-8 w-full sm:w-auto">
-        {isSubmitting && <Loader2 aria-hidden className="size-4 animate-spin" />}
-        {isSubmitting ? r.sending : r.submit}
+      <Button type="submit" size="lg" icon="arrow" pending={isSubmitting} pendingLabel={r.sending} className="mt-8 w-full sm:w-auto">
+        {r.submit}
       </Button>
     </form>
   );

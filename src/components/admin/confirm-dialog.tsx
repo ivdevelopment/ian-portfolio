@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useId, useRef } from "react";
-import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { pendingLabel as defaultPendingLabel } from "@/lib/pending-label";
 
 type ConfirmDialogProps = {
   open: boolean;
@@ -10,6 +10,8 @@ type ConfirmDialogProps = {
   children: React.ReactNode;
   confirmLabel: string;
   pending?: boolean;
+  /** What is happening while pending ("Deleting draft…"). Derived from the confirm label when omitted. */
+  pendingLabel?: string;
   error?: string | null;
   /** Red for destructive actions (default); accent for everything else. */
   tone?: "danger" | "primary";
@@ -24,6 +26,7 @@ export function ConfirmDialog({
   children,
   confirmLabel,
   pending,
+  pendingLabel,
   error,
   tone = "danger",
   onConfirm,
@@ -65,10 +68,10 @@ export function ConfirmDialog({
         <Button
           size="sm"
           onClick={onConfirm}
-          disabled={pending}
+          pending={pending}
+          pendingLabel={pendingLabel ?? defaultPendingLabel(confirmLabel)}
           className={tone === "danger" ? "bg-danger text-bg shadow-none hover:brightness-110" : undefined}
         >
-          {pending && <Loader2 aria-hidden className="size-4 animate-spin" />}
           {confirmLabel}
         </Button>
       </div>

@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState } from "react";
-import { Loader2 } from "lucide-react";
 import { updatePasswordAction, type ResetPasswordState } from "./actions";
 import { adminInput } from "@/components/admin/ui";
 import { Button } from "@/components/ui/button";
@@ -50,14 +49,8 @@ export function ResetPasswordForm() {
           {state.error}
         </p>
       )}
-      <Button type="submit" size="lg" className="w-full" disabled={pending}>
-        {pending ? (
-          <>
-            <Loader2 aria-hidden className="size-4 animate-spin" /> Saving…
-          </>
-        ) : (
-          "Set new password"
-        )}
+      <Button type="submit" size="lg" className="w-full" pending={pending} pendingLabel="Saving…">
+        Set new password
       </Button>
     </form>
   );

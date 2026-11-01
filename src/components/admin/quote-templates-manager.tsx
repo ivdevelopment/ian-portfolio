@@ -10,6 +10,7 @@ import type { QuoteTemplateRecord } from "@/lib/quotes/types";
 import { cn } from "@/lib/utils";
 import { AdminSelect } from "./admin-select";
 import { ConfirmDialog } from "./confirm-dialog";
+import { NETWORK_ERROR } from "./use-action-runner";
 import { Field, SaveBar } from "./form-bits";
 import { Badge, EmptyState, Panel, adminInput } from "./ui";
 import { useDirtySaveState } from "./use-dirty-save";
@@ -91,10 +92,14 @@ export function QuoteTemplatesManager({ templates }: { templates: QuoteTemplateR
         }}
         onConfirm={() =>
           startTransition(async () => {
-            const result = await deleteTemplateAction(deleting!.id);
-            if (!result.ok) return setError(result.error);
-            setDeleting(null);
-            router.refresh();
+            try {
+              const result = await deleteTemplateAction(deleting!.id);
+              if (!result.ok) return setError(result.error);
+              setDeleting(null);
+              router.refresh();
+            } catch {
+              setError(NETWORK_ERROR);
+            }
           })
         }
       >

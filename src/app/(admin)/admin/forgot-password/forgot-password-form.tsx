@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState } from "react";
-import { Loader2 } from "lucide-react";
 import { requestPasswordResetAction, type ForgotPasswordState } from "./actions";
 import { adminInput } from "@/components/admin/ui";
 import { Button } from "@/components/ui/button";
@@ -44,14 +43,8 @@ export function ForgotPasswordForm() {
           Enter a valid email address.
         </p>
       )}
-      <Button type="submit" size="lg" className="w-full" disabled={pending}>
-        {pending ? (
-          <>
-            <Loader2 aria-hidden className="size-4 animate-spin" /> Sending…
-          </>
-        ) : (
-          "Send recovery link"
-        )}
+      <Button type="submit" size="lg" className="w-full" pending={pending} pendingLabel="Sending…">
+        Send recovery link
       </Button>
     </form>
   );

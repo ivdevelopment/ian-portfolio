@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Check, Copy, Loader2 } from "lucide-react";
+import { Check, Copy } from "lucide-react";
 import {
   createInvitationAction,
   deleteInvitationAction,
@@ -11,6 +11,7 @@ import {
 import { EXPIRY_OPTIONS_DAYS } from "@/lib/review-tokens";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "./confirm-dialog";
+import { NETWORK_ERROR } from "./use-action-runner";
 import { Panel, adminInput, formatDateTime } from "./ui";
 
 type ProjectOption = { id: string; title: string };
@@ -31,22 +32,27 @@ export function InviteForm({ projects }: { projects: ProjectOption[] }) {
     const data = new FormData(form);
     setError(null);
     setFieldErrors({});
+    if (pending) return;
     startTransition(async () => {
-      const result = await createInvitationAction({
-        clientName: String(data.get("clientName") ?? ""),
-        email: String(data.get("email") ?? ""),
-        projectId: String(data.get("projectId") ?? ""),
-        expiresInDays: Number(data.get("expiresInDays")),
-      });
-      if (!result.ok) {
-        setError(result.error);
-        setFieldErrors(result.fieldErrors ?? {});
-        return;
+      try {
+        const result = await createInvitationAction({
+          clientName: String(data.get("clientName") ?? ""),
+          email: String(data.get("email") ?? ""),
+          projectId: String(data.get("projectId") ?? ""),
+          expiresInDays: Number(data.get("expiresInDays")),
+        });
+        if (!result.ok) {
+          setError(result.error);
+          setFieldErrors(result.fieldErrors ?? {});
+          return;
+        }
+        form.reset();
+        setIssued({ url: result.url, expiresAt: result.expiresAt });
+        setCopied(false);
+        router.refresh();
+      } catch {
+        setError(NETWORK_ERROR);
       }
-      form.reset();
-      setIssued({ url: result.url, expiresAt: result.expiresAt });
-      setCopied(false);
-      router.refresh();
     });
   };
 
@@ -152,8 +158,7 @@ export function InviteForm({ projects }: { projects: ProjectOption[] }) {
           </select>
         </div>
         <div className="sm:col-span-2 lg:col-span-4">
-          <Button type="submit" size="sm" disabled={pending}>
-            {pending && <Loader2 aria-hidden className="size-4 animate-spin" />}
+          <Button type="submit" size="sm" pending={pending} pendingLabel="Creating link…">
             Create link
           </Button>
           {error && (
@@ -201,19 +206,25 @@ export function InvitationRowActions({ id, label, status }: InvitationRowActions
         open={mode !== null}
         title={mode === "revoke" ? `Revoke the link for “${label}”?` : `Delete the invitation for “${label}”?`}
         confirmLabel={mode === "revoke" ? "Revoke link" : "Delete invitation"}
+        pendingLabel={mode === "revoke" ? "Revoking link…" : "Deleting invitation…"}
         pending={pending}
         error={error}
         onClose={() => setMode(null)}
         onConfirm={() => {
           setError(null);
+          if (pending) return;
           startTransition(async () => {
-            const result = mode === "revoke" ? await revokeInvitationAction(id) : await deleteInvitationAction(id);
-            if (!result.ok) {
-              setError(result.error);
-              return;
+            try {
+              const result = mode === "revoke" ? await revokeInvitationAction(id) : await deleteInvitationAction(id);
+              if (!result.ok) {
+                setError(result.error);
+                return;
+              }
+              setMode(null);
+              router.refresh();
+            } catch {
+              setError(NETWORK_ERROR);
             }
-            setMode(null);
-            router.refresh();
           });
         }}
       >

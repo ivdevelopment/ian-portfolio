@@ -11,7 +11,6 @@ import {
   ArrowUp,
   CheckCircle2,
   Eye,
-  Loader2,
   Plus,
   Trash2,
 } from "lucide-react";
@@ -636,22 +635,19 @@ export function ProjectEditor({ mode, initial, notice }: Props) {
           <div className="mt-5 flex flex-col gap-2">
             {wasPublished ? (
               <>
-                <Button onClick={() => save(true)} disabled={saving || !isDirty}>
-                  {saving && published && <Loader2 aria-hidden className="size-4 animate-spin" />}
-                  {saving && published ? "Saving…" : "Save changes"}
+                <Button onClick={() => save(true)} disabled={saving || !isDirty} pending={saving && published} pendingLabel="Saving…">
+                  Save changes
                 </Button>
-                <Button variant="secondary" onClick={() => save(false)} disabled={saving}>
+                <Button variant="secondary" onClick={() => save(false)} disabled={saving} pending={saving && !published} pendingLabel="Moving to draft…">
                   Move to draft
                 </Button>
               </>
             ) : (
               <>
-                <Button onClick={() => save(true)} disabled={saving}>
-                  {saving && published && <Loader2 aria-hidden className="size-4 animate-spin" />}
+                <Button onClick={() => save(true)} disabled={saving} pending={saving && published} pendingLabel="Publishing…">
                   Publish
                 </Button>
-                <Button variant="secondary" onClick={() => save(false)} disabled={saving}>
-                  {saving && !published && <Loader2 aria-hidden className="size-4 animate-spin" />}
+                <Button variant="secondary" onClick={() => save(false)} disabled={saving} pending={saving && !published} pendingLabel="Saving draft…">
                   Save draft
                 </Button>
               </>

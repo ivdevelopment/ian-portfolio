@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { AlertTriangle, CheckCircle2, FileUp, Loader2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, FileUp } from "lucide-react";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { IMPORT_FIELDS, type ColumnMapping, type ImportFieldKey } from "@/lib/prospects/import";
 import type { CommitResult, ValidationReport } from "@/lib/prospects/import-service";
@@ -135,9 +135,9 @@ export function ProspectImport() {
             }}
             className={cn(adminInput, "h-10 max-w-sm py-1.5 file:mr-3 file:rounded-full file:border-0 file:bg-glass-strong file:px-3 file:py-1 file:text-sm file:text-ink")}
           />
-          <Button size="sm" icon="none" disabled={!file || busy !== null} onClick={() => void parse()}>
-            {busy === "parse" ? <Loader2 aria-hidden className="size-4 animate-spin" /> : <FileUp aria-hidden className="size-4" />}
-            {busy === "parse" ? "Reading…" : "Read file"}
+          <Button size="sm" icon="none" disabled={!file || busy !== null} pending={busy === "parse"} pendingLabel="Reading file…" onClick={() => void parse()}>
+            <FileUp aria-hidden className="size-4" />
+            Read file
           </Button>
         </div>
         <p className="mt-3 text-xs text-subtle">
@@ -202,9 +202,8 @@ export function ProspectImport() {
           </div>
 
           <div className="mt-4">
-            <Button size="sm" icon="none" disabled={!companyMapped || busy !== null} onClick={() => void validate()}>
-              {busy === "validate" && <Loader2 aria-hidden className="size-4 animate-spin" />}
-              {busy === "validate" ? "Checking…" : "Check rows"}
+            <Button size="sm" icon="none" disabled={!companyMapped || busy !== null} pending={busy === "validate"} pendingLabel="Checking rows…" onClick={() => void validate()}>
+              Check rows
             </Button>
             {!companyMapped && <span className="ml-3 text-xs text-danger">Map the Company column first.</span>}
           </div>
@@ -278,9 +277,8 @@ export function ProspectImport() {
           )}
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <Button size="sm" icon="none" disabled={importable === 0 || busy !== null} onClick={() => void commit()}>
-              {busy === "commit" && <Loader2 aria-hidden className="size-4 animate-spin" />}
-              {busy === "commit" ? "Importing…" : `Import ${importable} ${importable === 1 ? "prospect" : "prospects"}`}
+            <Button size="sm" icon="none" disabled={importable === 0 || busy !== null} pending={busy === "commit"} pendingLabel={`Importing ${importable}…`} onClick={() => void commit()}>
+              Import {importable} {importable === 1 ? "prospect" : "prospects"}
             </Button>
             <p className="text-xs text-subtle">Rows with errors and unticked duplicates are skipped. Nothing is merged or overwritten.</p>
           </div>

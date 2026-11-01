@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { updateNotesAction } from "@/app/(admin)/admin/(panel)/prospects/actions";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -37,9 +37,8 @@ export function ProspectNotes({ id, initial }: { id: string; initial: string }) 
           )}
           {status.kind !== "error" && dirty && !saving && <span className="text-muted">Unsaved changes</span>}
         </div>
-        <Button size="sm" icon="none" disabled={!dirty || saving} onClick={() => void save()}>
-          {saving && <Loader2 aria-hidden className="size-4 animate-spin" />}
-          {saving ? "Saving…" : "Save notes"}
+        <Button size="sm" icon="none" disabled={!dirty} pending={saving} pendingLabel="Saving notes…" onClick={() => void save()}>
+          Save notes
         </Button>
       </div>
     </div>

@@ -1,95 +1,75 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
-import {
-  deleteReviewAction,
-  setReviewFeaturedAction,
-  setReviewStatusAction,
-  type ReviewActionResult,
-} from "@/app/(admin)/admin/(panel)/reviews/actions";
+import { useState } from "react";
+import { deleteReviewAction, setReviewFeaturedAction, setReviewStatusAction } from "@/app/(admin)/admin/(panel)/reviews/actions";
 import type { ReviewStatus } from "@/lib/schemas/review";
 import { cn } from "@/lib/utils";
 import { ConfirmDialog } from "./confirm-dialog";
+import { RowTextButton, rowTextButtonClass as btn } from "./icon-button";
+import { useActionRunner } from "./use-action-runner";
 
 type Props = { review: { id: string; name: string; status: ReviewStatus; featured: boolean } };
 
-const btn =
-  "inline-flex h-8 items-center rounded-md border border-line px-2.5 text-xs text-muted transition-colors " +
-  "hover:border-line-strong hover:bg-glass-strong hover:text-ink disabled:pointer-events-none disabled:opacity-50";
-
 export function ReviewRowActions({ review }: Props) {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const { run, active, pending, error, setError } = useActionRunner();
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const run = (action: () => Promise<ReviewActionResult>) => {
-    setError(null);
-    startTransition(async () => {
-      const result = await action();
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-      router.refresh();
-    });
-  };
-  const setStatus = (status: ReviewStatus) => run(() => setReviewStatusAction(review.id, status));
+  const setStatus = (key: string, status: ReviewStatus) => run(key, () => setReviewStatusAction(review.id, status));
   const { status } = review;
 
   return (
     <div className="flex flex-col items-start gap-1.5 sm:items-end">
       <div className="flex flex-wrap gap-1.5 sm:justify-end">
         {(status === "pending" || status === "rejected" || status === "archived") && (
-          <button type="button" className={btn} disabled={pending} onClick={() => setStatus("approved")}>
+          <RowTextButton busy={active === "approve"} busyLabel={status === "archived" ? "Restoring…" : "Approving…"} disabled={pending} onClick={() => setStatus("approve", "approved")}>
             {status === "archived" ? "Restore & publish" : "Approve"}
-          </button>
+          </RowTextButton>
         )}
         {status === "pending" && (
-          <button type="button" className={btn} disabled={pending} onClick={() => setStatus("rejected")}>
+          <RowTextButton busy={active === "reject"} busyLabel="Rejecting…" disabled={pending} onClick={() => setStatus("reject", "rejected")}>
             Reject
-          </button>
+          </RowTextButton>
         )}
         {status === "approved" && (
           <>
-            <button
-              type="button"
-              className={cn(btn, review.featured && "border-accent/50 text-ink")}
+            <RowTextButton
+              busy={active === "feature"}
+              busyLabel={review.featured ? "Unfeaturing…" : "Featuring…"}
+              className={cn(review.featured && "border-accent/50 text-ink")}
               aria-pressed={review.featured}
               disabled={pending}
-              onClick={() => run(() => setReviewFeaturedAction(review.id, !review.featured))}
+              onClick={() => run("feature", () => setReviewFeaturedAction(review.id, !review.featured))}
             >
               {review.featured ? "Unfeature" : "Feature"}
-            </button>
-            <button type="button" className={btn} disabled={pending} onClick={() => setStatus("archived")}>
+            </RowTextButton>
+            <RowTextButton busy={active === "archive"} busyLabel="Archiving…" disabled={pending} onClick={() => setStatus("archive", "archived")}>
               Archive
-            </button>
+            </RowTextButton>
           </>
         )}
         {(status === "pending" || status === "rejected") && (
-          <button type="button" className={btn} disabled={pending} onClick={() => setStatus("archived")}>
+          <RowTextButton busy={active === "archive"} busyLabel="Archiving…" disabled={pending} onClick={() => setStatus("archive", "archived")}>
             Archive
-          </button>
+          </RowTextButton>
         )}
         <Link href={`/admin/reviews/${review.id}/edit`} className={btn}>
           Edit
         </Link>
-        <button
-          type="button"
-          className={cn(btn, "hover:border-danger/50 hover:text-danger")}
+        <RowTextButton
+          busy={false}
+          busyLabel="Deleting…"
+          className="hover:border-danger/50 hover:text-danger"
           disabled={pending}
           onClick={() => {
-            setDeleteError(null);
+            setError(null);
             setConfirmOpen(true);
           }}
         >
           Delete
-        </button>
+        </RowTextButton>
       </div>
-      {error && (
+      {error && !confirmOpen && (
         <p role="alert" className="text-xs text-danger">
           {error}
         </p>
@@ -99,21 +79,10 @@ export function ReviewRowActions({ review }: Props) {
         open={confirmOpen}
         title={`Delete the review by “${review.name}”?`}
         confirmLabel="Delete review"
-        pending={pending}
-        error={deleteError}
+        pending={active === "delete"}
+        error={confirmOpen ? error : null}
         onClose={() => setConfirmOpen(false)}
-        onConfirm={() => {
-          setDeleteError(null);
-          startTransition(async () => {
-            const result = await deleteReviewAction(review.id);
-            if (!result.ok) {
-              setDeleteError(result.error);
-              return;
-            }
-            setConfirmOpen(false);
-            router.refresh();
-          });
-        }}
+        onConfirm={() => run("delete", () => deleteReviewAction(review.id), () => setConfirmOpen(false))}
       >
         <p>
           This permanently deletes the review, including the client&apos;s original submission. This can&apos;t be
