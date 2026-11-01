@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { adminModules } from "./admin-modules";
 
@@ -32,6 +33,18 @@ export function AdminNav() {
             "flex items-center gap-3 rounded-md px-3 py-2 text-sm whitespace-nowrap transition-colors",
             active ? "bg-glass-strong text-ink" : "text-muted",
           );
+
+          if (mod.external && mod.href) {
+            return (
+              <li key={mod.id} className="md:mt-3 md:border-t md:border-line md:pt-3">
+                <a href={mod.href} className={cn(classes, "hover:bg-glass hover:text-ink")}>
+                  <mod.icon aria-hidden className="size-4 shrink-0" />
+                  <span>{mod.label}</span>
+                  <ExternalLink aria-hidden className="ml-auto size-3.5 opacity-70" />
+                </a>
+              </li>
+            );
+          }
 
           return (
             <li key={mod.id}>

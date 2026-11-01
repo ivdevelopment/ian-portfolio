@@ -1,16 +1,12 @@
 import Link from "next/link";
+import { ExternalLink } from "lucide-react";
 import { Suspense } from "react";
 import { requireAdmin } from "@/lib/auth";
 import { AdminPageHeader, Badge, EmptyState, Panel, formatDate } from "@/components/admin/ui";
 import { InquiryStatusBadge } from "@/components/admin/inquiry-status";
 import { ButtonLink } from "@/components/ui/button";
 import { SectionSkeleton } from "@/components/ui/loading";
-import { FollowUpCell, ProspectStatusBadge } from "@/components/admin/prospect-ui";
-import { brusselsToday } from "@/lib/prospects/dates";
-import { formatEur } from "@/lib/prospects/money";
-import { getSummary, listFollowUpQueue } from "@/lib/prospects/queries";
-import { formatCents } from "@/lib/quotes/money";
-import { getQuoteMetrics } from "@/lib/quotes/queries";
+import { crmOrigin } from "@/lib/crm/host";
 
 export default async function AdminDashboardPage() {
   const { supabase } = await requireAdmin();
@@ -71,11 +67,16 @@ export default async function AdminDashboardPage() {
     <>
       <AdminPageHeader
         title="Dashboard"
-        description="A quick look at your portfolio."
+        description="Your website: portfolio, reviews, inquiries and media."
         actions={
-          <ButtonLink href="/admin/projects/new" size="sm" icon="none">
-            New project
-          </ButtonLink>
+          <>
+            <ButtonLink href={crmOrigin()} external variant="secondary" size="sm">
+              Open CRM
+            </ButtonLink>
+            <ButtonLink href="/admin/projects/new" size="sm" icon="none">
+              New project
+            </ButtonLink>
+          </>
         }
       />
 
@@ -88,15 +89,16 @@ export default async function AdminDashboardPage() {
         ))}
       </dl>
 
-      {/* These two read other tables: they stream in after the cards so the dashboard is usable straight away. */}
-      <Suspense fallback={<SectionSkeleton title="sales follow-ups" lines={4} />}>
-        <SalesPanel />
+      {/* The business side (prospects, pipeline, quotes, email) lives in the CRM. */}
+      <Panel className="mt-6" title="CRM" description="Prospects, follow-ups, pipeline, quotes and email are in the CRM workspace.">
+        <a href={crmOrigin()} className="inline-flex items-center gap-2 text-sm text-accent underline-offset-4 hover:underline">
+          Open CRM <ExternalLink aria-hidden className="size-3.5" />
+        </a>
+      </Panel>
+
+      <Suspense fallback={<SectionSkeleton title="client previews" lines={2} />}>
+        <PreviewsPanel />
       </Suspense>
-      <div className="mt-4">
-        <Suspense fallback={<SectionSkeleton title="quotes" lines={2} />}>
-          <QuotesPanel />
-        </Suspense>
-      </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <Panel
@@ -199,101 +201,26 @@ export default async function AdminDashboardPage() {
   );
 }
 
-async function SalesPanel() {
-  const today = brusselsToday();
-  const [crm, queue] = await Promise.all([getSummary(today), listFollowUpQueue(4, today)]);
+/** Client preview hosting is website infrastructure: how many are live, and the way into them. */
+async function PreviewsPanel() {
+  const { supabase } = await requireAdmin();
+  const [all, active] = await Promise.all([
+    supabase.from("client_previews").select("id", { count: "exact", head: true }),
+    supabase.from("client_previews").select("id", { count: "exact", head: true }).eq("active", true),
+  ]);
   return (
-      <Panel
-        className="mt-6"
-        title="Sales follow-ups"
-        actions={
-          <span className="flex gap-3 text-xs">
-            <Link href="/admin/prospects/kanban" className="text-muted hover:text-ink">
-              Open pipeline
-            </Link>
-            <Link href="/admin/prospects?view=list" className="text-muted hover:text-ink">
-              View prospects
-            </Link>
-          </span>
-        }
-      >
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
-          <div>
-            <dl className="grid grid-cols-3 gap-3 text-sm">
-              <Link href="/admin/prospects?followup=overdue" className="rounded-md border border-line p-2.5 hover:border-line-strong">
-                <dd className={"text-lg font-medium tabular-nums " + (crm.followups_overdue > 0 ? "text-danger" : "")}>{crm.followups_overdue}</dd>
-                <dt className="text-xs text-muted">Overdue</dt>
-              </Link>
-              <Link href="/admin/prospects?followup=today" className="rounded-md border border-line p-2.5 hover:border-line-strong">
-                <dd className="text-lg font-medium tabular-nums">{crm.followups_today}</dd>
-                <dt className="text-xs text-muted">Today</dt>
-              </Link>
-              <Link href="/admin/prospects?followup=week" className="rounded-md border border-line p-2.5 hover:border-line-strong">
-                <dd className="text-lg font-medium tabular-nums">{crm.followups_week}</dd>
-                <dt className="text-xs text-muted">Later this week</dt>
-              </Link>
-            </dl>
-            <p className="mt-3 text-xs text-muted">
-              {crm.total} prospects · {crm.replies} {crm.replies === 1 ? "reply" : "replies"}
-              {crm.pipeline_count > 0 ? ` · pipeline ${formatEur(crm.pipeline_value)}` : ""}
-            </p>
-          </div>
-          {queue.length === 0 ? (
-            <EmptyState>No follow-ups coming up.</EmptyState>
-          ) : (
-            <ul className="divide-y divide-line">
-              {queue.map((q) => (
-                <li key={q.id} className="flex items-center justify-between gap-3 py-2">
-                  <div className="min-w-0">
-                    <Link href={`/admin/prospects/${q.id}`} className="block truncate text-sm font-medium hover:text-accent">
-                      {q.company_name}
-                    </Link>
-                    <ProspectStatusBadge status={q.status} />
-                  </div>
-                  <FollowUpCell day={q.next_follow_up_on} status={q.status} today={today} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </Panel>
-  );
-}
-
-async function QuotesPanel() {
-  const quotes = await getQuoteMetrics(brusselsToday());
-  return (
-      <Panel
-        title="Quotes"
-        actions={
-          <span className="flex gap-3 text-xs">
-            <Link href="/admin/quotes/new" className="text-muted hover:text-ink">
-              New quote
-            </Link>
-            <Link href="/admin/quotes" className="text-muted hover:text-ink">
-              View quotes
-            </Link>
-          </span>
-        }
-      >
-        <dl className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
-          <Link href="/admin/quotes?status=draft" className="rounded-md border border-line p-2.5 hover:border-line-strong">
-            <dd className="text-lg font-medium tabular-nums">{quotes.draft.count + quotes.ready.count}</dd>
-            <dt className="text-xs text-muted">Draft{quotes.ready.count > 0 ? ` (${quotes.ready.count} ready)` : ""}</dt>
-          </Link>
-          <Link href="/admin/quotes?status=sent" className="rounded-md border border-line p-2.5 hover:border-line-strong">
-            <dd className="text-lg font-medium tabular-nums">{quotes.sent.count}</dd>
-            <dt className="text-xs text-muted">Sent{quotes.expired.count > 0 ? ` (${quotes.expired.count} expired)` : ""}</dt>
-          </Link>
-          <Link href="/admin/quotes?status=accepted" className="rounded-md border border-line p-2.5 hover:border-line-strong">
-            <dd className="text-lg font-medium tabular-nums">{quotes.accepted.count}</dd>
-            <dt className="text-xs text-muted">Accepted{quotes.accepted.count > 0 ? ` · ${formatCents(quotes.accepted.netCents)}` : ""}</dt>
-          </Link>
-          <div className="rounded-md border border-line p-2.5">
-            <dd className="text-lg font-medium tabular-nums">{quotes.open.count > 0 ? formatCents(quotes.open.netCents) : "—"}</dd>
-            <dt className="text-xs text-muted">Open quoted value, excl. VAT</dt>
-          </div>
-        </dl>
-      </Panel>
+    <Panel
+      className="mt-4"
+      title="Client previews"
+      actions={
+        <Link href="/admin/previews" className="text-xs text-muted hover:text-ink">
+          Manage
+        </Link>
+      }
+    >
+      <p className="text-sm text-muted">
+        <span className="text-lg font-medium text-ink tabular-nums">{active.count ?? 0}</span> active of {all.count ?? 0} client {all.count === 1 ? "preview" : "previews"}.
+      </p>
+    </Panel>
   );
 }

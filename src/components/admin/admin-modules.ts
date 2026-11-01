@@ -1,5 +1,4 @@
 import {
-  FileSignature,
   FileText,
   FolderKanban,
   Globe,
@@ -11,6 +10,7 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react";
+import { crmOrigin } from "@/lib/crm/host";
 
 export type AdminModule = {
   id: string;
@@ -21,6 +21,8 @@ export type AdminModule = {
   href?: string;
   /** Short note shown on placeholder modules. */
   note?: string;
+  /** Another application (opens by full URL). */
+  external?: boolean;
 };
 
 export const adminModules: AdminModule[] = [
@@ -33,24 +35,10 @@ export const adminModules: AdminModule[] = [
   },
   {
     id: "projects",
-    label: "Projects",
-    description: "Create, edit, publish, feature and delete projects, and manage their media.",
+    label: "Portfolio",
+    description: "The projects shown on the public website: create, edit, publish and feature them, and manage their media.",
     icon: FolderKanban,
     href: "/admin/projects",
-  },
-  {
-    id: "prospects",
-    label: "Prospects",
-    description: "Website-sales CRM: prospects, follow-ups and activity.",
-    icon: Users,
-    href: "/admin/prospects",
-  },
-  {
-    id: "quotes",
-    label: "Quotes",
-    description: "Offertes: build a quote, generate the PDF and track the answer.",
-    icon: FileSignature,
-    href: "/admin/quotes",
   },
   {
     id: "previews",
@@ -93,5 +81,13 @@ export const adminModules: AdminModule[] = [
     description: "Site details, social links and SEO defaults.",
     icon: Settings,
     href: "/admin/settings",
+  },
+  {
+    id: "crm",
+    label: "Open CRM",
+    description: "Prospects, pipeline, quotes and email live in the CRM workspace.",
+    icon: Users,
+    href: crmOrigin(),
+    external: true,
   },
 ];
