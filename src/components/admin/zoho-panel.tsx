@@ -87,6 +87,17 @@ export function ZohoPanel({ connection, lastRun }: { connection: PanelConnection
               Matched outgoing mail by folder: {Object.entries(report.outgoingByFolder).map(([f, n]) => `${f} ${n}`).join(" · ")}
             </p>
           )}
+          {report.capabilities && (
+            <div className="mt-3 text-xs text-muted">
+              <p className="font-medium text-ink">Read-only capability checks</p>
+              <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                <li>Result pages: {report.pages.join(", ") || "none"}</li>
+                <li>Pagination: {report.capabilities.pagination.ok ? "ok" : "problem"} ({report.capabilities.pagination.note})</li>
+                <li>Message read: {report.capabilities.messageRead.ok ? `ok (fields: ${report.capabilities.messageRead.fields.join(", ")})` : report.capabilities.messageRead.error}{report.capabilities.messageRead.folderName ? ` · folder: ${report.capabilities.messageRead.folderName}` : ""}</li>
+                <li>Folder names: {report.capabilities.folders.ok ? Object.entries(report.capabilities.folders.names).map(([id, n]) => `${id}=${n}`).join(", ") : `not available (${report.capabilities.folders.error})`}</li>
+              </ul>
+            </div>
+          )}
           {report.watched.length > 0 && (
             <div className="mt-3 text-xs text-muted">
               <p className="font-medium text-ink">Notes saying “Getoond in Zoho Drafts” (notes are never changed)</p>

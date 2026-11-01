@@ -39,6 +39,16 @@ export type SyncReport = {
   /** Messages whose other party's address belongs to two or more prospects: reported, never linked. */
   ambiguous: number;
   rateLimitRetries: number;
+  /** Sizes of the result pages Zoho returned (proves pagination behaviour). */
+  pages: number[];
+  /** Read-only capability evidence gathered by a dry run. */
+  capabilities?: {
+    folders: { ok: boolean; error: string | null; names: Record<string, string> };
+    messageRead: { ok: boolean; error: string | null; fields: string[]; folderName: string | null };
+    pagination: { ok: boolean; note: string };
+  };
+  /** The first matched message, used by the dry run to prove a single-message read works. */
+  sample: { messageId: string; folderId: string } | null;
   skippedUnusable: number;
   matched: number;
   alreadyStored: number;
@@ -53,7 +63,7 @@ export type SyncReport = {
 };
 
 export function emptyReport(mode: SyncReport["mode"], windowFrom: string): SyncReport {
-  return { mode, windowFrom, checked: 0, unique: 0, duplicateIds: 0, incoming: 0, outgoing: 0, unmatched: 0, ambiguous: 0, rateLimitRetries: 0, skippedUnusable: 0, matched: 0, alreadyStored: 0, stored: 0, errors: [], outgoingByFolder: {}, watched: [], preview: [] };
+  return { mode, windowFrom, checked: 0, unique: 0, duplicateIds: 0, incoming: 0, outgoing: 0, unmatched: 0, ambiguous: 0, rateLimitRetries: 0, pages: [], sample: null, skippedUnusable: 0, matched: 0, alreadyStored: 0, stored: 0, errors: [], outgoingByFolder: {}, watched: [], preview: [] };
 }
 
 export type SyncOptions = {
@@ -107,6 +117,7 @@ export async function runSync(options: SyncOptions): Promise<SyncReport> {
       break;
     }
     if (next.done) break;
+    report.pages.push(next.value.length);
 
     const records: Array<MailRecord & { prospect_id: string }> = [];
     for (const raw of next.value) {
@@ -131,6 +142,7 @@ export async function runSync(options: SyncOptions): Promise<SyncReport> {
         continue;
       }
       report.matched++;
+      if (!report.sample && record.folder_id) report.sample = { messageId: record.provider_message_id, folderId: record.folder_id };
       if (record.direction === "outgoing") {
         const folder = (record.folder_id && options.folderNames?.get(record.folder_id)) || record.folder_id || "unknown";
         report.outgoingByFolder[folder] = (report.outgoingByFolder[folder] ?? 0) + 1;

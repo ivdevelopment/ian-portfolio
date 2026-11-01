@@ -6,7 +6,7 @@ import { createTokenSource, ZohoMailClient } from "./client";
 import { getZohoConfig, ZOHO_READ_SCOPES, type ZohoConfig } from "./config";
 import { decryptToken, encryptToken } from "./crypto";
 import { exchangeCode, revokeRefreshToken, ZohoError } from "./oauth";
-import { emptyReport, incrementalStart, runSync, type MailStore, type SyncReport } from "./sync";
+import { emptyReport, incrementalStart, runSync, zohoSearchDate, type MailStore, type SyncReport } from "./sync";
 import type { MailRecord } from "./normalize";
 import type { MailRow } from "@/lib/mail/timeline";
 
@@ -138,7 +138,8 @@ export async function syncNow(config: ZohoConfig, opts: { dryRun: boolean; windo
   try {
     const refreshToken = decryptToken(conn.refresh_token_encrypted, config.encryptionKey);
     const client = new ZohoMailClient(config, createTokenSource(config, refreshToken));
-    const folderNames = (await client.getFolderNames(conn.provider_account_id)) ?? undefined;
+    const folders = await client.getFolderNames(conn.provider_account_id);
+    const folderNames = folders.names ?? undefined;
     report = await runSync({
       watch,
       folderNames,
@@ -150,6 +151,7 @@ export async function syncNow(config: ZohoConfig, opts: { dryRun: boolean; windo
       from,
       dryRun: opts.dryRun,
     });
+    if (opts.dryRun) report.capabilities = await probeCapabilities(client, conn.provider_account_id, from, report, folders);
   } catch (error) {
     const auth = error instanceof ZohoError && error.kind === "auth";
     if (auth) await supabase.from("mail_connections").update({ status: "needs_reconnect" }).eq("id", conn.id);
@@ -166,7 +168,7 @@ export async function syncNow(config: ZohoConfig, opts: { dryRun: boolean; windo
         messages_matched: report.matched,
         messages_stored: report.stored,
         errors: report.errors as never,
-        preview: { sample: report.preview, watched: report.watched, outgoingByFolder: report.outgoingByFolder, stats: { unique: report.unique, incoming: report.incoming, outgoing: report.outgoing, unmatched: report.unmatched, ambiguous: report.ambiguous, duplicateIds: report.duplicateIds, rateLimitRetries: report.rateLimitRetries } } as never,
+        preview: { sample: report.preview, watched: report.watched, outgoingByFolder: report.outgoingByFolder, capabilities: report.capabilities ?? null, pages: report.pages, stats: { unique: report.unique, incoming: report.incoming, outgoing: report.outgoing, unmatched: report.unmatched, ambiguous: report.ambiguous, duplicateIds: report.duplicateIds, rateLimitRetries: report.rateLimitRetries } } as never,
       })
       .eq("id", run.data.id);
   }
@@ -175,6 +177,34 @@ export async function syncNow(config: ZohoConfig, opts: { dryRun: boolean; windo
     await supabase.from("mail_connections").update({ last_sync_at: new Date().toISOString(), sync_from: today }).eq("id", conn.id);
   }
   return report;
+}
+
+/** Minimal read-only probes for the dry run: folder list, one message's metadata, and that two pages don't overlap. */
+async function probeCapabilities(client: ZohoMailClient, accountId: string, from: string, report: SyncReport, folders: Awaited<ReturnType<ZohoMailClient["getFolderNames"]>>): Promise<NonNullable<SyncReport["capabilities"]>> {
+  const out: NonNullable<SyncReport["capabilities"]> = {
+    folders: { ok: Boolean(folders.names), error: folders.error, names: Object.fromEntries(folders.names ?? []) },
+    messageRead: { ok: false, error: report.sample ? null : "no matched message to read", fields: [], folderName: null },
+    pagination: { ok: false, note: "not tested" },
+  };
+  if (report.sample) {
+    try {
+      const details = await client.getMessageDetails(accountId, report.sample.folderId, report.sample.messageId);
+      out.messageRead = { ok: true, error: null, fields: Object.keys(details).sort(), folderName: typeof details.folderName === "string" ? details.folderName : null };
+    } catch (error) {
+      out.messageRead = { ok: false, error: error instanceof ZohoError ? `${error.kind}${error.status ? ` (HTTP ${error.status})` : ""}: ${error.message}` : "unexpected error", fields: [], folderName: null };
+    }
+  }
+  try {
+    const key = `fromDate:${zohoSearchDate(from)}`;
+    const first = await client.searchMessages(accountId, key, 1, 10);
+    const second = await client.searchMessages(accountId, key, 11, 10);
+    const ids = new Set(first.map((m) => String(m.messageId)));
+    const overlap = second.filter((m) => ids.has(String(m.messageId))).length;
+    out.pagination = { ok: overlap === 0 && first.length <= 10 && second.length <= 10, note: `page 1 returned ${first.length}, page 2 (start=11) returned ${second.length}, overlap ${overlap}` };
+  } catch (error) {
+    out.pagination = { ok: false, note: error instanceof ZohoError ? error.message : "unexpected error" };
+  }
+  return out;
 }
 
 /** The mail linked to one prospect, newest first (metadata only). Empty when the integration is off or not connected. */

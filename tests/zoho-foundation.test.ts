@@ -362,6 +362,13 @@ describe("sync", () => {
     ].sort((x, y) => report.watched.findIndex((w) => w.prospect_id === x.prospect_id) - report.watched.findIndex((w) => w.prospect_id === y.prospect_id)));
   });
 
+  it("records the page sizes Zoho returned and a sample message for the read probe", async () => {
+    const { store } = memoryStore();
+    const report = await run(fakeClient([[raw(1, "geert@geertkips.be", mailbox, { folderId: 5 })], [raw(2, mailbox, "info@vaultone.be")]]), store, { dryRun: true });
+    expect(report.pages).toEqual([1, 1]);
+    expect(report.sample).toEqual({ messageId: "1", folderId: "5" });
+  });
+
   it("uses Zoho's search date format and overlaps incremental runs by a day", () => {
     expect(zohoSearchDate("2026-11-01")).toBe("01-Nov-2026");
     expect(zohoSearchDate("2026-12-09")).toBe("09-Dec-2026");

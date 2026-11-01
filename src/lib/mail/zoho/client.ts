@@ -50,14 +50,22 @@ export class ZohoMailClient {
       .map((a) => ({ accountId: String(a.accountId), primaryEmail: (a.primaryEmailAddress ?? a.mailboxAddress ?? "").toLowerCase() }));
   }
 
-  /** Best effort (the read scopes may not include folders): id -> name, or null when Zoho doesn't allow it. */
-  async getFolderNames(accountId: string): Promise<Map<string, string> | null> {
+  /** Folder id -> name. The read scopes may not allow this; then the provider's own error is returned for the report. */
+  async getFolderNames(accountId: string): Promise<{ names: Map<string, string> | null; error: string | null }> {
     try {
       const data = await this.request<Array<{ folderId?: string | number; folderName?: string; path?: string }>>(`/api/accounts/${encodeURIComponent(accountId)}/folders`);
-      return new Map(data.filter((f) => f.folderId !== undefined).map((f) => [String(f.folderId), f.folderName ?? f.path ?? String(f.folderId)]));
-    } catch {
-      return null;
+      return { names: new Map(data.filter((f) => f.folderId !== undefined).map((f) => [String(f.folderId), f.folderName ?? f.path ?? String(f.folderId)])), error: null };
+    } catch (error) {
+      return { names: null, error: error instanceof ZohoError ? `${error.kind}${error.status ? ` (HTTP ${error.status})` : ""}: ${error.message}` : "unexpected error" };
     }
+  }
+
+  /** Metadata of one message (scalar fields only, no body): proves single-message read works and shows which fields exist. */
+  async getMessageDetails(accountId: string, folderId: string, messageId: string): Promise<Record<string, string | number | boolean | null>> {
+    const data = await this.request<Record<string, unknown>>(`/api/accounts/${encodeURIComponent(accountId)}/folders/${encodeURIComponent(folderId)}/messages/${encodeURIComponent(messageId)}/details`);
+    const out: Record<string, string | number | boolean | null> = {};
+    for (const [k, v] of Object.entries(data ?? {})) if (v === null || ["string", "number", "boolean"].includes(typeof v)) out[k] = v as never;
+    return out;
   }
 
   searchMessages(accountId: string, searchKey: string, start: number, limit: number): Promise<ZohoMessage[]> {
