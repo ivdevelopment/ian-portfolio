@@ -160,10 +160,10 @@ describe.skipIf(!enabled)("P6 prospect CRM", () => {
 
     it("keeps the list summary (last activity) current without loading the timeline", async () => {
       const id = await make("last-activity");
-      await admin.from("prospect_activities").insert({ prospect_id: id, type: "note", title: "Called the owner", occurred_on: "2026-11-01" });
-      await admin.from("prospect_activities").insert({ prospect_id: id, type: "note", title: "Older note", occurred_on: "2026-10-01" });
+      await admin.from("prospect_activities").insert({ prospect_id: id, type: "note", title: "Called the owner", occurred_on: "2099-01-01" });
+      await admin.from("prospect_activities").insert({ prospect_id: id, type: "note", title: "Older note", occurred_on: "2098-01-01" });
       const { data } = await admin.from("prospects").select("last_activity_on, last_activity_title").eq("id", id).single();
-      expect(data).toEqual({ last_activity_on: "2026-11-01", last_activity_title: "Called the owner" });
+      expect(data).toEqual({ last_activity_on: "2099-01-01", last_activity_title: "Called the owner" });
     });
 
     it("rejects unknown activity types, and history cannot be edited (append-only)", async () => {
