@@ -50,6 +50,16 @@ export class ZohoMailClient {
       .map((a) => ({ accountId: String(a.accountId), primaryEmail: (a.primaryEmailAddress ?? a.mailboxAddress ?? "").toLowerCase() }));
   }
 
+  /** Best effort (the read scopes may not include folders): id -> name, or null when Zoho doesn't allow it. */
+  async getFolderNames(accountId: string): Promise<Map<string, string> | null> {
+    try {
+      const data = await this.request<Array<{ folderId?: string | number; folderName?: string; path?: string }>>(`/api/accounts/${encodeURIComponent(accountId)}/folders`);
+      return new Map(data.filter((f) => f.folderId !== undefined).map((f) => [String(f.folderId), f.folderName ?? f.path ?? String(f.folderId)]));
+    } catch {
+      return null;
+    }
+  }
+
   searchMessages(accountId: string, searchKey: string, start: number, limit: number): Promise<ZohoMessage[]> {
     return this.request<ZohoMessage[]>(`/api/accounts/${encodeURIComponent(accountId)}/messages/search`, { searchKey, start, limit });
   }

@@ -1,5 +1,5 @@
 import type { ZohoMailClient } from "./client";
-import { buildProspectIndex, matchProspect, type ProspectEmail } from "./match";
+import { buildProspectIndex, counterpartAddresses, findAmbiguousAddresses, matchProspect, type ProspectEmail } from "./match";
 import { toMailRecord, type MailRecord } from "./normalize";
 import { ZohoError } from "./oauth";
 
@@ -28,14 +28,33 @@ export type SyncReport = {
   mode: "dry_run" | "sync";
   windowFrom: string;
   checked: number;
+  /** Distinct provider message ids among the usable entries. */
+  unique: number;
+  /** The same provider id seen more than once in the scan. */
+  duplicateIds: number;
+  incoming: number;
+  outgoing: number;
+  /** Usable messages that matched no prospect (not stored). */
+  unmatched: number;
+  /** Messages whose other party's address belongs to two or more prospects: reported, never linked. */
+  ambiguous: number;
+  rateLimitRetries: number;
   skippedUnusable: number;
   matched: number;
   alreadyStored: number;
   stored: number;
   errors: string[];
+  /** Matched OUTGOING messages per provider folder (names when the folder list could be read). */
+  outgoingByFolder: Record<string, number>;
+  /** For the prospects given in `watch`: how many outgoing messages to them exist, and in which folders. */
+  watched: Array<{ prospect_id: string; company?: string; outgoing: number; incoming: number; folders: string[] }>;
   /** A small sample of matches (dry run), for review before anything is stored. */
   preview: Array<{ prospect_id: string; direction: "incoming" | "outgoing"; subject: string | null; sent_at: string }>;
 };
+
+export function emptyReport(mode: SyncReport["mode"], windowFrom: string): SyncReport {
+  return { mode, windowFrom, checked: 0, unique: 0, duplicateIds: 0, incoming: 0, outgoing: 0, unmatched: 0, ambiguous: 0, rateLimitRetries: 0, skippedUnusable: 0, matched: 0, alreadyStored: 0, stored: 0, errors: [], outgoingByFolder: {}, watched: [], preview: [] };
+}
 
 export type SyncOptions = {
   client: ZohoMailClient;
@@ -48,6 +67,10 @@ export type SyncOptions = {
   dryRun: boolean;
   maxMessages?: number;
   maxRateLimitRetries?: number;
+  /** Prospects whose history should be reported individually (e.g. notes saying a message was only seen in Drafts). */
+  watch?: ReadonlySet<string>;
+  /** Folder id -> display name, when readable. */
+  folderNames?: ReadonlyMap<string, string>;
   sleep?: (ms: number) => Promise<void>;
 };
 
@@ -61,7 +84,9 @@ export async function runSync(options: SyncOptions): Promise<SyncReport> {
   const sleep = options.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
   const maxRetries = options.maxRateLimitRetries ?? 3;
   const index = buildProspectIndex(prospects);
-  const report: SyncReport = { mode: dryRun ? "dry_run" : "sync", windowFrom: from, checked: 0, skippedUnusable: 0, matched: 0, alreadyStored: 0, stored: 0, errors: [], preview: [] };
+  const ambiguousAddresses = findAmbiguousAddresses(prospects);
+  const report = emptyReport(dryRun ? "dry_run" : "sync", from);
+  const watchedMap = new Map<string, { prospect_id: string; outgoing: number; incoming: number; folders: Set<string> }>();
   const seen = new Set<string>();
 
   const pages = client.searchAll(accountId, `fromDate:${zohoSearchDate(from)}`, { maxMessages: options.maxMessages });
@@ -73,6 +98,7 @@ export async function runSync(options: SyncOptions): Promise<SyncReport> {
     } catch (error) {
       if (error instanceof ZohoError && error.kind === "rate_limit" && retries < maxRetries) {
         retries++;
+        report.rateLimitRetries++;
         await sleep(error.retryAfterMs ?? 5000 * retries);
         // The generator is finished after a throw, so resume from a fresh search that skips what was already seen.
         return mergeReports(report, await runSync({ ...options, maxRateLimitRetries: maxRetries - retries }));
@@ -90,11 +116,31 @@ export async function runSync(options: SyncOptions): Promise<SyncReport> {
         report.skippedUnusable++;
         continue;
       }
-      if (seen.has(record.provider_message_id)) continue;
+      if (seen.has(record.provider_message_id)) {
+        report.duplicateIds++;
+        continue;
+      }
       seen.add(record.provider_message_id);
+      report.unique++;
+      if (record.direction === "incoming") report.incoming++;
+      else report.outgoing++;
       const prospectId = matchProspect(record, index, mailbox);
-      if (!prospectId) continue;
+      if (!prospectId) {
+        if (counterpartAddresses(record, mailbox).some((a) => ambiguousAddresses.has(a))) report.ambiguous++;
+        else report.unmatched++;
+        continue;
+      }
       report.matched++;
+      if (record.direction === "outgoing") {
+        const folder = (record.folder_id && options.folderNames?.get(record.folder_id)) || record.folder_id || "unknown";
+        report.outgoingByFolder[folder] = (report.outgoingByFolder[folder] ?? 0) + 1;
+      }
+      if (options.watch?.has(prospectId)) {
+        const w = watchedMap.get(prospectId) ?? { prospect_id: prospectId, outgoing: 0, incoming: 0, folders: new Set<string>() };
+        w[record.direction]++;
+        w.folders.add((record.folder_id && options.folderNames?.get(record.folder_id)) || record.folder_id || "unknown");
+        watchedMap.set(prospectId, w);
+      }
       records.push({ ...record, prospect_id: prospectId });
       if (report.preview.length < 25) report.preview.push({ prospect_id: prospectId, direction: record.direction, subject: record.subject, sent_at: record.sent_at });
     }
@@ -112,10 +158,11 @@ export async function runSync(options: SyncOptions): Promise<SyncReport> {
       }
     }
   }
+  report.watched = [...watchedMap.values()].map((w) => ({ ...w, folders: [...w.folders].sort() }));
   return report;
 }
 
 /** After a rate-limit pause the run restarts: counts from the retry replace the partial ones; ids already stored are skipped by the store. */
 function mergeReports(partial: SyncReport, retry: SyncReport): SyncReport {
-  return { ...retry, stored: retry.stored + partial.stored, errors: [...partial.errors, ...retry.errors] };
+  return { ...retry, stored: retry.stored + partial.stored, rateLimitRetries: partial.rateLimitRetries + retry.rateLimitRetries, errors: [...partial.errors, ...retry.errors] };
 }

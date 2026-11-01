@@ -342,6 +342,26 @@ describe("sync", () => {
     expect(stored.size).toBe(2);
   });
 
+  it("reports the full dry-run picture: unique, directions, unmatched, ambiguous, duplicate ids, folders and watched prospects", async () => {
+    const { store } = memoryStore();
+    const people = [...prospects, { id: "a", email: "shared@x.be" }, { id: "b", email: "SHARED@x.be" }];
+    const page = [
+      raw(1, "geert@geertkips.be", mailbox),
+      raw(1, "geert@geertkips.be", mailbox), // the same provider id again
+      raw(2, mailbox, "info@vaultone.be", { folderId: 11 }),
+      raw(3, "stranger@elsewhere.be", mailbox),
+      raw(4, "shared@x.be", mailbox),
+      { messageId: 5 } as ReturnType<typeof raw>,
+    ];
+    const report = await run(fakeClient([page]), store, { dryRun: true, prospects: people, watch: new Set(["vault", "geert"]), folderNames: new Map([["11", "Sent"]]) });
+    expect(report).toMatchObject({ checked: 6, unique: 4, duplicateIds: 1, incoming: 3, outgoing: 1, matched: 2, unmatched: 1, ambiguous: 1, skippedUnusable: 1, stored: 0 });
+    expect(report.outgoingByFolder).toEqual({ Sent: 1 });
+    expect(report.watched).toEqual([
+      { prospect_id: "geert", outgoing: 0, incoming: 1, folders: ["unknown"] },
+      { prospect_id: "vault", outgoing: 1, incoming: 0, folders: ["Sent"] },
+    ].sort((x, y) => report.watched.findIndex((w) => w.prospect_id === x.prospect_id) - report.watched.findIndex((w) => w.prospect_id === y.prospect_id)));
+  });
+
   it("uses Zoho's search date format and overlaps incremental runs by a day", () => {
     expect(zohoSearchDate("2026-11-01")).toBe("01-Nov-2026");
     expect(zohoSearchDate("2026-12-09")).toBe("09-Dec-2026");

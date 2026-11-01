@@ -6,7 +6,7 @@ import { createTokenSource, ZohoMailClient } from "./client";
 import { getZohoConfig, ZOHO_READ_SCOPES, type ZohoConfig } from "./config";
 import { decryptToken, encryptToken } from "./crypto";
 import { exchangeCode, revokeRefreshToken, ZohoError } from "./oauth";
-import { incrementalStart, runSync, type MailStore, type SyncReport } from "./sync";
+import { emptyReport, incrementalStart, runSync, type MailStore, type SyncReport } from "./sync";
 import type { MailRecord } from "./normalize";
 import type { MailRow } from "@/lib/mail/timeline";
 
@@ -129,13 +129,19 @@ export async function syncNow(config: ZohoConfig, opts: { dryRun: boolean; windo
   const from = opts.dryRun ? fallback : incrementalStart(conn.sync_from, fallback);
 
   const run = await supabase.from("mail_sync_runs").insert({ connection_id: conn.id, mode: opts.dryRun ? "dry_run" : "sync", window_from: from }).select("id").single();
-  const { data: prospects } = await supabase.from("prospects").select("id, email").not("email", "is", null).limit(20000);
+  const { data: prospects } = await supabase.from("prospects").select("id, email, company_name, notes").not("email", "is", null).limit(20000);
+  // Prospects whose notes say a message was only seen in Drafts: their mail history is reported individually (notes are never changed).
+  const watch = new Set((prospects ?? []).filter((p) => /zoho drafts/i.test(p.notes ?? "")).map((p) => p.id));
+  const names = new Map((prospects ?? []).map((p) => [p.id, p.company_name]));
 
   let report: SyncReport;
   try {
     const refreshToken = decryptToken(conn.refresh_token_encrypted, config.encryptionKey);
     const client = new ZohoMailClient(config, createTokenSource(config, refreshToken));
+    const folderNames = (await client.getFolderNames(conn.provider_account_id)) ?? undefined;
     report = await runSync({
+      watch,
+      folderNames,
       client,
       accountId: conn.provider_account_id,
       mailbox: conn.account_email,
@@ -147,9 +153,10 @@ export async function syncNow(config: ZohoConfig, opts: { dryRun: boolean; windo
   } catch (error) {
     const auth = error instanceof ZohoError && error.kind === "auth";
     if (auth) await supabase.from("mail_connections").update({ status: "needs_reconnect" }).eq("id", conn.id);
-    report = { mode: opts.dryRun ? "dry_run" : "sync", windowFrom: from, checked: 0, skippedUnusable: 0, matched: 0, alreadyStored: 0, stored: 0, preview: [], errors: [auth ? "Zoho rejected the saved credentials. Reconnect the mailbox." : "The sync could not run."] };
+    report = { ...emptyReport(opts.dryRun ? "dry_run" : "sync", from), errors: [auth ? "Zoho rejected the saved credentials. Reconnect the mailbox." : "The sync could not run."] };
   }
 
+  report.watched = report.watched.map((w) => ({ ...w, company: names.get(w.prospect_id) }));
   if (run.data) {
     await supabase
       .from("mail_sync_runs")
@@ -159,7 +166,7 @@ export async function syncNow(config: ZohoConfig, opts: { dryRun: boolean; windo
         messages_matched: report.matched,
         messages_stored: report.stored,
         errors: report.errors as never,
-        preview: report.preview as never,
+        preview: { sample: report.preview, watched: report.watched, outgoingByFolder: report.outgoingByFolder, stats: { unique: report.unique, incoming: report.incoming, outgoing: report.outgoing, unmatched: report.unmatched, ambiguous: report.ambiguous, duplicateIds: report.duplicateIds, rateLimitRetries: report.rateLimitRetries } } as never,
       })
       .eq("id", run.data.id);
   }

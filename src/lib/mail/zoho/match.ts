@@ -33,3 +33,20 @@ export function matchProspect(message: Pick<MailRecord, "direction" | "from_addr
   };
   return message.direction === "incoming" ? pick([message.from_address]) : pick([...message.to_addresses, ...message.cc_addresses]);
 }
+
+/** Addresses that belong to more than one prospect. A message touching one of these is reported, never linked. */
+export function findAmbiguousAddresses(prospects: readonly ProspectEmail[]): Set<string> {
+  const owners = new Map<string, Set<string>>();
+  for (const p of prospects) {
+    const email = normalizeAddress(p.email);
+    if (!email) continue;
+    owners.set(email, (owners.get(email) ?? new Set()).add(p.id));
+  }
+  return new Set([...owners].filter(([, ids]) => ids.size > 1).map(([email]) => email));
+}
+
+/** The other party's addresses (never your own mailbox). */
+export function counterpartAddresses(message: Pick<MailRecord, "direction" | "from_address" | "to_addresses" | "cc_addresses">, mailbox: string): string[] {
+  const own = normalizeAddress(mailbox);
+  return (message.direction === "incoming" ? [message.from_address] : [...message.to_addresses, ...message.cc_addresses]).filter((a) => a !== own);
+}

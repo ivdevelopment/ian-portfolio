@@ -13,7 +13,7 @@ export async function zohoDryRunAction(): Promise<ZohoActionResult> {
   const config = getZohoConfig();
   if (!config.enabled) return { ok: false, error: config.reason ?? "Zoho Mail is not enabled." };
   try {
-    return { ok: true, report: await syncNow(config, { dryRun: true, windowDays: 14 }) };
+    return { ok: true, report: await syncNow(config, { dryRun: true, windowDays: 30 }) };
   } catch {
     return { ok: false, error: "The check could not run. Is the mailbox connected?" };
   }
@@ -25,7 +25,7 @@ export async function zohoSyncNowAction(): Promise<ZohoActionResult> {
   const config = getZohoConfig();
   if (!config.enabled) return { ok: false, error: config.reason ?? "Zoho Mail is not enabled." };
   try {
-    return { ok: true, report: await syncNow(config, { dryRun: false, windowDays: 14 }) };
+    return { ok: true, report: await syncNow(config, { dryRun: false, windowDays: 30 }) };
   } catch {
     return { ok: false, error: "The sync could not run. Is the mailbox connected?" };
   }

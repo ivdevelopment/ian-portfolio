@@ -69,11 +69,36 @@ export function ZohoPanel({ connection, lastRun }: { connection: PanelConnection
         <div className="mt-4 rounded-card border border-line p-3 text-sm" role="status">
           <p className="font-medium">{report.mode === "dry_run" ? "Dry run (nothing stored)" : "Sync finished"}</p>
           <dl className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Stat label="Messages checked" value={report.checked} />
-            <Stat label="Linked to prospects" value={report.matched} />
+            <Stat label="Messages scanned" value={report.checked} />
+            <Stat label="Unique messages" value={report.unique} />
+            <Stat label="Outgoing" value={report.outgoing} />
+            <Stat label="Incoming" value={report.incoming} />
+            <Stat label="Matched to a prospect" value={report.matched} />
+            <Stat label="Unmatched" value={report.unmatched} />
+            <Stat label="Ambiguous (not linked)" value={report.ambiguous} />
+            <Stat label="Duplicate provider ids" value={report.duplicateIds} />
             <Stat label="Already stored" value={report.alreadyStored} />
             <Stat label={report.mode === "dry_run" ? "Would store" : "Stored"} value={report.mode === "dry_run" ? report.matched - report.alreadyStored : report.stored} />
+            <Stat label="Rate-limit retries" value={report.rateLimitRetries} />
+            <Stat label="Unusable entries" value={report.skippedUnusable} />
           </dl>
+          {Object.keys(report.outgoingByFolder).length > 0 && (
+            <p className="mt-3 text-xs text-muted">
+              Matched outgoing mail by folder: {Object.entries(report.outgoingByFolder).map(([f, n]) => `${f} ${n}`).join(" · ")}
+            </p>
+          )}
+          {report.watched.length > 0 && (
+            <div className="mt-3 text-xs text-muted">
+              <p className="font-medium text-ink">Notes saying “Getoond in Zoho Drafts” (notes are never changed)</p>
+              <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                {report.watched.map((w) => (
+                  <li key={w.prospect_id}>
+                    {w.company ?? w.prospect_id}: {w.outgoing} outgoing, {w.incoming} incoming{w.folders.length ? ` · folders: ${w.folders.join(", ")}` : ""}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {report.errors.length > 0 && (
             <ul className="mt-2 list-disc pl-5 text-danger">
               {report.errors.map((e, i) => (
