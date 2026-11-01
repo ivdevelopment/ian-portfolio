@@ -41,6 +41,8 @@ export type SyncReport = {
   rateLimitRetries: number;
   /** Sizes of the result pages Zoho returned (proves pagination behaviour). */
   pages: number[];
+  /** Dry run only, never stored: who the unmatched messages were with, so unmatched addresses can be reviewed. */
+  unmatchedDetail?: Array<{ direction: "incoming" | "outgoing"; sent_at: string; from: string; to: string[]; cc: string[]; subject: string | null; ambiguous: boolean; candidate?: { prospect_id: string; company: string; reason: string; hasEmail: boolean } | null }>;
   /** Read-only capability evidence gathered by a dry run. */
   capabilities?: {
     folders: { ok: boolean; error: string | null; names: Record<string, string> };
@@ -137,8 +139,10 @@ export async function runSync(options: SyncOptions): Promise<SyncReport> {
       else report.outgoing++;
       const prospectId = matchProspect(record, index, mailbox);
       if (!prospectId) {
-        if (counterpartAddresses(record, mailbox).some((a) => ambiguousAddresses.has(a))) report.ambiguous++;
+        const isAmbiguous = counterpartAddresses(record, mailbox).some((a) => ambiguousAddresses.has(a));
+        if (isAmbiguous) report.ambiguous++;
         else report.unmatched++;
+        if (dryRun && (report.unmatchedDetail ??= []).length < 100) report.unmatchedDetail.push({ direction: record.direction, sent_at: record.sent_at, from: record.from_address, to: record.to_addresses, cc: record.cc_addresses, subject: record.subject, ambiguous: isAmbiguous });
         continue;
       }
       report.matched++;

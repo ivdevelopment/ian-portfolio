@@ -2,6 +2,7 @@ import "server-only";
 
 import { requireAdmin } from "@/lib/auth";
 import { brusselsToday } from "@/lib/prospects/dates";
+import { suggestProspect } from "./candidates";
 import { createTokenSource, ZohoMailClient } from "./client";
 import { getZohoConfig, ZOHO_READ_SCOPES, type ZohoConfig } from "./config";
 import { decryptToken, encryptToken } from "./crypto";
@@ -129,7 +130,7 @@ export async function syncNow(config: ZohoConfig, opts: { dryRun: boolean; windo
   const from = opts.dryRun ? fallback : incrementalStart(conn.sync_from, fallback);
 
   const run = await supabase.from("mail_sync_runs").insert({ connection_id: conn.id, mode: opts.dryRun ? "dry_run" : "sync", window_from: from }).select("id").single();
-  const { data: prospects } = await supabase.from("prospects").select("id, email, company_name, notes").not("email", "is", null).limit(20000);
+  const { data: prospects } = await supabase.from("prospects").select("id, email, company_name, notes, website_url").not("email", "is", null).limit(20000);
   // Prospects whose notes say a message was only seen in Drafts: their mail history is reported individually (notes are never changed).
   const watch = new Set((prospects ?? []).filter((p) => /zoho drafts/i.test(p.notes ?? "")).map((p) => p.id));
   const names = new Map((prospects ?? []).map((p) => [p.id, p.company_name]));
@@ -152,6 +153,16 @@ export async function syncNow(config: ZohoConfig, opts: { dryRun: boolean; windo
       dryRun: opts.dryRun,
     });
     if (opts.dryRun) {
+      for (const m of report.unmatchedDetail ?? []) {
+        const other = (m.direction === "incoming" ? [m.from] : [...m.to, ...m.cc]).filter((a) => a !== conn.account_email.toLowerCase());
+        for (const a of other) {
+          const c = suggestProspect(a, prospects ?? []);
+          if (c) {
+            m.candidate = c;
+            break;
+          }
+        }
+      }
       report.capabilities = await probeCapabilities(client, conn.provider_account_id, from, report, folders);
       // For prospects whose notes say "only seen in Drafts": read ONE outgoing message each (metadata only) and report Zoho's own delivery status.
       for (const w of report.watched.slice(0, 40)) {

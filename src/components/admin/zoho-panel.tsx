@@ -87,6 +87,19 @@ export function ZohoPanel({ connection, lastRun }: { connection: PanelConnection
               Matched outgoing mail by folder: {Object.entries(report.outgoingByFolder).map(([f, n]) => `${f} ${n}`).join(" · ")}
             </p>
           )}
+          {report.unmatchedDetail && report.unmatchedDetail.length > 0 && (
+            <div className="mt-3 text-xs text-muted">
+              <p className="font-medium text-ink">Unmatched messages ({report.unmatchedDetail.length}), shown for review and not stored</p>
+              <ul data-testid="unmatched" className="mt-1 list-disc space-y-0.5 pl-5">
+                {report.unmatchedDetail.map((m, i) => (
+                  <li key={i}>
+                    {m.direction} · {m.sent_at.slice(0, 10)} · from {m.from} → {[...m.to, ...m.cc].join(", ") || "—"} · {m.subject ?? "(no subject)"}
+                    {m.candidate ? ` · candidate: ${m.candidate.company} (${m.candidate.reason}${m.candidate.hasEmail ? "; already has an email" : "; no email yet"})` : " · no candidate"}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {report.capabilities && (
             <div className="mt-3 text-xs text-muted">
               <p className="font-medium text-ink">Read-only capability checks</p>
