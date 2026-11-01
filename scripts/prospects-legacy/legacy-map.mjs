@@ -188,6 +188,8 @@ audit as (
          (select count(*) from ins), ${report.parsed} - (select count(*) from ins),
          (select n from already) + ${report.sourceDuplicates},
          ${lit(JSON.stringify(report.warnings))}::jsonb
+   -- A re-run that changes nothing leaves no new audit entry.
+   where (select count(*) from ins) > 0
   returning id
 )
 select (select count(*) from ins) as imported,

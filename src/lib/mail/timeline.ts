@@ -23,12 +23,21 @@ export function brusselsDay(iso: string): string {
 }
 
 /**
+ * When an activity "happened" for ordering. A day-only activity logged on a LATER day (an import, a backfill) has no real time,
+ * so it sorts at the start of its day instead of at the moment it was recorded, and never jumps above mail that was really sent that day.
+ */
+export function activitySortKey(a: Pick<ActivityRecord, "occurred_on" | "occurred_at" | "created_at">): string {
+  if (a.occurred_at) return a.occurred_at;
+  return brusselsDay(a.created_at) === a.occurred_on ? a.created_at : `${a.occurred_on}T00:00:00.000Z`;
+}
+
+/**
  * One timeline, newest first, rendered from two separate sources: CRM activities and synced mail. Mail is never copied
  * into `prospect_activities`.
  */
 export function mergeTimeline(activities: readonly ActivityRecord[], mail: readonly MailRow[]): TimelineItem[] {
   const items: TimelineItem[] = [
-    ...activities.map((a): TimelineItem => ({ kind: "activity", key: `a:${a.id}`, day: a.occurred_on, sortAt: a.occurred_at ?? a.created_at, activity: a })),
+    ...activities.map((a): TimelineItem => ({ kind: "activity", key: `a:${a.id}`, day: a.occurred_on, sortAt: activitySortKey(a), activity: a })),
     ...mail.map((m): TimelineItem => ({ kind: "email", key: `m:${m.id}`, day: brusselsDay(m.sent_at), sortAt: m.sent_at, mail: m })),
   ];
   // Newest day first; within a day newest first (a mail has an exact time, activities fall back to when they were logged).

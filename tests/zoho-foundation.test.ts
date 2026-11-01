@@ -397,8 +397,18 @@ describe("CRM timeline from synced mail (mail stays in its own table)", () => {
     expect(reply).toMatchObject({ suggestedStatus: "replied", currentLabel: "Contacted" });
     expect(reply?.mail.id).toBe("b");
     expect(suggestReply("contacted", [mail("a", "incoming", "2026-10-30T10:00:00Z"), mail("b", "outgoing", "2026-10-31T10:00:00Z")])).toBeNull();
-    for (const status of ["replied", "interested", "won", "lost"] as const) expect(suggestReply(status, [mail("a", "incoming", "2026-10-31T10:00:00Z")])).toBeNull();
+    // A prospect already past "replied" is never pulled back, however recent the incoming mail is.
+    for (const status of ["replied", "interested", "concept_sent", "meeting_planned", "quote_sent", "won", "lost", "not_interested"] as const) expect(suggestReply(status, [mail("a", "incoming", "2026-10-31T10:00:00Z")])).toBeNull();
     expect(suggestReply("contacted", [])).toBeNull();
+  });
+
+  it("a day-only activity recorded later (an import) does not jump above mail really sent that day", () => {
+    const imported = { ...activity("legacy", "2026-10-31", "2026-11-01T14:00:00Z") };
+    const items = mergeTimeline([imported], [mail("m", "outgoing", "2026-10-31T17:59:00Z")]);
+    expect(items.map((i) => i.key)).toEqual(["m:m", "a:legacy"]);
+    // A note written today still sorts by when it was written.
+    const note = activity("note", "2026-11-01", "2026-11-01T09:00:00Z");
+    expect(mergeTimeline([note], [mail("early", "incoming", "2026-11-01T07:00:00Z")]).map((i) => i.key)).toEqual(["a:note", "m:early"]);
   });
 
   it("finds the last email", () => {
