@@ -103,10 +103,22 @@ export function mergeCandidate(existing: CandidateRow | null, draft: CandidateDr
 
 export type NameBasis = "header" | "domain" | "address";
 
+/** Mailbox names that say nothing about who the company is. */
+const GENERIC_MAILBOX = new Set(["info", "contact", "mail", "email", "sales", "verkoop", "admin", "administratie", "office", "kantoor", "secretariaat", "hello", "hallo", "welcome", "support", "service", "webmaster", "post", "boekhouding", "facturatie"]);
+
+/** A display name that is only the mailbox part of the address ("info" for info@acme.be) is not a company name. */
+function usableDisplayName(address: string, displayName: string | null): string {
+  const name = (displayName ?? "").replace(/\s+/g, " ").trim();
+  if (!name || name.includes("@")) return "";
+  const local = normalizeAddress(address).split("@")[0] ?? "";
+  const lower = name.toLowerCase();
+  return lower === local || GENERIC_MAILBOX.has(lower) ? "" : name;
+}
+
 /** A company name only where the evidence supports one: the recipient's display name, else a distinctive domain; otherwise the address itself. */
 export function suggestName(address: string, displayName: string | null): { value: string; basis: NameBasis } {
-  const name = (displayName ?? "").replace(/\s+/g, " ").trim();
-  if (name && !name.includes("@")) return { value: name.slice(0, 200), basis: "header" };
+  const name = usableDisplayName(address, displayName);
+  if (name) return { value: name.slice(0, 200), basis: "header" };
   const domain = domainOf(normalizeAddress(address));
   if (domain && !SHARED_DOMAINS.has(domain)) {
     const parts = domain.split(".");

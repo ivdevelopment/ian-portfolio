@@ -85,6 +85,13 @@ describe("what is suggested, and only where the evidence supports it", () => {
     expect(suggestName("a@ab.be", null)).toEqual({ value: "a@ab.be", basis: "address" });
   });
 
+  it("does not take a mailbox name for a company name ('info' for info@acme.be falls back to the domain)", () => {
+    expect(suggestName("info@thierrybikerepair.be", "info")).toEqual({ value: "Thierrybikerepair", basis: "domain" });
+    expect(suggestName("jan.peeters@gmail.com", "jan.peeters")).toEqual({ value: "jan.peeters@gmail.com", basis: "address" });
+    expect(suggestName("x@acme-bouw.be", "Sales")).toEqual({ value: "Acme Bouw", basis: "domain" });
+    expect(suggestName("info@x.be", "Garage Heyrick")).toEqual({ value: "Garage Heyrick", basis: "header" });
+  });
+
   it("shows which existing prospects already use this address, domain or website, without hiding the candidate", () => {
     const prospects = [
       { id: "1", company_name: "Acme", email: "info@acme.be", website_url: null },
