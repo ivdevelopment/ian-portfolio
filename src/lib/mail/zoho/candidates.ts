@@ -2,7 +2,7 @@ import { normalizeCompany, websiteHost } from "@/lib/prospects/duplicates";
 import { normalizeAddress } from "./normalize";
 
 /** Mail providers where the domain says nothing about the company. */
-const SHARED_DOMAINS = new Set([
+export const SHARED_DOMAINS = new Set([
   "gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "live.com", "live.be", "hotmail.be", "yahoo.com", "icloud.com", "me.com",
   "telenet.be", "skynet.be", "proximus.be", "pandora.be", "belgacom.net", "msn.com", "outlook.be", "gmx.com", "protonmail.com", "proton.me",
 ]);

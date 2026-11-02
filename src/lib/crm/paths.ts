@@ -35,6 +35,8 @@ export type AppPaths = {
 
   /** CRM settings (quote defaults + business details). */
   settings: string;
+  /** Where prospect candidates from the mail sync are reviewed (always the CRM). */
+  candidatesReview: string;
   /** Screens that only exist in the CRM workspace (null on the legacy mount). */
   followUps: string | null;
   clients: string | null;
@@ -82,6 +84,7 @@ function table(kind: AppKind): AppPaths {
     quotePdf: (id) => `${crmBase}/quotes/${id}/pdf`,
 
     settings: crm ? "/settings" : "/admin/settings/quotes",
+    candidatesReview: crm ? "/settings#prospect-candidates" : `${crmOrigin()}/settings#prospect-candidates`,
     followUps: crm ? "/follow-ups" : null,
     clients: crm ? "/clients" : null,
     projects: crm ? "/projects" : null,

@@ -1,7 +1,8 @@
 import type { ZohoMailClient } from "./client";
 import { buildProspectIndex, counterpartAddresses, findAmbiguousAddresses, matchProspect, type ProspectEmail } from "./match";
-import { toMailRecord, type MailRecord } from "./normalize";
+import { parseRecipientNames, toMailRecord, type MailRecord } from "./normalize";
 import { ZohoError } from "./oauth";
+import { candidateRecipients, mergeCandidate, type CandidateDraft, type CandidateRow } from "./prospect-candidates";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -22,6 +23,9 @@ export interface MailStore {
   /** Provider ids that are already stored (so a re-run never duplicates). */
   existingIds(ids: readonly string[]): Promise<Set<string>>;
   save(records: ReadonlyArray<MailRecord & { prospect_id: string }>): Promise<void>;
+  /** The candidate rows that already exist for these addresses (pending, ignored or added). Optional: without it nothing is proposed. */
+  candidateRows?(addresses: readonly string[]): Promise<Map<string, CandidateRow>>;
+  saveCandidates?(rows: readonly CandidateRow[]): Promise<void>;
 }
 
 export type SyncReport = {
@@ -34,8 +38,18 @@ export type SyncReport = {
   duplicateIds: number;
   incoming: number;
   outgoing: number;
-  /** Usable messages that matched no prospect (not stored). */
+  /** Usable messages that matched no prospect (not stored). Includes mail that is not outreach (incoming, internal, test...). */
   unmatched: number;
+  /** How many different prospects the matched messages belong to. */
+  matchedProspects: number;
+  /** Outgoing recipients that matched no prospect and are worth a review: NEW this run (a dry run: that would be new). Never a created prospect. */
+  candidates: number;
+  /** Recipients seen again that were already waiting for review (or decided): nothing new for them. */
+  candidatesKnown: number;
+  /** Total candidates waiting for review after this run (filled in by the service). */
+  candidatesPending?: number;
+  /** A small sample of the new candidates. */
+  candidatePreview: Array<{ address: string; subject: string | null; sent_at: string }>;
   /** Messages whose other party's address belongs to two or more prospects: reported, never linked. */
   ambiguous: number;
   rateLimitRetries: number;
@@ -65,7 +79,7 @@ export type SyncReport = {
 };
 
 export function emptyReport(mode: SyncReport["mode"], windowFrom: string): SyncReport {
-  return { mode, windowFrom, checked: 0, unique: 0, duplicateIds: 0, incoming: 0, outgoing: 0, unmatched: 0, ambiguous: 0, rateLimitRetries: 0, pages: [], sample: null, skippedUnusable: 0, matched: 0, alreadyStored: 0, stored: 0, errors: [], outgoingByFolder: {}, watched: [], preview: [] };
+  return { mode, windowFrom, checked: 0, unique: 0, duplicateIds: 0, incoming: 0, outgoing: 0, unmatched: 0, matchedProspects: 0, candidates: 0, candidatesKnown: 0, candidatePreview: [], ambiguous: 0, rateLimitRetries: 0, pages: [], sample: null, skippedUnusable: 0, matched: 0, alreadyStored: 0, stored: 0, errors: [], outgoingByFolder: {}, watched: [], preview: [] };
 }
 
 export type SyncOptions = {
@@ -100,6 +114,8 @@ export async function runSync(options: SyncOptions): Promise<SyncReport> {
   const report = emptyReport(dryRun ? "dry_run" : "sync", from);
   const watchedMap = new Map<string, { prospect_id: string; outgoing: number; incoming: number; folders: Set<string>; outgoingSample?: { messageId: string; folderId: string } }>();
   const seen = new Set<string>();
+  const matchedProspectIds = new Set<string>();
+  const drafts = new Map<string, CandidateDraft>();
 
   const pages = client.searchAll(accountId, `fromDate:${zohoSearchDate(from)}`, { maxMessages: options.maxMessages });
   let retries = 0;
@@ -142,10 +158,21 @@ export async function runSync(options: SyncOptions): Promise<SyncReport> {
         const isAmbiguous = counterpartAddresses(record, mailbox).some((a) => ambiguousAddresses.has(a));
         if (isAmbiguous) report.ambiguous++;
         else report.unmatched++;
+        if (!isAmbiguous) {
+          // Outgoing mail to someone no prospect has: remembered as a candidate for review, never as a prospect.
+          const { recipients } = candidateRecipients(record, mailbox, parseRecipientNames(raw.toAddress));
+          for (const r of recipients) {
+            const draft = drafts.get(r.address) ?? { address: r.address, displayName: r.displayName, messages: [] };
+            draft.displayName ??= r.displayName;
+            draft.messages.push(record);
+            drafts.set(r.address, draft);
+          }
+        }
         if (dryRun && (report.unmatchedDetail ??= []).length < 100) report.unmatchedDetail.push({ direction: record.direction, sent_at: record.sent_at, from: record.from_address, to: record.to_addresses, cc: record.cc_addresses, subject: record.subject, ambiguous: isAmbiguous });
         continue;
       }
       report.matched++;
+      matchedProspectIds.add(prospectId);
       if (!report.sample && record.folder_id) report.sample = { messageId: record.provider_message_id, folderId: record.folder_id };
       if (record.direction === "outgoing") {
         const folder = (record.folder_id && options.folderNames?.get(record.folder_id)) || record.folder_id || "unknown";
@@ -175,9 +202,34 @@ export async function runSync(options: SyncOptions): Promise<SyncReport> {
       }
     }
   }
+  report.matchedProspects = matchedProspectIds.size;
+  await proposeCandidates(report, drafts, options);
   report.watched = [...watchedMap.values()].map((w) => ({ ...w, folders: [...w.folders].sort() }));
   report.watched.sort((a, b) => a.prospect_id.localeCompare(b.prospect_id));
   return report;
+}
+
+/** Turns what the run saw into candidate rows. A dry run only counts them; nothing is ever turned into a prospect here. */
+async function proposeCandidates(report: SyncReport, drafts: ReadonlyMap<string, CandidateDraft>, options: SyncOptions): Promise<void> {
+  if (drafts.size === 0 || !options.store.candidateRows) return;
+  try {
+    const existing = await options.store.candidateRows([...drafts.keys()]);
+    const toSave: CandidateRow[] = [];
+    for (const draft of drafts.values()) {
+      const merged = mergeCandidate(existing.get(draft.address) ?? null, draft);
+      if (!merged?.created) {
+        report.candidatesKnown++;
+        if (merged) toSave.push(merged.row);
+        continue;
+      }
+      report.candidates++;
+      if (report.candidatePreview.length < 25) report.candidatePreview.push({ address: merged.row.address, subject: merged.row.subject, sent_at: merged.row.last_message_at });
+      toSave.push(merged.row);
+    }
+    if (!options.dryRun && toSave.length > 0 && options.store.saveCandidates) await options.store.saveCandidates(toSave);
+  } catch {
+    report.errors.push("Prospect candidates could not be saved.");
+  }
 }
 
 /** After a rate-limit pause the run restarts: counts from the retry replace the partial ones; ids already stored are skipped by the store. */

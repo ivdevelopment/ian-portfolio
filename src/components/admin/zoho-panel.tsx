@@ -3,7 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { zohoDisconnectAction, zohoDryRunAction, zohoSyncNowAction } from "@/app/(admin)/admin/(panel)/settings/integrations/actions";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { useAppPaths } from "@/lib/crm/paths-context";
+import { syncSummary } from "@/lib/mail/zoho/sync-summary";
 import type { SyncReport } from "@/lib/mail/zoho/sync";
 import { formatBrusselsDateTime } from "@/lib/preview/access-activity";
 import { ConfirmDialog } from "./confirm-dialog";
@@ -47,6 +50,7 @@ export type PanelConnection = { account: string; lastSync: string | null; needsR
 /** Connect / check / sync / disconnect for Zoho Mail. Tokens never reach the browser: every button calls the server. */
 export function ZohoPanel({ connection, lastRun, manageHref }: { connection: PanelConnection; manageHref?: string; lastRun: Pick<SyncReport, "checked" | "matched" | "stored" | "errors"> & { mode: string; at: string } | null }) {
   const router = useRouter();
+  const P = useAppPaths();
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState<"dry" | "sync" | null>(null);
   const [report, setReport] = useState<SyncReport | null>(null);
@@ -126,21 +130,57 @@ export function ZohoPanel({ connection, lastRun, manageHref }: { connection: Pan
       )}
       {report && (
         <div className="mt-4 rounded-card border border-line p-3 text-sm" role="status">
-          <p className="font-medium">{report.mode === "dry_run" ? "Dry run (nothing stored)" : "Sync finished"}</p>
+          {report.mode === "dry_run" ? (
+            <p className="font-medium">Dry run (nothing stored, nothing created)</p>
+          ) : (
+            <p className="font-medium">
+              {syncSummary(report).title}: {syncSummary(report).parts.join(" · ")}
+            </p>
+          )}
+          {(report.candidatesPending ?? 0) > 0 && report.mode !== "dry_run" && (
+            <p className="mt-1 text-muted">
+              {report.candidatesPending === 1 ? "1 prospect candidate is" : `${report.candidatesPending} prospect candidates are`} waiting for review.{" "}
+              {P.candidatesReview.startsWith("/") ? (
+                <Link href={P.candidatesReview} className="text-accent underline-offset-4 hover:underline">
+                  Review
+                </Link>
+              ) : (
+                <a href={P.candidatesReview} className="text-accent underline-offset-4 hover:underline">
+                  Review in the CRM
+                </a>
+              )}
+            </p>
+          )}
           <dl className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Stat label="Messages scanned" value={report.checked} />
+            <Stat label={report.mode === "dry_run" ? "Would be new emails" : "New emails"} value={report.mode === "dry_run" ? report.matched - report.alreadyStored : report.stored} />
+            <Stat label="Matched prospects" value={report.matchedProspects} />
+            <Stat label={report.mode === "dry_run" ? "Would be prospect candidates" : "New prospect candidates"} value={report.candidates} />
+            <Stat label="Prospects created" value={0} />
+            <Stat label="Unmatched messages" value={report.unmatched} />
+            <Stat label="Matched messages" value={report.matched} />
+            <Stat label="Already stored" value={report.alreadyStored} />
             <Stat label="Unique messages" value={report.unique} />
             <Stat label="Outgoing" value={report.outgoing} />
             <Stat label="Incoming" value={report.incoming} />
-            <Stat label="Matched to a prospect" value={report.matched} />
-            <Stat label="Unmatched" value={report.unmatched} />
             <Stat label="Ambiguous (not linked)" value={report.ambiguous} />
             <Stat label="Duplicate provider ids" value={report.duplicateIds} />
-            <Stat label="Already stored" value={report.alreadyStored} />
-            <Stat label={report.mode === "dry_run" ? "Would store" : "Stored"} value={report.mode === "dry_run" ? report.matched - report.alreadyStored : report.stored} />
             <Stat label="Rate-limit retries" value={report.rateLimitRetries} />
             <Stat label="Unusable entries" value={report.skippedUnusable} />
           </dl>
+          <p className="mt-2 text-xs text-subtle">A sync never creates a prospect. Outgoing mail to an address nobody has is only proposed as a candidate; you add it or ignore it.</p>
+          {report.mode === "dry_run" && report.candidatePreview.length > 0 && (
+            <div className="mt-3 text-xs text-muted">
+              <p className="font-medium text-ink">Would be proposed as prospect candidates ({report.candidatePreview.length})</p>
+              <ul data-testid="candidates" className="mt-1 list-disc space-y-0.5 pl-5">
+                {report.candidatePreview.map((c) => (
+                  <li key={c.address}>
+                    {c.address} · {formatBrusselsDateTime(c.sent_at)} · {c.subject ?? "(no subject)"}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {Object.keys(report.outgoingByFolder).length > 0 && (
             <p className="mt-3 text-xs text-muted">
               Matched outgoing mail by folder: {Object.entries(report.outgoingByFolder).map(([f, n]) => `${f} ${n}`).join(" · ")}
@@ -148,12 +188,12 @@ export function ZohoPanel({ connection, lastRun, manageHref }: { connection: Pan
           )}
           {report.unmatchedDetail && report.unmatchedDetail.length > 0 && (
             <div className="mt-3 text-xs text-muted">
-              <p className="font-medium text-ink">Unmatched messages ({report.unmatchedDetail.length}), shown for review and not stored</p>
+              <p className="font-medium text-ink">Unmatched messages ({report.unmatchedDetail.length}), shown for information and not stored</p>
               <ul data-testid="unmatched" className="mt-1 list-disc space-y-0.5 pl-5">
                 {report.unmatchedDetail.map((m, i) => (
                   <li key={i}>
                     {m.direction} · {formatBrusselsDateTime(m.sent_at)} ({m.sent_at}) · from {m.from} → {[...m.to, ...m.cc].join(", ") || "—"} · {m.subject ?? "(no subject)"}
-                    {m.candidate ? ` · candidate: ${m.candidate.company} (${m.candidate.reason}${m.candidate.hasEmail ? "; already has an email" : "; no email yet"})` : " · no candidate"}
+                    {m.candidate ? ` · possible existing prospect: ${m.candidate.company} (${m.candidate.reason}${m.candidate.hasEmail ? "; already has an email" : "; no email yet"})` : " · no existing prospect suggested"}
                   </li>
                 ))}
               </ul>
@@ -210,7 +250,7 @@ export function ZohoPanel({ connection, lastRun, manageHref }: { connection: Pan
       </ConfirmDialog>
       {lastRun && !report && (
         <p className="mt-3 text-xs text-subtle">
-          Last run: {lastRun.mode === "dry_run" ? "dry run" : "sync"} · {lastRun.checked} checked · {lastRun.matched} linked · {lastRun.errors.length} errors
+          Last run: {lastRun.mode === "dry_run" ? "dry run" : "sync"} · {lastRun.checked} checked · {lastRun.matched} matched · {lastRun.errors.length} errors
         </p>
       )}
     </div>

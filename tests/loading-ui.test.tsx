@@ -193,7 +193,7 @@ describe("Zoho sync", () => {
 
     await act(async () => pending.resolve({ ok: true, report: emptyReport }));
     expect((screen.getByRole("button", { name: "Sync now" }) as HTMLButtonElement).disabled).toBe(false);
-    expect(screen.getByText("Sync finished")).toBeTruthy();
+    expect(screen.getByText(/Sync complete/)).toBeTruthy();
     expect(refresh).toHaveBeenCalled();
   });
 

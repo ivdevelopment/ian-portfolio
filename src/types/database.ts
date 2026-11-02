@@ -105,6 +105,32 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"mail_prospect_candidates": {
+                  Row: {
+                    "address": string,"connection_id": string,"created_at": string,"decided_at": string | null,"decided_by": string | null,"decision_note": string | null,"display_name": string | null,"first_message_at": string,"id": string,"ignored_at": string | null,"last_message_at": string,"message_count": number,"messages": NonNullable<Json>,"prospect_id": string | null,"status": string,"subject": string | null,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "address": string,"connection_id": string,"created_at"?: string,"decided_at"?: string | null,"decided_by"?: string | null,"decision_note"?: string | null,"display_name"?: string | null,"first_message_at": string,"id"?: string,"ignored_at"?: string | null,"last_message_at": string,"message_count"?: number,"messages"?: NonNullable<Json>,"prospect_id"?: string | null,"status"?: string,"subject"?: string | null,"updated_at"?: string
+                  }
+                  Update: {
+                    "address"?: string,"connection_id"?: string,"created_at"?: string,"decided_at"?: string | null,"decided_by"?: string | null,"decision_note"?: string | null,"display_name"?: string | null,"first_message_at"?: string,"id"?: string,"ignored_at"?: string | null,"last_message_at"?: string,"message_count"?: number,"messages"?: NonNullable<Json>,"prospect_id"?: string | null,"status"?: string,"subject"?: string | null,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "mail_prospect_candidates_connection_id_fkey"
+      columns: ["connection_id"]
+isOneToOne: false
+      referencedRelation: "mail_connections"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "mail_prospect_candidates_prospect_id_fkey"
+      columns: ["prospect_id"]
+isOneToOne: false
+      referencedRelation: "prospects"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"mail_sync_runs": {
                   Row: {
                     "connection_id": string,"errors": NonNullable<Json>,"finished_at": string | null,"id": string,"messages_checked": number,"messages_matched": number,"messages_stored": number,"mode": string,"preview": NonNullable<Json>,"started_at": string,"window_from": string | null

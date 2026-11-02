@@ -3,6 +3,7 @@ import "server-only";
 import { requireAdmin } from "@/lib/auth";
 import { brusselsToday } from "@/lib/prospects/dates";
 import { suggestProspect } from "./candidates";
+import { candidateStore, countPendingCandidates, listPendingCandidates, type CandidateView } from "./candidate-service";
 import { createTokenSource, ZohoMailClient } from "./client";
 import { getZohoConfig, ZOHO_READ_SCOPES, type ZohoConfig } from "./config";
 import { decryptToken, encryptToken } from "./crypto";
@@ -148,7 +149,7 @@ export async function syncNow(config: ZohoConfig, opts: { dryRun: boolean; windo
       accountId: conn.provider_account_id,
       mailbox: conn.account_email,
       prospects: prospects ?? [],
-      store: supabaseStore(supabase, conn.id),
+      store: { ...supabaseStore(supabase, conn.id), ...candidateStore(supabase, conn.id) },
       from,
       dryRun: opts.dryRun,
     });
@@ -182,6 +183,7 @@ export async function syncNow(config: ZohoConfig, opts: { dryRun: boolean; windo
   }
 
   report.watched = report.watched.map((w) => ({ ...w, company: names.get(w.prospect_id) }));
+  report.candidatesPending = await countPendingCandidates(supabase, conn.id);
   if (run.data) {
     await supabase
       .from("mail_sync_runs")
@@ -191,7 +193,7 @@ export async function syncNow(config: ZohoConfig, opts: { dryRun: boolean; windo
         messages_matched: report.matched,
         messages_stored: report.stored,
         errors: report.errors as never,
-        preview: { sample: report.preview, watched: report.watched, outgoingByFolder: report.outgoingByFolder, capabilities: report.capabilities ?? null, pages: report.pages, stats: { unique: report.unique, incoming: report.incoming, outgoing: report.outgoing, unmatched: report.unmatched, ambiguous: report.ambiguous, duplicateIds: report.duplicateIds, rateLimitRetries: report.rateLimitRetries } } as never,
+        preview: { sample: report.preview, watched: report.watched, outgoingByFolder: report.outgoingByFolder, capabilities: report.capabilities ?? null, pages: report.pages, stats: { unique: report.unique, incoming: report.incoming, outgoing: report.outgoing, unmatched: report.unmatched, matchedProspects: report.matchedProspects, candidates: report.candidates, candidatesKnown: report.candidatesKnown, ambiguous: report.ambiguous, duplicateIds: report.duplicateIds, rateLimitRetries: report.rateLimitRetries } } as never,
       })
       .eq("id", run.data.id);
   }
@@ -242,4 +244,11 @@ export async function listProspectMail(prospectId: string): Promise<MailRow[]> {
     .limit(100);
   if (error) return [];
   return (data ?? []) as MailRow[];
+}
+
+/** Outgoing recipients no prospect has, waiting for a decision. Empty when the integration is off. */
+export async function getPendingCandidates(): Promise<CandidateView[]> {
+  if (!getZohoConfig().enabled) return [];
+  const { supabase } = await requireAdmin();
+  return listPendingCandidates(supabase);
 }

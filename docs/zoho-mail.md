@@ -51,3 +51,44 @@ Future automation options (not built): Vercel Cron calling a protected sync endp
 3. In the Vercel project `ian-portfolio` (Production), set `ZOHO_MAIL_ENABLED=1`, `ZOHO_DATA_CENTER=eu`, `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET` (sensitive), `ZOHO_TOKEN_ENCRYPTION_KEY` (sensitive, `openssl rand -base64 32`), optional `ZOHO_MAILBOX`; redeploy.
 4. Settings → Integrations → **Connect Zoho Mail**, approve the two read scopes while signed in as `hello@ianverlinden.com`.
 5. **Check mailbox (dry run)** first and review the matches, then **Sync now**.
+
+## Prospect candidates (manual sync, reviewed by a person)
+
+**What the sync reports.** "Sync now" only ever *stores mail that matches a prospect's exact email address* and *proposes* the rest. Its result
+uses five different words, and none of them means a prospect was created:
+
+| Label | Meaning |
+| --- | --- |
+| New emails | messages stored by this run (they matched a prospect) |
+| Matched prospects | how many different prospects those messages belong to |
+| Prospect candidates | outgoing recipients nobody has yet, found by this run, waiting for a decision |
+| Prospects created | always 0 for a sync: only **Add as prospect** creates one |
+| Unmatched messages | every message that matched no prospect (incoming mail, internal mail, tests, candidates...): information only, never stored |
+
+**What was ambiguous before.** The old result showed `Unmatched` and (in the dry run) `candidate: <Company>`; the latter was a suggestion that an
+unmatched address belongs to an *existing* prospect (same website / domain name) and had nothing to do with a new prospect. It now reads
+"possible existing prospect". Nothing in the sync ever inserted a prospect.
+
+**Candidate rules** (`src/lib/mail/zoho/prospect-candidates.ts`). A recipient is proposed only when the message is outgoing, the address is on the
+To line (not Cc), no prospect has that exact address (and it is not shared by two prospects), it is not your own address or domain, not a
+no-reply/bounce/test address or reserved test domain, the subject is not a test, there are at most 5 recipients, and the address was not
+ignored or added before. Incoming mail never creates a candidate. Only mail inside the sync window is considered; history is never scanned.
+
+**Storage** (`mail_prospect_candidates`, additive, admin-only RLS): one row per (connection, recipient address) with the pending outgoing
+messages (at most 20). A repeated sync adds only provider ids not seen before, so nothing is duplicated.
+
+**Decisions** (the review list in CRM Settings → Email; the sync result links to it):
+
+* **Add as prospect**: claims the candidate atomically (a double click or two tabs create one prospect), then creates a prospect with `status = contacted`,
+  `priority = normal`, `email` = the exact recipient, `source = "Zoho outreach"`, first/last contact = the Brussels day of the first/last message, and the
+  activity *First contact sent* ("Created from unmatched outgoing Zoho mail after manual review: <subject>"). The company name is the recipient's display
+  name, else the domain (garage-heyrick.be → Garage Heyrick), else the address itself, and is editable before adding. No city, phone, website, sector or value
+  is invented. If a prospect with that exact address already exists the candidate links to it instead of creating a second one. The pending messages are then
+  stored once in `mail_messages` (the provider message id stays the idempotency key, an id that is already stored is skipped), so the dossier shows them at once and
+  the next sync finds them already stored.
+* **Ignore**: an auditable decision, not a deletion. The row becomes `ignored` with `ignored_at`, `decided_by` and a `decision_note`; the address, the provider message
+  ids and their metadata (subject, times, folder, recipients) are kept so the dedup and the reason it no longer appears stay explainable; only the snippets are
+  dropped and no body is ever stored. The address is never proposed again. Nothing in Zoho is touched and mail already linked in the CRM stays. Restoring a
+  candidate later is `status = 'pending'` (no screen for it in this milestone). A sync that raced with the decision cannot revive it (decided rows are never overwritten).
+
+Unchanged: read-only Zoho scopes, nothing is sent, manual sync only, encrypted tokens, existing RLS.

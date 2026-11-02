@@ -19,6 +19,19 @@ export function parseAddressList(value: string | null | undefined): string[] {
   return [...new Set(found.map(normalizeAddress))];
 }
 
+/** `"Name" <a@x.be>, B <b@y.be>` -> { a@x.be: "Name", b@y.be: "B" }. Only names the header really carries; addresses without one are absent. */
+export function parseRecipientNames(value: string | null | undefined): Map<string, string> {
+  const names = new Map<string, string>();
+  if (!value) return names;
+  const pattern = /(?:"([^"]*)"|([^,;<>"]+?))\s*<\s*([^<>\s]+@[^<>\s]+)\s*>/g;
+  for (const m of decodeEntities(value).matchAll(pattern)) {
+    const address = normalizeAddress(m[3]);
+    const name = (m[1] ?? m[2] ?? "").replace(/\s+/g, " ").trim();
+    if (name && !name.includes("@") && name.length <= 120 && name.toLowerCase() !== address) names.set(address, name);
+  }
+  return names;
+}
+
 /** Plain text from possibly-HTML content: scripts/styles/comments and every tag removed (so tracking pixels and links vanish), entities decoded. */
 const stripMarkup = (s: string) =>
   s

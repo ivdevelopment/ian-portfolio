@@ -2,9 +2,10 @@ import Link from "next/link";
 import { QuoteSettingsForm } from "@/components/admin/quote-settings-form";
 import { AdminPageHeader, Badge, Panel, formatDateTime } from "@/components/admin/ui";
 import { ZohoPanel } from "@/components/admin/zoho-panel";
+import { ProspectCandidates } from "@/components/crm/prospect-candidates";
 import { getPaths } from "@/lib/crm/server-paths";
 import { getZohoConfig } from "@/lib/mail/zoho/config";
-import { getConnection, getLastRun } from "@/lib/mail/zoho/service";
+import { getConnection, getLastRun, getPendingCandidates } from "@/lib/mail/zoho/service";
 import { getQuoteSettings } from "@/lib/quotes/queries";
 
 /** CRM settings: quote defaults and business details, services, and the mailbox. Website content settings live in the website admin. */
@@ -12,7 +13,7 @@ export default async function CrmSettingsPage() {
   const P = await getPaths();
   const [settings, config] = await Promise.all([getQuoteSettings(), Promise.resolve(getZohoConfig())]);
   const connection = config.enabled ? await getConnection() : null;
-  const lastRun = connection ? await getLastRun(connection.id) : null;
+  const [lastRun, candidates] = connection ? await Promise.all([getLastRun(connection.id), getPendingCandidates()]) : [null, []];
 
   return (
     <>
@@ -59,6 +60,11 @@ export default async function CrmSettingsPage() {
                   connection={connection ? { account: connection.account_email, lastSync: connection.last_sync_at, needsReconnect: connection.status !== "connected" } : null}
                   lastRun={lastRun ? { mode: lastRun.mode, at: lastRun.started_at, checked: lastRun.messages_checked, matched: lastRun.messages_matched, stored: lastRun.messages_stored, errors: lastRun.errors } : null}
                 />
+                {connection && (
+                  <div className="mt-6 border-t border-line pt-4">
+                    <ProspectCandidates items={candidates} />
+                  </div>
+                )}
               </>
             )}
           </Panel>
