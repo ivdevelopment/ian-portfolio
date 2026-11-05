@@ -39,6 +39,8 @@ export type AppPaths = {
   candidatesReview: string;
   /** Screens that only exist in the CRM workspace (null on the legacy mount). */
   followUps: string | null;
+  /** The AI Prospect Finder (CRM only). */
+  prospecting: string | null;
   clients: string | null;
   projects: string | null;
 
@@ -86,6 +88,7 @@ function table(kind: AppKind): AppPaths {
     settings: crm ? "/settings" : "/admin/settings/quotes",
     candidatesReview: crm ? "/settings#prospect-candidates" : `${crmOrigin()}/settings#prospect-candidates`,
     followUps: crm ? "/follow-ups" : null,
+    prospecting: crm ? "/prospecting" : null,
     clients: crm ? "/clients" : null,
     projects: crm ? "/projects" : null,
 

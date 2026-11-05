@@ -53,3 +53,4 @@ scripts/prospects-legacy/data/
 
 # Zoho client hand-off (never committed)
 .zoho-client.env
+fake-codex.mode

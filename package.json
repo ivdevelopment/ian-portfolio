@@ -9,7 +9,8 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:rls": "node --env-file=.env.supabase-local node_modules/vitest/vitest.mjs run --no-file-parallelism tests/rls.integration.test.ts tests/rls-p2.integration.test.ts tests/rls-p5.integration.test.ts tests/rls-p6.integration.test.ts tests/rls-preview-access.integration.test.ts tests/rls-mail.integration.test.ts tests/rls-mail-candidates.integration.test.ts tests/rls-quotes.integration.test.ts",
+    "prospect-agent": "node --conditions=react-server --import tsx tools/prospect-agent/src/cli.ts",
+    "test:rls": "node --env-file=.env.supabase-local node_modules/vitest/vitest.mjs run --no-file-parallelism tests/rls.integration.test.ts tests/rls-p2.integration.test.ts tests/rls-p5.integration.test.ts tests/rls-p6.integration.test.ts tests/rls-preview-access.integration.test.ts tests/rls-mail.integration.test.ts tests/rls-mail-candidates.integration.test.ts tests/rls-prospecting.integration.test.ts tests/rls-prospect-agent.integration.test.ts tests/rls-quotes.integration.test.ts",
     "db:start": "supabase start -x imgproxy,postgres-meta,vector,studio,mailpit,realtime,logflare,edge-runtime",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
@@ -57,6 +58,7 @@
     "pdfjs-dist": "4.10.38",
     "supabase": "^2.122.0",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5",
     "vitest": "^5.0.5"
   }

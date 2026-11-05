@@ -2,8 +2,13 @@ import Link from "next/link";
 import { QuoteSettingsForm } from "@/components/admin/quote-settings-form";
 import { AdminPageHeader, Badge, Panel, formatDateTime } from "@/components/admin/ui";
 import { ZohoPanel } from "@/components/admin/zoho-panel";
+import { AiProviderPanel } from "@/components/crm/ai-provider-panel";
+import { LocalAgentPanel } from "@/components/crm/local-agent-panel";
 import { ProspectCandidates } from "@/components/crm/prospect-candidates";
 import { getPaths } from "@/lib/crm/server-paths";
+import { getAgentStatus } from "@/lib/prospecting/agent/service";
+import { getProviderStatus, providerFlag } from "@/lib/prospecting/config";
+import { requireAdmin } from "@/lib/auth";
 import { getZohoConfig } from "@/lib/mail/zoho/config";
 import { getConnection, getLastRun, getPendingCandidates } from "@/lib/mail/zoho/service";
 import { getQuoteSettings } from "@/lib/quotes/queries";
@@ -13,6 +18,7 @@ export default async function CrmSettingsPage() {
   const P = await getPaths();
   const [settings, config] = await Promise.all([getQuoteSettings(), Promise.resolve(getZohoConfig())]);
   const connection = config.enabled ? await getConnection() : null;
+  const agent = await getAgentStatus((await requireAdmin()).supabase);
   const [lastRun, candidates] = connection ? await Promise.all([getLastRun(connection.id), getPendingCandidates()]) : [null, []];
 
   return (
@@ -68,6 +74,16 @@ export default async function CrmSettingsPage() {
               </>
             )}
           </Panel>
+        </section>
+
+        <section aria-labelledby="ai-h" className="pt-4">
+          <h2 id="ai-h" className="mb-3 text-xs font-medium tracking-wider text-subtle uppercase">
+            AI prospecting
+          </h2>
+          <div className="space-y-4">
+            <AiProviderPanel status={getProviderStatus(process.env, agent)} />
+            <LocalAgentPanel agent={agent} flagOn={providerFlag() === "local_codex"} />
+          </div>
         </section>
 
         <section aria-labelledby="site-h" className="pt-4">

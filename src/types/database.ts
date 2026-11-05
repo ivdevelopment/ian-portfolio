@@ -245,6 +245,92 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"prospect_agents": {
+                  Row: {
+                    "codex_state": string | null,"codex_version": string | null,"created_at": string,"created_by": string | null,"display_name": string,"id": string,"last_failure_kind": string | null,"last_seen_at": string | null,"revoked_at": string | null,"token_hash": string,"token_hint": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "codex_state"?: string | null,"codex_version"?: string | null,"created_at"?: string,"created_by"?: string | null,"display_name": string,"id"?: string,"last_failure_kind"?: string | null,"last_seen_at"?: string | null,"revoked_at"?: string | null,"token_hash": string,"token_hint": string
+                  }
+                  Update: {
+                    "codex_state"?: string | null,"codex_version"?: string | null,"created_at"?: string,"created_by"?: string | null,"display_name"?: string,"id"?: string,"last_failure_kind"?: string | null,"last_seen_at"?: string | null,"revoked_at"?: string | null,"token_hash"?: string,"token_hint"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"prospect_discovery_candidates": {
+                  Row: {
+                    "added_prospect_id": string | null,"city": string | null,"company_name": string,"contact_name": string | null,"created_at": string,"decided_by": string | null,"decision_note": string | null,"domain": string | null,"duplicate_of": string | null,"duplicate_reason": string | null,"email": string | null,"evidence": NonNullable<Json>,"id": string,"ignored_at": string | null,"industry": string | null,"opportunity": string | null,"phone": string | null,"region": string | null,"reviewed_at": string | null,"run_id": string,"score": number,"score_breakdown": NonNullable<Json>,"source_urls": NonNullable<Json>,"status": string,"summary": string | null,"synthetic": boolean,"website_url": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "added_prospect_id"?: string | null,"city"?: string | null,"company_name": string,"contact_name"?: string | null,"created_at"?: string,"decided_by"?: string | null,"decision_note"?: string | null,"domain"?: string | null,"duplicate_of"?: string | null,"duplicate_reason"?: string | null,"email"?: string | null,"evidence"?: NonNullable<Json>,"id"?: string,"ignored_at"?: string | null,"industry"?: string | null,"opportunity"?: string | null,"phone"?: string | null,"region"?: string | null,"reviewed_at"?: string | null,"run_id": string,"score": number,"score_breakdown"?: NonNullable<Json>,"source_urls"?: NonNullable<Json>,"status"?: string,"summary"?: string | null,"synthetic"?: boolean,"website_url"?: string | null
+                  }
+                  Update: {
+                    "added_prospect_id"?: string | null,"city"?: string | null,"company_name"?: string,"contact_name"?: string | null,"created_at"?: string,"decided_by"?: string | null,"decision_note"?: string | null,"domain"?: string | null,"duplicate_of"?: string | null,"duplicate_reason"?: string | null,"email"?: string | null,"evidence"?: NonNullable<Json>,"id"?: string,"ignored_at"?: string | null,"industry"?: string | null,"opportunity"?: string | null,"phone"?: string | null,"region"?: string | null,"reviewed_at"?: string | null,"run_id"?: string,"score"?: number,"score_breakdown"?: NonNullable<Json>,"source_urls"?: NonNullable<Json>,"status"?: string,"summary"?: string | null,"synthetic"?: boolean,"website_url"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "prospect_discovery_candidates_added_prospect_id_fkey"
+      columns: ["added_prospect_id"]
+isOneToOne: false
+      referencedRelation: "prospects"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "prospect_discovery_candidates_duplicate_of_fkey"
+      columns: ["duplicate_of"]
+isOneToOne: false
+      referencedRelation: "prospects"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "prospect_discovery_candidates_run_id_fkey"
+      columns: ["run_id"]
+isOneToOne: false
+      referencedRelation: "prospect_discovery_runs"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"prospect_discovery_runs": {
+                  Row: {
+                    "agent_id": string | null,"analyzed": number,"area": string | null,"attempts": number,"cancel_requested": boolean,"codex_calls": number | null,"codex_ms": number | null,"created_by": string | null,"duplicates_removed": number,"errors": NonNullable<Json>,"events": NonNullable<Json>,"exclude_researched": boolean,"failure_kind": string | null,"finished_at": string | null,"heartbeat_at": string | null,"id": string,"industry": string | null,"lease_expires_at": string | null,"location": string,"mode": string,"provider": string,"qualified": number,"raw_found": number,"requested_count": number,"skipped_cooldown": number,"stage": string | null,"started_at": string,"status": string,"threshold": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "agent_id"?: string | null,"analyzed"?: number,"area"?: string | null,"attempts"?: number,"cancel_requested"?: boolean,"codex_calls"?: number | null,"codex_ms"?: number | null,"created_by"?: string | null,"duplicates_removed"?: number,"errors"?: NonNullable<Json>,"events"?: NonNullable<Json>,"exclude_researched"?: boolean,"failure_kind"?: string | null,"finished_at"?: string | null,"heartbeat_at"?: string | null,"id"?: string,"industry"?: string | null,"lease_expires_at"?: string | null,"location": string,"mode": string,"provider": string,"qualified"?: number,"raw_found"?: number,"requested_count": number,"skipped_cooldown"?: number,"stage"?: string | null,"started_at"?: string,"status"?: string,"threshold"?: number
+                  }
+                  Update: {
+                    "agent_id"?: string | null,"analyzed"?: number,"area"?: string | null,"attempts"?: number,"cancel_requested"?: boolean,"codex_calls"?: number | null,"codex_ms"?: number | null,"created_by"?: string | null,"duplicates_removed"?: number,"errors"?: NonNullable<Json>,"events"?: NonNullable<Json>,"exclude_researched"?: boolean,"failure_kind"?: string | null,"finished_at"?: string | null,"heartbeat_at"?: string | null,"id"?: string,"industry"?: string | null,"lease_expires_at"?: string | null,"location"?: string,"mode"?: string,"provider"?: string,"qualified"?: number,"raw_found"?: number,"requested_count"?: number,"skipped_cooldown"?: number,"stage"?: string | null,"started_at"?: string,"status"?: string,"threshold"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "prospect_discovery_runs_agent_id_fkey"
+      columns: ["agent_id"]
+isOneToOne: false
+      referencedRelation: "prospect_agents"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"prospect_discovery_seen": {
+                  Row: {
+                    "domain": string,"last_analyzed_at": string,"last_score": number | null,"outcome": string,"run_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "domain": string,"last_analyzed_at"?: string,"last_score"?: number | null,"outcome": string,"run_id"?: string | null
+                  }
+                  Update: {
+                    "domain"?: string,"last_analyzed_at"?: string,"last_score"?: number | null,"outcome"?: string,"run_id"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "prospect_discovery_seen_run_id_fkey"
+      columns: ["run_id"]
+isOneToOne: false
+      referencedRelation: "prospect_discovery_runs"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"prospect_imports": {
                   Row: {
                     "created_at": string,"created_by": string | null,"duplicates": number,"file_name": string | null,"id": string,"rows_imported": number,"rows_parsed": number,"rows_skipped": number,"source": string,"warnings": NonNullable<Json>
@@ -527,7 +613,31 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            "allocate_quote_number":
+            "agent_claim_run":
+{ Args: { "p_lease_seconds"?: number,"p_token": string }; Returns: Json
+                           },
+"agent_context":
+{ Args: { "p_run": string,"p_token": string }; Returns: Json
+                           },
+"agent_fail":
+{ Args: { "p_kind": string,"p_message": string,"p_run": string,"p_status"?: string,"p_token": string }; Returns: Json
+                           },
+"agent_heartbeat":
+{ Args: { "p_codex_state": string,"p_codex_version": string,"p_failure": string,"p_token": string }; Returns: Json
+                           },
+"agent_progress":
+{ Args: { "p_counters": Json,"p_errors": Json,"p_lease_seconds"?: number,"p_run": string,"p_stage": string,"p_status": string,"p_token": string }; Returns: Json
+                           },
+"agent_resolve":
+{ Args: { "p_token": string }; Returns: string
+                           },
+"agent_run_params":
+{ Args: { "p_run": string,"p_token": string }; Returns: Json
+                           },
+"agent_submit":
+{ Args: { "p_candidates": Json,"p_duplicates": Json,"p_final": Json,"p_run": string,"p_seen": Json,"p_token": string }; Returns: Json
+                           },
+"allocate_quote_number":
 { Args: { "p_year": number }; Returns: string
                            },
 "create_client_preview":

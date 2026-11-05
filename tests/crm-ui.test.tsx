@@ -41,7 +41,7 @@ describe("CrmNav", () => {
     pathname = "/prospects/abc";
     render(<CrmNav />);
     const links = screen.getAllByRole("link");
-    expect(links.map((l) => l.getAttribute("href"))).toEqual(["/", "/prospects", "/pipeline", "/follow-ups", "/clients", "/quotes", "/projects", "/settings"]);
+    expect(links.map((l) => l.getAttribute("href"))).toEqual(["/", "/prospects", "/prospecting", "/pipeline", "/follow-ups", "/clients", "/quotes", "/projects", "/settings"]);
     expect(links.find((l) => l.getAttribute("aria-current") === "page")?.textContent).toBe("Prospects");
     expect(links.some((l) => (l.getAttribute("href") ?? "").includes("/admin"))).toBe(false);
   });

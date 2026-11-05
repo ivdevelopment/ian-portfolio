@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { DiscoveryInsightPanel } from "@/components/crm/discovery-insight";
 import { ExternalLink } from "lucide-react";
 import { OpenLink, ProspectActions } from "@/components/admin/prospect-detail-actions";
 import { MarkRepliedButton } from "@/components/admin/prospect-mail";
@@ -247,6 +248,10 @@ async function OverviewTab({ prospect, P, today }: { prospect: ProspectRecord; P
           </dl>
         </Panel>
       </div>
+
+      <Suspense fallback={null}>
+        <DiscoveryInsightPanel prospectId={prospect.id} />
+      </Suspense>
 
       <Panel title="Notes">
         <ProspectNotes id={prospect.id} initial={prospect.notes ?? ""} />

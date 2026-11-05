@@ -204,7 +204,7 @@ describe("CRM navigation", () => {
   const items = CRM_NAV.flatMap((g) => g.items);
 
   it("follows the agreed structure and links only to screens that exist", () => {
-    expect(items.map((i) => i.href)).toEqual(["/", "/prospects", "/pipeline", "/follow-ups", "/clients", "/quotes", "/projects", "/settings"]);
+    expect(items.map((i) => i.href)).toEqual(["/", "/prospects", "/prospecting", "/pipeline", "/follow-ups", "/clients", "/quotes", "/projects", "/settings"]);
     expect(CRM_NAV.map((g) => g.label)).toEqual([null, "Sales", "Work", null]);
   });
 

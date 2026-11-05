@@ -1,4 +1,4 @@
-import { FileSignature, FolderKanban, KanbanSquare, LayoutDashboard, Settings, UserCheck, Users, CalendarClock, type LucideIcon } from "lucide-react";
+import { FileSignature, FolderKanban, KanbanSquare, LayoutDashboard, Search, Settings, UserCheck, Users, CalendarClock, type LucideIcon } from "lucide-react";
 
 /**
  * The CRM's information architecture. Groups and order follow the daily workflow: what needs attention, who is in the pipeline,
@@ -15,6 +15,7 @@ export const CRM_NAV: CrmNavGroup[] = [
     label: "Sales",
     items: [
       { id: "prospects", label: "Prospects", href: "/prospects", icon: Users },
+      { id: "prospecting", label: "Find prospects", href: "/prospecting", icon: Search },
       { id: "pipeline", label: "Pipeline", href: "/pipeline", icon: KanbanSquare },
       { id: "follow-ups", label: "Follow-ups", href: "/follow-ups", icon: CalendarClock },
       { id: "clients", label: "Clients", href: "/clients", icon: UserCheck },
