@@ -221,10 +221,103 @@ Rollout order: (A) build and test with the flag off; (B) run the agent against a
 
 ## 8. Not built (by design)
 
-Automatic outreach, email sending, contact-form submission, autonomous prospect additions, API-key inference, a cloud worker, a Windows service / autostart, realtime push to the agent, multi-device dispatch, a CRM button for the Codex test (it is a CLI command), un-ignoring candidates.
+Automatic outreach, email sending, contact-form submission, autonomous prospect additions, API-key inference, a cloud worker, a Windows *service* (the tray application of section 10 has an optional per-user start with Windows instead), realtime push to the agent, multi-device dispatch, a CRM button for the Codex test (it is a CLI command or the tray app's Test Codex button), un-ignoring candidates.
 
 ## 9. Tests
 
 `npm test` covers the worker (fake Codex through a real Windows `.cmd` shim in a folder with a space, failure kinds, cancellation, lease loss, usage exhaustion, malformed/oversized output, timeouts, no-secret grep), the API (validation, rejection of bad candidates,
 rate limit) and the UI states. `npm run test:rls` (local Supabase) covers the real functions: wrong and revoked tokens, two workers claiming the same run, expired leases and retries, ownership, server-side rejection, no side effects on existing data.
 `tools/prospect-agent/dev/fake-codex.cmd` is a stand-in `codex` for local end-to-end runs without a ChatGPT sign-in (`CODEX_BIN` points at it; `PROSPECT_AGENT_SOURCE=sample` swaps discovery for invented businesses and only works against a local CRM).
+
+## 10. Ian Prospect Agent: the Windows tray application (P10.4)
+
+A small native-feeling Windows utility so the agent does not have to be run from PowerShell. It is an **additional interface**: every CLI command
+(`start`, `status`, `doctor`, `test-codex`, `update-business-data`) still works, and both now call the same code.
+
+### 10.1 Architecture
+
+```
+Ian Prospect Agent.exe (tools/prospect-agent-desktop)        npm run prospect-agent -- <command>
+  tray icon · status window · notifications                          (tools/prospect-agent/src/cli.ts)
+            \                                                           /
+             └────────────►  ProspectAgentService  ◄────────────────────┘      tools/prospect-agent/src/service.ts
+                              │  start / stop / getState / testCodex / updateBusinessData / doctor / diagnostics
+                              ▼
+                  worker loop (worker.ts, job.ts, codex.ts, osm/*): unchanged behaviour, now with observer hooks
+```
+
+* **No worker logic is duplicated.** The desktop app never imports the worker, job, Codex or token modules directly; it holds one
+  `ProspectAgentService` (a test enforces this). The CLI's `start` is a thin caller of the same service.
+* **State**: `service.getState()` is plain, JSON-safe data: worker `stopped | starting | running | stopping | error`; CRM `unknown | connected | offline | rejected`
+  (+ last heartbeat); Codex `ready | not_installed | not_authenticated | error | usage_limit` (+ version); business data (ready, date, count, health); the active run
+  (mode, location, stage, done/total from the real counters); last run; last error (a fixed sanitised kind and message); progress of Test Codex and of a data update.
+  It contains **no token, no filesystem path, no candidate or business detail**. Nothing is parsed from human-formatted CLI output.
+* **The three on-demand actions** are the existing implementations: `testCodex()` is the real structured `codex exec` test, `updateBusinessData()` is the P10.2 update
+  with real stage events (checking, verifying checksum, downloading with bytes, building with percent, verifying index, installing) and `doctor()` is the same report as `doctor`.
+  In the tray app the (synchronous, minutes-long) index build runs on a **worker thread**, so the window, tray and heartbeats stay live (measured: during a full rebuild the longest
+  gap between heartbeats was 22.9 s against a 20 s interval).
+* **Stopping**: `stop({mode})`. `ask` (default) refuses while a run is active and the UI asks "A prospecting run is currently active. Stopping now may interrupt it. [Cancel] [Stop anyway]";
+  `graceful` lets the run stop between steps (the CLI's Ctrl+C); `force` ends the Codex process tree at once and the run is reported to the CRM as **cancelled**, keeping what it found. P10.1 lease
+  semantics are untouched: a run whose agent died is re-queued when its lease expires.
+* **Usage limit**: after Codex reports its limit the worker stays online (heartbeats continue) but claims no new run for 30 minutes, or until Test Codex succeeds. No provider is ever switched.
+* **One worker per Windows user**: `%LOCALAPPDATA%\IanProspectAgent\agent.lock` (exclusive create, owner pid; a lock whose owner is gone is taken over). The CLI and the tray app cannot both run a worker;
+  the second says so. The tray app itself is **single-instance** (`app.requestSingleInstanceLock`): starting it again shows the running app's window and exits.
+* **Crash recovery**: every Codex child process is recorded (pid, parent, start time) in `children.json`. On the next start, children whose owner is gone are ended, but only if the process's creation time
+  matches the record (a recycled pid can never take down an unrelated program). Windows sign-out or shutdown stops the worker first.
+
+### 10.2 Framework choice: Electron (small shell), not Tauri
+
+| | Electron 45 (chosen) | Tauri 2 |
+| --- | --- | --- |
+| Runs the existing worker | **In-process.** Electron 45 embeds Node 24 with the same `node:sqlite`; `service.ts` is bundled into the app | Needs a **Node sidecar** (bundle `node.exe`, ~70 MB, or Node SEA) and an IPC protocol between Rust and the worker: a second lifecycle to keep correct |
+| Toolchain on this PC | npm only | Rust + MSVC build tools are not installed (several GB) |
+| Size | ~120 MB installer | ~10 MB shell + ~70 MB Node sidecar: the saving mostly disappears |
+| Tray, notifications, single instance, login item | built in | plugins |
+| Reliable process control | Node `child_process` (the same code the CLI uses) | via the sidecar |
+| New dependencies | `electron`, `electron-builder`, `esbuild` (dev only, in its **own package**, never in the website) | Rust crates + the same Node sidecar |
+
+The decisive point is the first row: the worker is TypeScript on Node 24 and uses `node:sqlite`; Electron lets the tray shell *be* the Node process that runs it, so there is no second runtime and
+no protocol to keep in sync. Revisit Tauri only if the worker is ever rewritten in Rust.
+
+### 10.3 What it shows and does
+
+Window (460 × 680, resizable 400-680 wide, position remembered, **close hides it to the tray and the worker keeps running**; only **Exit** ends the app and the worker, asking first when a run is active):
+status pill, CRM, Codex (version; **Open Codex Login** opens a terminal running `codex login` when sign-in is needed: Codex owns authentication, the app never signs in or reads its files), Business data
+(source, date, count, health: no paths), Worker, an **Active search** card (mode · location, stage, done / total), **Start / Stop Agent**, **Test Codex**, **Update business data**, **Open CRM**
+(`https://crm.ianverlinden.com/prospecting`, default browser), two start-up switches (below) and a collapsed **Diagnostics** panel (agent, Codex, Electron and Node versions, Codex executable, CRM endpoint,
+last heartbeat, index date and count, last error, **Copy diagnostics**, **Open logs folder**; paths appear only here, and the copied text goes through the secret scrubber). With no connection token the window shows
+**Setup required** and the three steps. The tray menu is: Ian Prospect Agent · Status · Open · Start Agent · Stop Agent · Open CRM · Exit. The tray icon is the site's "IV" mark with a status dot
+(green connected, amber partly ready / setup / starting, red error, gray stopped); the words are always shown as well (tooltip, menu, window).
+
+**Notifications** (fixed wording, no business names; at most one per kind per 30 s): "Prospect search completed: N candidates ready for review", "Prospect search failed: Open the agent for details.",
+"Agent disconnected" (device revoked). Never for heartbeats, offline periods, a cancelled run or a stop you asked for.
+
+### 10.4 Windows
+
+* **No administrator rights**: the app and the installer run as the current user (`asInvoker`, per-user install to `%LOCALAPPDATA%\Programs\Ian Prospect Agent`, uninstall entry under HKCU, no UAC prompt).
+* **Start-up is two separate switches, both OFF by default** (one checkbox would be ambiguous): *Start app with Windows* (a per-user login item that opens the app hidden in the tray; only in the installed app)
+  and *Start agent automatically* (when the app opens, start the worker too, if the device is connected).
+* **Shortcuts**: the installer creates a Start Menu and a Desktop shortcut.
+* **Offline**: the worker keeps running and retries with backoff; the tray says "Offline — retrying". No notification.
+
+### 10.5 Security
+
+* The CRM connection token stays in **Windows DPAPI** (`token.dpapi`), read only inside the service. The tray app has no code path that reads, stores or shows it (a test checks for it); there is no plaintext
+  token file, registry value, localStorage or config entry, and no OpenAI or other API key anywhere.
+* The window is sandboxed: `contextIsolation`, `sandbox`, no Node, no navigation, no new windows, no permissions, a strict CSP, `devTools` off in the installed app. It writes with `textContent` only. The only
+  messages it can send are a fixed list (start, stop, test, update, open one of two CRM pages, copy diagnostics, open logs, two boolean switches); URLs and commands are built in the main process.
+* Logs: `%LOCALAPPDATA%\IanProspectAgent\logs\agent.log` (1 MB, rotated once), every line passed through the redactor; no tokens, no ChatGPT credentials, no Supabase sessions, no email bodies.
+
+### 10.6 Build, run, package
+
+```bash
+cd tools/prospect-agent-desktop
+npm install                      # also fetches the Electron binary (postinstall)
+npm start                        # build and run from the repository (dev mode; Start with Windows is unavailable here)
+npm run typecheck
+npm run dist                     # release/Ian Prospect Agent Setup.exe (installer) and release/win-unpacked/ (runs without installing)
+```
+
+`release/` and `dist/` are Git-ignored: installers are **not committed**. The package is **unsigned** (private internal tool), so Windows SmartScreen may ask for confirmation the first time.
+After installation neither Node nor npm is needed: Electron brings its own Node and the worker is bundled. **Not built (by design)**: an auto-updater and any update server or public download
+(rebuild and run the installer again to update; a later option is a signed build with `electron-updater` pointed at a private location), code signing, a Windows service.
