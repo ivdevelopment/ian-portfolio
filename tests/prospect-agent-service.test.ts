@@ -29,6 +29,8 @@ afterEach(() => {
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
 });
 const quiet = createLogger({ file: false, sink: () => undefined });
+// Runs are scripted and fast, but a loaded machine (the whole suite in parallel) can take a few seconds: wait generously, return as soon as it is true.
+const wf = <T>(fn: () => T | Promise<T>) => vi.waitFor(fn, { timeout: 15_000, interval: 10 });
 const instantSleep = async () => new Promise<void>((r) => setTimeout(r, 1));
 const TOKEN = `ipa_${"T".repeat(43)}`;
 const RUN: RunParams = { id: "22222222-2222-4222-8222-222222222222", mode: "quick", location: "Brugge", area: null, industry: null, threshold: 70, count: 5, excludeResearched: true, attempt: 1 };
@@ -113,7 +115,7 @@ function make(api: AgentApi, runner: ProcRunner, over: Partial<ServiceDeps> & { 
 
 const running = async (s: ProspectAgentService) => {
   expect(await s.start()).toEqual({ ok: true });
-  await vi.waitFor(() => expect(s.getState().worker).toBe("running"));
+  await wf(() => expect(s.getState().worker).toBe("running"));
 };
 
 /* ---------------------------------- start, state, stop ---------------------------------- */
@@ -124,7 +126,7 @@ describe("ProspectAgentService: start, state and stop", () => {
     const { service, h } = make(f.api, fakeCodex().runner);
     expect(service.getState().worker).toBe("stopped");
     await running(service);
-    await vi.waitFor(() => expect(service.getState().codex.state).toBe("ready"));
+    await wf(() => expect(service.getState().codex.state).toBe("ready"));
     const s = service.getState();
     expect(s).toMatchObject({ worker: "running", crm: { state: "connected", device: "Ian-PC" }, codex: { state: "ready", version: "0.166.0" }, activeRun: null });
     expect(s.crm.lastHeartbeat).toBeGreaterThan(0);
@@ -145,7 +147,7 @@ describe("ProspectAgentService: start, state and stop", () => {
     const [a, b, c] = await Promise.all([service.start(), service.start(), service.start()]);
     expect([a, b, c]).toEqual([{ ok: true }, { ok: true }, { ok: true }]);
     expect(created).toHaveLength(1);
-    await vi.waitFor(() => expect(service.getState().worker).toBe("running"));
+    await wf(() => expect(service.getState().worker).toBe("running"));
     expect(await service.start()).toMatchObject({ ok: false, reason: "already_running" });
     expect(created).toHaveLength(1);
     await service.stop();
@@ -179,7 +181,7 @@ describe("ProspectAgentService: start, state and stop", () => {
     const f = fakeApi({ heartbeat: async () => { if (++calls > 1) await gate; return { ok: true as const, device: "Ian-PC" }; } });
     const { service } = make(f.api, fakeCodex().runner);
     await running(service);
-    await vi.waitFor(() => expect(calls).toBeGreaterThan(1)); // a later heartbeat is now in flight
+    await wf(() => expect(calls).toBeGreaterThan(1)); // a later heartbeat is now in flight
     await service.stop();
     const stopped = service.getState();
     expect(stopped).toMatchObject({ worker: "stopped", crm: { state: "unknown" } });
@@ -194,7 +196,7 @@ describe("ProspectAgentService: start, state and stop", () => {
     const f = fakeApi({ heartbeat: async () => { throw new AgentApiError("unauthorized", "x", 401); } });
     const { service } = make(f.api, fakeCodex().runner, { h, noLock: false });
     await service.start();
-    await vi.waitFor(() => expect(service.getState().worker).toBe("error"));
+    await wf(() => expect(service.getState().worker).toBe("error"));
     const s = service.getState();
     expect(s).toMatchObject({ crm: { state: "rejected" }, lastError: { kind: "crm_rejected" } });
     expect(deriveOverall(s)).toMatchObject({ level: "red", label: "Error" });
@@ -254,11 +256,11 @@ describe("readiness: CRM, Codex, business data are separate", () => {
     const f = fakeApi({ heartbeat: async () => { if (offline) throw new AgentApiError("network", "offline"); return { ok: true as const, device: "Ian-PC" }; } });
     const { service } = make(f.api, fakeCodex().runner);
     await service.start();
-    await vi.waitFor(() => expect(service.getState().crm.state).toBe("offline"));
+    await wf(() => expect(service.getState().crm.state).toBe("offline"));
     expect(service.getState().worker).toBe("running");
     expect(deriveOverall(service.getState())).toMatchObject({ level: "amber", label: "Offline — retrying" });
     offline = false;
-    await vi.waitFor(() => expect(service.getState().crm.state).toBe("connected"));
+    await wf(() => expect(service.getState().crm.state).toBe("connected"));
     await service.stop();
   });
 
@@ -266,7 +268,7 @@ describe("readiness: CRM, Codex, business data are separate", () => {
     const f = fakeApi();
     const { service } = make(f.api, fakeCodex({ login: 1 }).runner);
     await service.start();
-    await vi.waitFor(() => expect(service.getState().codex.state).toBe("not_authenticated"));
+    await wf(() => expect(service.getState().codex.state).toBe("not_authenticated"));
     const s = service.getState();
     expect(s.crm.state).toBe("connected");
     expect(deriveOverall(s).detail).toContain("Codex sign-in required");
@@ -278,7 +280,7 @@ describe("readiness: CRM, Codex, business data are separate", () => {
   it("Codex not installed is reported as such", async () => {
     const { service } = make(fakeApi().api, fakeCodex({ version: null }).runner);
     await service.start();
-    await vi.waitFor(() => expect(service.getState().codex.state).toBe("not_installed"));
+    await wf(() => expect(service.getState().codex.state).toBe("not_installed"));
     expect(deriveOverall(service.getState()).detail).toContain("Codex not installed");
     await service.stop();
   });
@@ -309,9 +311,9 @@ describe("an active run: stopping never kills it silently", () => {
     const codex = fakeCodex({ hang: true });
     const { service } = make(f.api, codex.runner);
     await running(service);
-    await vi.waitFor(() => expect(service.getState().activeRun).not.toBeNull());
+    await wf(() => expect(service.getState().activeRun).not.toBeNull());
     expect(service.getState().activeRun).toMatchObject({ modeLabel: "Quick Find", location: "Brugge" });
-    await vi.waitFor(() => expect(codex.calls.some((a) => a[0] === "exec" && a[1] !== "--help")).toBe(true));
+    await wf(() => expect(codex.calls.some((a) => a[0] === "exec" && a[1] !== "--help")).toBe(true));
     // Without confirmation nothing is stopped.
     expect(await service.stop()).toMatchObject({ ok: false, reason: "run_active" });
     expect(service.getState()).toMatchObject({ worker: "running" });
@@ -330,7 +332,7 @@ describe("an active run: stopping never kills it silently", () => {
     const f = fakeApi({ claims: [RUN] });
     const { service } = make(f.api, fakeCodex({ hang: true }).runner);
     await running(service);
-    await vi.waitFor(() => expect(service.getState().activeRun?.stage).toMatch(/Qualifying|Analyz|Checking/));
+    await wf(() => expect(service.getState().activeRun?.stage).toMatch(/Qualifying|Analyz|Checking/));
     const json = JSON.stringify(service.getState().activeRun);
     expect(json).not.toMatch(/@|company|email|phone/i);
     await service.stop({ mode: "force" });
@@ -342,7 +344,7 @@ describe("an active run: stopping never kills it silently", () => {
     const events: Array<{ type: string; status?: string; candidates?: number }> = [];
     service.onEvent((e) => events.push(e));
     await running(service);
-    await vi.waitFor(() => expect(events.some((e) => e.type === "run_finished")).toBe(true));
+    await wf(() => expect(events.some((e) => e.type === "run_finished")).toBe(true));
     expect(events.find((e) => e.type === "run_finished")).toMatchObject({ status: "completed" });
     expect(service.getState().lastRun).toMatchObject({ status: "completed" });
     await service.stop();
@@ -363,7 +365,7 @@ describe("Codex usage limit", () => {
     const f = fakeApi({ claims: [RUN, RUN, RUN] });
     const { service } = make(f.api, fakeCodex({ exec: () => ({ raw: { code: 1, stderr: "You've hit your usage limit. Try again in 3 hours." } }) }).runner);
     await running(service);
-    await vi.waitFor(() => expect(service.getState().codex.state).toBe("usage_limit"));
+    await wf(() => expect(service.getState().codex.state).toBe("usage_limit"));
     const s = service.getState();
     expect(s.worker).toBe("running");
     expect(s.crm.state).toBe("connected");
@@ -413,7 +415,7 @@ describe("Test Codex", () => {
     const codex = fakeCodex({ hang: true });
     const { service } = make(fakeApi().api, codex.runner);
     const first = service.testCodex();
-    await vi.waitFor(() => expect(service.getState().tasks.codexTest.state).toBe("running"));
+    await wf(() => expect(service.getState().tasks.codexTest.state).toBe("running"));
     const second = await service.testCodex();
     expect(second.state).toBe("failed");
     expect(second.message).toMatch(/already running/);
@@ -450,7 +452,7 @@ describe("Update business data", () => {
     const gate = new Promise<void>((r) => (release = r));
     const { service, h } = make(f.api, fakeCodex({ hang: true }).runner, { updateBusinessData: async () => { await gate; return { outcome: "failed", message: "x", status: (await import("../tools/prospect-agent/src/osm/data-manager")).businessDataStatus(h) }; } });
     await running(service);
-    await vi.waitFor(() => expect(service.getState().activeRun).not.toBeNull());
+    await wf(() => expect(service.getState().activeRun).not.toBeNull());
     expect(await service.updateBusinessData()).toMatchObject({ ok: false, reason: "run_active" });
     await service.stop({ mode: "force" });
     const first = service.updateBusinessData();
@@ -529,7 +531,7 @@ describe("diagnostics and secrets", () => {
     const seen: string[] = [];
     service.onState((s) => seen.push(JSON.stringify(s)));
     await running(service);
-    await vi.waitFor(() => expect(service.getState().lastRun).not.toBeNull());
+    await wf(() => expect(service.getState().lastRun).not.toBeNull());
     await service.stop();
     expect(seen.length).toBeGreaterThan(5);
     expect(seen.join("\n")).not.toContain(TOKEN);
@@ -577,7 +579,7 @@ describe("crash recovery: no zombie Codex", () => {
     try {
       const ctrl = new AbortController();
       const run = runProcess(process.execPath, ["-e", "setTimeout(()=>{},60000)"], { cwd: h, stdin: "", timeoutMs: 60_000, maxBytes: 1000, signal: ctrl.signal });
-      await vi.waitFor(() => expect(readChildren(h)).toHaveLength(1), { timeout: 10_000 });
+      await wf(() => expect(readChildren(h)).toHaveLength(1));
       expect(readChildren(h)[0]).toMatchObject({ parentPid: process.pid });
       ctrl.abort();
       const r = await run;

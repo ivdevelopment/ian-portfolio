@@ -318,6 +318,8 @@ npm run typecheck
 npm run dist                     # release/Ian Prospect Agent Setup.exe (installer) and release/win-unpacked/ (runs without installing)
 ```
 
+**Electron is pinned to exactly 45.0.0.** On Ian's PC, Electron 45.2.3 renderers crashed at start-up (exit code `0x80000003`) for every page, even a one-line `data:` URL, while 45.0.0 rendered normally with the same files; the cause was not found, so the known-good version is pinned. Before upgrading Electron, run the trivial-page check: a main process that opens a `BrowserWindow` on a `data:` URL and exits when `did-finish-load` fires (a crashed renderer shows up as `render-process-gone`; the app now logs that with its reason).
+
 `release/` and `dist/` are Git-ignored: installers are **not committed**. The package is **unsigned** (private internal tool), so Windows SmartScreen may ask for confirmation the first time.
 After installation neither Node nor npm is needed: Electron brings its own Node and the worker is bundled. **Not built (by design)**: an auto-updater and any update server or public download
 (rebuild and run the installer again to update; a later option is a signed build with `electron-updater` pointed at a private location), code signing, a Windows service.
