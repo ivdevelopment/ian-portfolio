@@ -110,7 +110,7 @@ export function buildPrompt(request: DiscoveryRequest, items: AnalyzedBusiness[]
 
 export type ProviderStats = { calls: number; okCalls: number; ms: number; lastFailure: FailureKind | null; notes: string[] };
 
-export type CodexProviderOptions = { bin: string; model: string | null; effort: Effort; timeoutMs: number; dir: string; flags: ReadonlySet<string>; run?: ProcRunner; onLog?: (msg: string, fields?: Record<string, unknown>) => void };
+export type CodexProviderOptions = { bin: string; model: string | null; effort: Effort; timeoutMs: number; dir: string; flags: ReadonlySet<string>; run?: ProcRunner; signal?: AbortSignal; onLog?: (msg: string, fields?: Record<string, unknown>) => void };
 
 export class CodexProvider implements ProspectAIProvider {
   readonly id = "local_codex" as const;
@@ -124,10 +124,15 @@ export class CodexProvider implements ProspectAIProvider {
   async qualifyBusinesses({ request, items }: QualifyInput): Promise<ProviderAssessment[]> {
     const out: ProviderAssessment[] = [];
     for (let i = 0; i < items.length; i += BATCH_SIZE) {
+      if (this.o.signal?.aborted) break; // the agent was stopped: keep what was assessed so far
       const batch = items.slice(i, i + BATCH_SIZE);
       const n = ++this.stats.calls;
-      const res = await execStructured({ bin: this.o.bin, dir: join(this.o.dir, `call-${n}`), prompt: buildPrompt(request, batch), schema: OUTPUT_SCHEMA as unknown as Record<string, unknown>, model: this.o.model, effort: this.o.effort, timeoutMs: this.o.timeoutMs, flags: this.o.flags, run: this.o.run });
+      const res = await execStructured({ bin: this.o.bin, dir: join(this.o.dir, `call-${n}`), prompt: buildPrompt(request, batch), schema: OUTPUT_SCHEMA as unknown as Record<string, unknown>, model: this.o.model, effort: this.o.effort, timeoutMs: this.o.timeoutMs, flags: this.o.flags, run: this.o.run, signal: this.o.signal });
       this.stats.ms += res.ms;
+      if (!res.ok && res.aborted) {
+        this.stats.calls--; // a call that was cut short by Stop is not a Codex problem and is not counted
+        break;
+      }
       this.o.onLog?.("codex call", { call: n, ok: res.ok, exit: res.ok ? res.exitCode : res.exitCode, ms: res.ms, ...(res.ok ? {} : { kind: res.kind }) });
       if (!res.ok) {
         this.stats.lastFailure = res.kind;

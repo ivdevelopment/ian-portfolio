@@ -1,6 +1,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { registerChild, unregisterChild } from "./children";
 
 /**
  * The one place that runs Codex CLI. Codex owns authentication and everything about talking to ChatGPT; this module only starts the official
@@ -11,8 +12,8 @@ import { join } from "node:path";
  * (model, effort) and file paths we created; the prompt travels over stdin. The child gets a small allow-listed environment (no tokens of ours,
  * no Supabase keys). Output is capped; a stuck process is killed with its children.
  */
-export type ProcResult = { code: number | null; stdout: string; stderr: string; timedOut: boolean; truncated: boolean; spawnError: string | null };
-export type ProcRunner = (cmd: string, args: string[], opts: { cwd: string; stdin: string; timeoutMs: number; maxBytes: number }) => Promise<ProcResult>;
+export type ProcResult = { code: number | null; stdout: string; stderr: string; timedOut: boolean; truncated: boolean; spawnError: string | null; /** The caller's AbortSignal fired and the process tree was killed. */ aborted?: boolean };
+export type ProcRunner = (cmd: string, args: string[], opts: { cwd: string; stdin: string; timeoutMs: number; maxBytes: number; signal?: AbortSignal }) => Promise<ProcResult>;
 
 import { FAILURE_KINDS, FAILURE_MESSAGES, type FailureKind } from "../../../src/lib/prospecting/agent/messages";
 export { FAILURE_KINDS };
@@ -133,6 +134,17 @@ export const runProcess: ProcRunner = (bin, args, opts) =>
     let truncated = false;
     let timedOut = false;
     let spawnError: string | null = null;
+    let aborted = false;
+    // Children are remembered on disk while they run, so a crash of the parent cannot leave a Codex process behind unnoticed (see children.ts).
+    registerChild(child.pid);
+    const onAbort = () => {
+      aborted = true;
+      killTree(child.pid);
+    };
+    if (opts.signal) {
+      if (opts.signal.aborted) onAbort();
+      else opts.signal.addEventListener("abort", onAbort, { once: true });
+    }
     const add = (which: "out" | "err", chunk: Buffer) => {
       const room = opts.maxBytes - (stdout.length + stderr.length);
       if (room <= 0) {
@@ -155,8 +167,10 @@ export const runProcess: ProcRunner = (bin, args, opts) =>
     });
     child.on("close", (code) => {
       clearTimeout(timer);
+      opts.signal?.removeEventListener("abort", onAbort);
       killTree(child.pid);
-      resolve({ code, stdout, stderr, timedOut, truncated, spawnError });
+      unregisterChild(child.pid);
+      resolve({ code, stdout, stderr, timedOut, truncated, spawnError, ...(aborted ? { aborted } : {}) });
     });
     child.stdin.on("error", () => undefined);
     child.stdin.end(opts.stdin);
@@ -228,8 +242,10 @@ export type ExecOptions = {
   timeoutMs: number;
   flags: ReadonlySet<string>;
   run?: ProcRunner;
+  /** Aborting kills the Codex process tree at once (the agent was stopped). */
+  signal?: AbortSignal;
 };
-export type ExecResult = { ok: true; value: unknown; ms: number; exitCode: number } | { ok: false; kind: FailureKind; message: string; ms: number; exitCode: number | null };
+export type ExecResult = { ok: true; value: unknown; ms: number; exitCode: number } | { ok: false; kind: FailureKind; message: string; ms: number; exitCode: number | null; aborted?: boolean };
 
 /**
  * One headless Codex call: `codex exec` in a throwaway folder, read-only sandbox, schema-constrained final message. The prompt is passed on
@@ -255,8 +271,9 @@ export async function execStructured(o: ExecOptions): Promise<ExecResult> {
   args.push("-c", `model_reasoning_effort=${o.effort}`, "-");
 
   const started = Date.now();
-  const r = await run(o.bin, args, { cwd: o.dir, stdin: o.prompt, timeoutMs: o.timeoutMs, maxBytes: LIMITS.maxStreamBytes });
+  const r = await run(o.bin, args, { cwd: o.dir, stdin: o.prompt, timeoutMs: o.timeoutMs, maxBytes: LIMITS.maxStreamBytes, signal: o.signal });
   const ms = Date.now() - started;
+  if (r.aborted) return { ok: false, kind: "agent_error", message: "Stopped.", ms, exitCode: r.code, aborted: true };
   if (r.spawnError || r.timedOut || r.code !== 0) {
     const kind = classify(r);
     return { ok: false, kind, message: KIND_MESSAGES[kind], ms, exitCode: r.code };

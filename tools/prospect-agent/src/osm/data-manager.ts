@@ -137,10 +137,20 @@ export function md5File(path: string): Promise<string> {
   });
 }
 
+/** The real stages of an update, for a UI that shows progress. `percent` is of the whole update only where it is known (download, build). */
+export type UpdateStage =
+  | { stage: "checking" }
+  | { stage: "verifying"; detail: "existing_extract" | "download" }
+  | { stage: "downloading"; bytes: number; total: number | null }
+  | { stage: "building"; percent: number }
+  | { stage: "installing" }
+  | { stage: "done"; outcome: "up_to_date" | "updated" | "failed" };
+
 export type UpdateDeps = {
   home?: string;
   force?: boolean;
   log?: (message: string) => void;
+  onStage?: (stage: UpdateStage) => void;
   now?: () => number;
   remote?: () => Promise<RemoteInfo>;
   download?: (opts: { dest: string; info: RemoteInfo; onProgress?: (bytes: number, total: number | null) => void }) => Promise<DownloadResult>;
@@ -161,10 +171,21 @@ export type UpdateResult =
 export async function updateBusinessData(deps: UpdateDeps = {}): Promise<UpdateResult> {
   const home = deps.home ?? agentHome();
   const log = deps.log ?? (() => undefined);
+  const stage = (s: UpdateStage) => {
+    try {
+      deps.onStage?.(s);
+    } catch {
+      /* a UI callback must never break an update */
+    }
+  };
   const now = deps.now ?? Date.now;
   const p = osmPaths(home);
   mkdirSync(p.dir, { recursive: true });
-  const fail = (message: string): UpdateResult => ({ outcome: "failed", message, status: businessDataStatus(home, now()) });
+  const fail = (message: string): UpdateResult => {
+    stage({ stage: "done", outcome: "failed" });
+    return { outcome: "failed", message, status: businessDataStatus(home, now()) };
+  };
+  stage({ stage: "checking" });
   const cleanup = () => {
     rmSync(p.building, { force: true });
     rmSync(`${p.building}-journal`, { force: true });
@@ -181,6 +202,7 @@ export async function updateBusinessData(deps: UpdateDeps = {}): Promise<UpdateR
   const before = businessDataStatus(home, now());
   if (!deps.force && before.indexReady && current && info.md5 && current.pbf.md5 === info.md5) {
     writeMetadata(home, { ...current, lastCheckedAt: new Date(now()).toISOString() });
+    stage({ stage: "done", outcome: "up_to_date" });
     return { outcome: "up_to_date", status: businessDataStatus(home, now()) };
   }
 
@@ -191,6 +213,7 @@ export async function updateBusinessData(deps: UpdateDeps = {}): Promise<UpdateR
   let downloadSeconds = 0;
   let md5: string | null = info.md5;
   try {
+    if (info.md5 && existsSync(p.pbf)) stage({ stage: "verifying", detail: "existing_extract" });
     if (info.md5 && existsSync(p.pbf) && (await md5File(p.pbf)) === info.md5) {
       pbfPath = p.pbf;
       reused = true;
@@ -198,7 +221,16 @@ export async function updateBusinessData(deps: UpdateDeps = {}): Promise<UpdateR
     } else {
       rmSync(p.pbfNext, { force: true });
       const t0 = now();
-      const dl = await (deps.download ?? ((o) => downloadPbf(o)))({ dest: p.pbfNext, info, onProgress: (b, total) => log(`downloading: ${(b / 1e6).toFixed(0)} MB${total ? ` of ${(total / 1e6).toFixed(0)} MB` : ""}`) });
+      stage({ stage: "downloading", bytes: 0, total: info.sizeBytes });
+      const dl = await (deps.download ?? ((o) => downloadPbf(o)))({
+        dest: p.pbfNext,
+        info,
+        onProgress: (b, total) => {
+          log(`downloading: ${(b / 1e6).toFixed(0)} MB${total ? ` of ${(total / 1e6).toFixed(0)} MB` : ""}`);
+          stage({ stage: "downloading", bytes: b, total });
+        },
+      });
+      stage({ stage: "verifying", detail: "download" });
       downloadedBytes = dl.bytes;
       downloadSeconds = Math.round((now() - t0) / 1000);
       md5 = dl.md5;
@@ -212,7 +244,14 @@ export async function updateBusinessData(deps: UpdateDeps = {}): Promise<UpdateR
   cleanup();
   let stats: BuildStats;
   try {
-    stats = (deps.build ?? buildIndex)({ pbfPath, outPath: p.building, log, extraMeta: { source: SOURCE_NAME } });
+    stage({ stage: "building", percent: 0 });
+    // The index builder reports "pass 1/2: 40%"; both passes together make up the percentage shown.
+    const buildLog = (m: string) => {
+      log(m);
+      const hit = /^pass (\d)\/2: (\d+)%/.exec(m);
+      if (hit) stage({ stage: "building", percent: Math.min(100, (Number(hit[1]) - 1) * 50 + Number(hit[2]) / 2) });
+    };
+    stats = (deps.build ?? buildIndex)({ pbfPath, outPath: p.building, log: buildLog, extraMeta: { source: SOURCE_NAME } });
     const min = deps.minBusinesses ?? 1000;
     if (stats.businesses < min) throw new Error(`the new index has only ${stats.businesses} businesses (expected at least ${min})`);
     const db = openIndex(p.building);
@@ -229,6 +268,7 @@ export async function updateBusinessData(deps: UpdateDeps = {}): Promise<UpdateR
   }
 
   // Swap. The old index is kept as "previous" and restored if the second rename fails.
+  stage({ stage: "installing" });
   try {
     rmSync(p.previous, { force: true });
     if (existsSync(p.index)) renameSync(p.index, p.previous);
@@ -260,5 +300,6 @@ export async function updateBusinessData(deps: UpdateDeps = {}): Promise<UpdateR
     lastCheckedAt: stamp,
     lastUpdatedAt: stamp,
   });
+  stage({ stage: "done", outcome: "updated" });
   return { outcome: "updated", status: businessDataStatus(home, now()), downloadedBytes, downloadSeconds, reusedExtract: reused, build: stats };
 }

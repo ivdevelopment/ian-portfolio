@@ -30,6 +30,10 @@ export type JobDeps = {
   budgets?: { quickMs: number; deepMs: number; callQuickMs: number; callDeepMs: number };
   /** True once the worker was told to stop (Ctrl+C): the job stops between steps and reports what it has. */
   stopping?: () => boolean;
+  /** Aborted when a person chooses "stop anyway": the running Codex process is ended and the run is reported as cancelled with what it has. */
+  signal?: AbortSignal;
+  /** Real progress for a UI (the same stage and counters that are sent to the CRM). Never carries business details. */
+  onProgress?: (progress: { status?: "discovering" | "analyzing" | "qualifying"; stage: string; counters: Partial<RunCounters> }) => void;
   analyzeDeps?: Parameters<typeof runPipeline>[1]["analyzeDeps"];
 };
 
@@ -93,6 +97,7 @@ export async function runJob(run: RunParams, deps: JobDeps): Promise<JobSummary>
     effort: effortFor(config, mode),
     timeoutMs: mode === "quick" ? budgets.callQuickMs : budgets.callDeepMs,
     dir,
+    signal: deps.signal,
     flags: deps.flags,
     run: deps.runner,
     onLog: (m, f) => log.info(m, { run: run.id, ...f }),
@@ -120,6 +125,11 @@ export async function runJob(run: RunParams, deps: JobDeps): Promise<JobSummary>
         Object.assign(latest.counters, counters);
         if (errors) latest.errors = errors;
         log.info("progress", { run: run.id, stage: latest.stage, ...latest.counters });
+        try {
+          deps.onProgress?.({ status: latest.status, stage: latest.stage, counters: { ...latest.counters } });
+        } catch {
+          /* a UI callback must never break a run */
+        }
         await send();
       },
       async saveCandidates(rows: CandidateInsert[]) {
@@ -141,7 +151,7 @@ export async function runJob(run: RunParams, deps: JobDeps): Promise<JobSummary>
       source,
       store,
       analyzeDeps: deps.analyzeDeps,
-      shouldCancel: () => (leaseLost || cancelRequested || deps.stopping?.() ? "cancelled" : Date.now() > deadline ? "deadline" : null),
+      shouldCancel: () => (leaseLost || cancelRequested || deps.stopping?.() || deps.signal?.aborted ? "cancelled" : Date.now() > deadline ? "deadline" : null),
     });
 
     clearInterval(keepAlive);

@@ -44,6 +44,11 @@ export async function loadToken(home = agentHome(), env: Record<string, string |
   }
 }
 
+/** Is a token stored? A file check only: nothing is decrypted, so a status screen can ask as often as it likes. */
+export function tokenExists(home = agentHome(), env: Record<string, string | undefined> = process.env): boolean {
+  return Boolean(env.PROSPECT_AGENT_TOKEN) || existsSync(tokenFile(home));
+}
+
 export function forgetToken(home = agentHome()): boolean {
   const file = tokenFile(home);
   if (!existsSync(file)) return false;

@@ -1,18 +1,17 @@
 import { createInterface } from "node:readline";
 import { Writable } from "node:stream";
 import { AgentApi, AgentApiError } from "./api-client";
-import { diagnose, execStructured, KIND_MESSAGES, parseVersion, resolveExecutableCached, runProcess, supportedFlags } from "./codex";
-import { TEST_SCHEMA } from "./codex-provider";
+import { diagnose, KIND_MESSAGES, resolveExecutableCached } from "./codex";
 import { loadConfig, saveConfig, validateCrmUrl } from "./config";
 import { createLogger } from "./logger";
 import { agentHome } from "./paths";
 import { forgetToken, loadToken, saveToken } from "./secret-store";
+import { ProspectAgentService } from "./service";
 import { MockBusinessSource } from "../../../src/lib/prospecting/providers/mock";
 import { CompositeBusinessSource } from "./discovery-source";
-import { businessDataStatus, statusLine, updateBusinessData } from "./osm/data-manager";
+import { businessDataStatus, statusLine } from "./osm/data-manager";
 import { SOURCE_NAME } from "./osm/geofabrik";
 import type { LocalOsmBusinessSource } from "./osm/local-osm-source";
-import { startWorker } from "./worker";
 
 /**
  * Ian Prospect Agent. Commands:
@@ -55,17 +54,28 @@ async function main(argv: string[]): Promise<number> {
   if (cmd === "update-business-data") {
     const force = argv.includes("--force");
     console.log(`Checking Geofabrik (${SOURCE_NAME}) for the current Belgium extract...`);
-    const res = await updateBusinessData({ force, log: (m) => console.log(`  ${m}`) });
-    if (res.outcome === "failed") {
-      console.error(`\n${res.message}`);
+    const res = await new ProspectAgentService({ log, noLock: true }).updateBusinessData({ force, log: (m) => console.log(`  ${m}`) });
+    if (!res.ok) {
+      console.error(`
+${res.message}`);
       return 1;
     }
-    if (res.outcome === "up_to_date") {
-      console.log(`\nThe local business data is already the newest version (${statusLine(res.status)}). Use --force to rebuild the index anyway.`);
+    if (res.result.outcome === "up_to_date") {
+      console.log(`
+The local business data is already the newest version (${statusLine(res.result.status)}). Use --force to rebuild the index anyway.`);
       return 0;
     }
-    const s = res.status;
-    console.log(`\nLocal business data is ready.\n  Source:        ${s.source}\n  Data date:     ${s.dataDate ?? "unknown"}\n  Businesses:    ${s.businesses.toLocaleString("en")} indexed (${s.places.toLocaleString("en")} places for search centres)\n  Download:      ${res.reusedExtract ? "reused the extract already on disk" : `${(res.downloadedBytes / 1e6).toFixed(0)} MB in ${res.downloadSeconds} s`}\n  Index size:    ${(s.indexBytes / 1e6).toFixed(0)} MB (import took ${res.build.seconds} s)\n  Attribution:   ${s.attribution}`);
+    if (res.result.outcome !== "updated") return 1;
+    const r = res.result;
+    const s = r.status;
+    console.log(`
+Local business data is ready.
+  Source:        ${s.source}
+  Data date:     ${s.dataDate ?? "unknown"}
+  Businesses:    ${s.businesses.toLocaleString("en")} indexed (${s.places.toLocaleString("en")} places for search centres)
+  Download:      ${r.reusedExtract ? "reused the extract already on disk" : `${(r.downloadedBytes / 1e6).toFixed(0)} MB in ${r.downloadSeconds} s`}
+  Index size:    ${(s.indexBytes / 1e6).toFixed(0)} MB (import took ${r.build.seconds} s)
+  Attribution:   ${s.attribution}`);
     return 0;
   }
 
@@ -140,68 +150,78 @@ async function main(argv: string[]): Promise<number> {
   }
 
   if (cmd === "status") {
+    const service = new ProspectAgentService({ log, noLock: true });
     const token = await loadToken();
-    const d = await diagnose(config.codexBin);
+    const state = await service.refresh();
+    const d = state.codex;
     console.log(`Business data: ${statusLine(businessDataStatus())}`);
-    console.log(`Home:    ${agentHome()}\nCRM:    ${config.crmUrl}\nToken:   ${token ? "stored" : "not set (run setup)"}\nModel:   ${config.model ?? "Codex default"}\nEffort:  quick=${config.effortQuick}, deep=${config.effortDeep}\nCodex:   ${d.state}${d.version ? ` (${d.version})` : ""}${d.note ? ` - ${d.note}` : ""}\nExe:     ${resolveExecutableCached(config.codexBin) ?? "not found"}`);
+    console.log(`Home:    ${agentHome()}
+CRM:    ${config.crmUrl}
+Token:   ${token ? "stored" : "not set (run setup)"}
+Model:   ${config.model ?? "Codex default"}
+Effort:  quick=${config.effortQuick}, deep=${config.effortDeep}
+Codex:   ${d.state}${d.version ? ` (${d.version})` : ""}${d.note ? ` - ${d.note}` : ""}
+Exe:     ${resolveExecutableCached(config.codexBin) ?? "not found"}`);
     return d.state === "ready" && token ? 0 : 1;
   }
 
   if (cmd === "doctor") {
-    const d = await diagnose(config.codexBin);
-    const bd = businessDataStatus();
-    console.log(`Business data\n  Installed:          ${bd.indexReady ? "yes" : "no"}\n  Source:             ${bd.source}\n  Data date:          ${bd.dataDate ?? "unknown"}${bd.ageDays !== null ? ` (${bd.ageDays} ${bd.ageDays === 1 ? "day" : "days"} old, ${bd.freshness})` : ""}\n  Index ready:        ${bd.indexReady ? "yes" : "no"}\n  Businesses indexed: ${bd.businesses.toLocaleString("en")}\n  Attribution:        ${bd.attribution}${bd.indexReady ? "" : `\n  ${statusLine(bd)}`}\n`);
-    console.log(`Agent check: ${d.state}${d.version ? ` (codex ${d.version})` : ""}${d.note ? `\n  ${d.note}` : ""}\n  Executable: ${resolveExecutableCached(config.codexBin) ?? "not found"}`);
+    const r = await new ProspectAgentService({ log, noLock: true }).doctor();
+    const bd = r.businessData;
+    const d = r.codex;
+    console.log(`Business data
+  Installed:          ${bd.indexReady ? "yes" : "no"}
+  Source:             ${bd.source}
+  Data date:          ${bd.dataDate ?? "unknown"}${bd.ageDays !== null ? ` (${bd.ageDays} ${bd.ageDays === 1 ? "day" : "days"} old, ${bd.freshness})` : ""}
+  Index ready:        ${bd.indexReady ? "yes" : "no"}
+  Businesses indexed: ${bd.businesses.toLocaleString("en")}
+  Attribution:        ${bd.attribution}${bd.indexReady ? "" : `
+  ${statusLine(bd)}`}
+`);
+    console.log(`Agent check: ${d.state}${d.version ? ` (codex ${d.version})` : ""}${d.note ? `
+  ${d.note}` : ""}
+  Executable: ${d.executable ?? "not found"}`);
     if (d.state === "not_installed") console.log("  Install Codex CLI: npm install -g @openai/codex   (or the installer from the Codex docs), then run: codex");
     if (d.state === "not_authenticated") console.log("  Sign in: run `codex` and choose Sign in with ChatGPT.");
-    const r = await runProcess(config.codexBin, ["doctor", "--summary"], { cwd: process.cwd(), stdin: "", timeoutMs: 60_000, maxBytes: 50_000 });
-    console.log(r.code === 0 ? `\ncodex doctor:\n${r.stdout.trim()}` : "\n`codex doctor --summary` is not available in this Codex version (nothing was changed).");
+    console.log(r.codexSummary !== null ? `\ncodex doctor:\n${r.codexSummary}` : "\n`codex doctor --summary` is not available in this Codex version (nothing was changed).");
     return d.state === "ready" ? 0 : 1;
   }
 
   if (cmd === "test-codex") {
-    const d = await diagnose(config.codexBin);
-    if (d.state !== "ready") {
-      console.error(`Codex is not ready: ${d.note ?? d.state}`);
-      return 1;
-    }
-    const flags = await supportedFlags(config.codexBin);
-    const res = await execStructured({ bin: config.codexBin, dir: `${agentHome()}/runs/test-${Date.now()}`, prompt: 'Return the JSON object {"ok": true}. Do not run any commands.', schema: TEST_SCHEMA as unknown as Record<string, unknown>, model: config.model, effort: "low", timeoutMs: 120_000, flags });
-    if (res.ok && (res.value as { ok?: unknown })?.ok === true) {
-      console.log(`Codex ${d.version ?? ""} works: headless exec, ChatGPT sign-in and structured output are fine (${res.ms} ms).\nExecutable: ${resolveExecutableCached(config.codexBin) ?? "?"}`);
+    const service = new ProspectAgentService({ log, noLock: true });
+    const out = await service.testCodex();
+    if (out.state === "ready") {
+      console.log(`Codex ${out.version ?? ""} works: headless exec, ChatGPT sign-in and structured output are fine (${out.ms} ms).
+Executable: ${resolveExecutableCached(config.codexBin) ?? "?"}`);
       return 0;
     }
-    console.error(res.ok ? "Codex answered, but not with the expected structure." : `${res.message} (${res.kind})`);
+    console.error(`${out.message}`);
     return 1;
   }
 
   if (cmd === "start") {
-    const token = await loadToken();
-    if (!token) {
-      console.error("No connection token. Run: prospect-agent setup");
-      return 1;
-    }
-    const api = new AgentApi(config.crmUrl, token);
-    log.info("agent starting", { crm: config.crmUrl, codex: config.codexBin, model: config.model ?? "default", node: process.version, version: parseVersion(process.version) ?? "" });
     // Development only: PROSPECT_AGENT_SOURCE=sample uses invented businesses, and only while talking to a LOCAL CRM (never the real one).
     const sample = process.env.PROSPECT_AGENT_SOURCE === "sample" && /^http:\/\/(localhost|127\.0\.0\.1|[a-z0-9-]+\.localhost)(:|$)/.test(config.crmUrl);
-    if (process.env.PROSPECT_AGENT_SOURCE === "sample" && !sample) log.warn("PROSPECT_AGENT_SOURCE=sample is ignored: it only works against a local CRM");
-    const handle = startWorker({ api, config, log, source: sample ? new MockBusinessSource() : undefined });
-    const bd = businessDataStatus();
-    log.info("business data", { ready: bd.indexReady, source: bd.source, dataDate: bd.dataDate ?? "", businesses: bd.businesses, freshness: bd.freshness });
-    if (!bd.indexReady && !sample) log.warn(statusLine(bd));
+    if (process.env.PROSPECT_AGENT_SOURCE === "sample" && !sample) log.warn("PROSPECT_AGENT_SOURCE=sample is ignored: it only works against a local CRM (never the real one)");
+    const service = new ProspectAgentService({ log, owner: "cli", source: sample ? new MockBusinessSource() : undefined });
+    const started = await service.start();
+    if (!started.ok) {
+      console.error(started.reason === "not_configured" ? "No connection token. Run: prospect-agent setup" : started.message);
+      return 1;
+    }
     let signals = 0;
     const onSignal = () => {
       signals++;
       if (signals > 1) process.exit(130);
       log.info("stopping: finishing the current step, then exiting (press Ctrl+C again to force)");
-      handle.stop();
+      void service.stop({ mode: "graceful" });
     };
     process.on("SIGINT", onSignal);
     process.on("SIGTERM", onSignal);
-    const result = await handle.done;
-    log.info("agent stopped", { reason: result });
-    return result === "unauthorized" ? 2 : 0;
+    const reason = await new Promise<"stopped" | "unauthorized">((resolve) => {
+      service.onEvent((e) => e.type === "worker_stopped" && resolve(e.reason));
+    });
+    return reason === "unauthorized" ? 2 : 0;
   }
 
   console.error(`Unknown command "${cmd}". ${KIND_MESSAGES.agent_error ? "Run: prospect-agent help" : ""}`);
