@@ -83,8 +83,8 @@ function assess(request: DiscoveryRequest, item: AnalyzedBusiness): ProviderAsse
   put("business_fit", 14 + (request.industry && (b.industry ?? "").toLowerCase().includes(request.industry.toLowerCase()) ? 6 : 3) + (b.industry ? 3 : 0), `${b.industry ?? "A local service business"} with clear local activity in ${b.city ?? "the region"}.`);
 
   if (noSite) {
-    put("website_need", 22, "No standalone website was found; the business appears to rely on a social media page.", ids(item, /No standalone website/));
-    put("conversion_gap", 12, "There is no website where customers can send an enquiry or request a quote.", ids(item, /No standalone website/));
+    put("website_need", 22, "No website URL is present in the listing; the business appears to rely on a social media page.", ids(item, /No website URL/));
+    put("conversion_gap", 12, "No website is listed where customers can send an enquiry or request a quote.", ids(item, /No website URL/));
   } else if (!s.reachable) {
     put("website_need", 0, "The website could not be analysed.");
     put("conversion_gap", 0, "The enquiry flow could not be assessed.");

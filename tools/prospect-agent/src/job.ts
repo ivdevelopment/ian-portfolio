@@ -3,6 +3,7 @@ import { businessKey, type DedupeContext } from "../../../src/lib/prospecting/de
 import { runPipeline, type CandidateInsert, type PipelineStore, type RunCounters, type SeenOutcome } from "../../../src/lib/prospecting/pipeline";
 import type { BusinessSource } from "../../../src/lib/prospecting/providers/types";
 import { SourceError } from "./osm-source";
+import { BusinessDataMissingError } from "./osm/local-osm-source";
 import { SEARCH_MODES, type DiscoveryRequest, type SearchMode } from "../../../src/lib/prospecting/types";
 import { AgentApiError, type AgentApi, type RunParams } from "./api-client";
 import { KIND_MESSAGES, type FailureKind, type ProcRunner } from "./codex";
@@ -64,13 +65,18 @@ export async function runJob(run: RunParams, deps: JobDeps): Promise<JobSummary>
 
   // A failing discovery source is its own failure kind: it must never be reported as a Codex problem.
   let sourceFailed = false;
+  let dataMissing = false;
   const source: BusinessSource = {
     id: deps.source.id,
     discover: async (r) => {
       try {
-        return await deps.source.discover(r);
+        const t0 = Date.now();
+        const found = await deps.source.discover(r);
+        log.info("discovery finished", { run: run.id, source: deps.source.id, businesses: found.length, ms: Date.now() - t0 });
+        return found;
       } catch (e) {
         sourceFailed = true;
+        dataMissing = e instanceof BusinessDataMissingError;
         log.warn("business source failed", { run: run.id, error: e instanceof SourceError ? e.message : "error" });
         throw e;
       }
@@ -143,13 +149,17 @@ export async function runJob(run: RunParams, deps: JobDeps): Promise<JobSummary>
       log.warn("lease lost, results not submitted", { run: run.id });
       return { status: "abandoned", candidates: 0, codexCalls: provider.stats.calls, codexMs: provider.stats.ms, kind: null };
     }
-    const kind = sourceFailed ? ("source_error" as FailureKind) : provider.stats.lastFailure;
+    const kind = sourceFailed ? (dataMissing ? ("business_data_missing" as FailureKind) : ("source_error" as FailureKind)) : provider.stats.lastFailure;
     const nothing = candidates.length === 0;
     // Codex never produced a usable answer and nothing was kept: that is a failure with a reason, not an empty "completed" run.
     const codexNeverWorked = provider.stats.calls > 0 && provider.stats.okCalls === 0 && kind !== null;
     if (nothing && outcome.status !== "cancelled" && (outcome.status === "failed" || codexNeverWorked || sourceFailed)) {
       const k: FailureKind = kind ?? "agent_error";
-      await api.fail({ runId: run.id, kind: k, message: KIND_MESSAGES[k] });
+      // A CRM that predates `business_data_missing` rejects the new kind; the run is then failed as a generic source error with the clear message.
+      await api.fail({ runId: run.id, kind: k, message: KIND_MESSAGES[k] }).catch((e: unknown) => {
+        if (k === "business_data_missing" && e instanceof AgentApiError && e.kind === "rejected") return api.fail({ runId: run.id, kind: "source_error", message: KIND_MESSAGES[k] });
+        throw e;
+      });
       log.error("run failed", { run: run.id, kind: k, ms: Date.now() - started });
       return { status: "failed", candidates: 0, codexCalls: provider.stats.calls, codexMs: provider.stats.ms, kind: k };
     }

@@ -10,6 +10,7 @@ import { KIND_MESSAGES, LIMITS, childEnv, classify, diagnose, execStructured, pa
 import { BATCH_SIZE, CodexProvider, OUTPUT_SCHEMA, buildPrompt } from "../tools/prospect-agent/src/codex-provider";
 import { DEFAULT_CONFIG, effortFor, loadConfig, validateCrmUrl } from "../tools/prospect-agent/src/config";
 import { runJob } from "../tools/prospect-agent/src/job";
+import { CompositeBusinessSource } from "../tools/prospect-agent/src/discovery-source";
 import { createLogger, redact } from "../tools/prospect-agent/src/logger";
 import { OsmBusinessSource, SourceError, buildQuery, industryFilters, radiusKm, toBusiness } from "../tools/prospect-agent/src/osm-source";
 import { forgetToken, loadToken, saveToken } from "../tools/prospect-agent/src/secret-store";
@@ -431,6 +432,36 @@ describe("OpenStreetMap discovery when the public servers are busy", () => {
     expect(of("result")).toHaveLength(0);
     expect(codex.execCalls()).toBe(0);
   });
+
+  it("missing local business data fails the run at once with its own kind and a clear message, before Codex is ever used", async () => {
+    const h = home();
+    const { api, of } = fakeApi();
+    const codex = fakeCodex({ exec: (_n, prompt) => ({ json: answer(prompt) }) });
+    const missing = new CompositeBusinessSource({ home: h });
+    const t0 = Date.now();
+    const summary = await runJob(RUN, jobDeps(api, codex.runner, h, { source: missing }));
+    expect(Date.now() - t0).toBeLessThan(3000);
+    expect(summary).toMatchObject({ status: "failed", kind: "business_data_missing" });
+    expect(of("fail")[0]).toMatchObject({ kind: "business_data_missing", message: expect.stringContaining("Local business data is not installed on the agent PC yet") });
+    expect(codex.execCalls()).toBe(0);
+  });
+
+  it("an older CRM that does not know business_data_missing still gets the run failed (as source_error)", async () => {
+    const h = home();
+    const { api, of } = fakeApi();
+    const real = api.fail.bind(api);
+    let first = true;
+    api.fail = (async (body: Parameters<typeof real>[0]) => {
+      if (first && body.kind === "business_data_missing") {
+        first = false;
+        throw new AgentApiError("rejected", "The CRM rejected the request (invalid_request).", 400);
+      }
+      return real(body);
+    }) as typeof api.fail;
+    const codex = fakeCodex({ exec: (_n, prompt) => ({ json: answer(prompt) }) });
+    await runJob(RUN, jobDeps(api, codex.runner, h, { source: new CompositeBusinessSource({ home: h }) }));
+    expect(of("fail")[0]).toMatchObject({ kind: "source_error", message: expect.stringContaining("Local business data is not installed") });
+  });
 });
 
 /* ------------------------------------ CRM API client ------------------------------------ */
@@ -550,7 +581,7 @@ describe("running a job", () => {
     const h = home();
     const { api, of } = fakeApi();
     const codex = fakeCodex({ exec: (n, prompt) => (n === 1 ? { json: answer(prompt) } : { raw: { code: 1, stderr: "usage limit reached" } }) });
-    const many = { id: "many", discover: async () => Array.from({ length: 14 }, (_, i) => ({ companyName: `Biz ${i}`, websiteUrl: null, email: null, phone: null, city: "Brugge", region: "West-Vlaanderen", industry: "x", sourceUrls: ["https://www.facebook.com/x"] })) };
+    const many = { id: "many", discover: async () => Array.from({ length: 14 }, (_, i) => ({ companyName: `Biz ${i}`, websiteUrl: `https://biz${i}.example/`, fixturePages: { "/": "<html><head><title>Biz</title></head><body><p>Welcome</p></body></html>" }, email: null, phone: null, city: "Brugge", region: "West-Vlaanderen", industry: "x", sourceUrls: ["https://www.facebook.com/x"] })) };
     const summary = await runJob(RUN, jobDeps(api, codex.runner, h, { source: many }));
     expect(summary.status).toBe("partial");
     const result = of("result")[0] as { candidates: unknown[]; final: { status: string; failureKind: string | null; errors: string[] } };

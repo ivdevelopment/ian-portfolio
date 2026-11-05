@@ -1,3 +1,5 @@
+import { verifiedEmail, verifiedPhone } from "./contact";
+import { corroborate, defaultWebsiteState, domainCandidates, verdictOf, websiteStateFact, type WebsiteState } from "./website-state";
 import { fetchPublicPage, validatePublicUrl, type FetchResult } from "./public-fetch";
 import { isAllowedByRobots } from "./robots";
 import type { Observation, RawBusiness, SiteAnalysis, SiteSignals } from "./types";
@@ -56,8 +58,8 @@ export function analyzeHtml(html: string): PageFindings {
   const visible = [...anchors.map((a) => `${a.label} ${a.href}`), ...buttons].join(" \n ");
   const social = [...new Set(anchors.map((a) => SOCIAL_HOSTS.find((h) => hostOf(a.href.startsWith("http") ? a.href : "") === h || hostOf(a.href.startsWith("http") ? a.href : "").endsWith(`.${h}`))).filter((h): h is string => Boolean(h)))];
   const years = [...html.matchAll(/(?:©|&copy;|copyright)\s*(?:\d{4}\s*[-–]\s*)?(\d{4})/gi)].map((m) => Number(m[1])).filter((y) => y >= 1995 && y <= 2100);
-  const emails = [...new Set([...(html.match(EMAIL_RE) ?? []), ...anchors.filter((a) => /^mailto:/i.test(a.href)).map((a) => a.href.replace(/^mailto:/i, "").split("?")[0]).filter(Boolean)].map((e) => e.toLowerCase()))].filter((e) => !NOT_A_MAILBOX.test(e));
-  const phones = [...new Set(anchors.filter((a) => /^tel:/i.test(a.href)).map((a) => a.href.replace(/^tel:/i, "").replace(/[^\d+]/g, "")).filter((p) => p.length >= 8))];
+  const emails = [...new Set([...(html.match(EMAIL_RE) ?? []), ...anchors.filter((a) => /^mailto:/i.test(a.href)).map((a) => a.href.replace(/^mailto:/i, "").split("?")[0]).filter(Boolean)].map((e) => e.toLowerCase()))].filter((e) => !NOT_A_MAILBOX.test(e) && verifiedEmail(e) !== null);
+  const phones = [...new Set(anchors.filter((a) => /^tel:/i.test(a.href)).map((a) => a.href.replace(/^tel:/i, "").replace(/[^\d+]/g, "")).filter((p) => verifiedPhone(p) !== null))];
   const generator = /<meta[^>]+name=["']generator["'][^>]*content=["']([^"']+)["']/i.exec(html)?.[1];
   return {
     title: title ? text(title).slice(0, 160) : null,
@@ -80,6 +82,8 @@ export function analyzeHtml(html: string): PageFindings {
 
 export type AnalyzeDeps = {
   fetchPage?: (url: string, kind?: "html" | "text") => Promise<FetchResult>;
+  /** Skip the check for a website of a business whose listing has none (tests, and sample data). Real searches leave this off. */
+  skipWebsiteDiscovery?: boolean;
   now?: () => Date;
   sleep?: (ms: number) => Promise<void>;
   /** Pages to read per website: the homepage plus up to this many more. Kept small on purpose. */
@@ -118,18 +122,42 @@ export async function analyzeWebsite(business: RawBusiness, deps: AnalyzeDeps = 
   const sleep = deps.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
   const at = now().toISOString();
   const observations: Observation[] = [];
-  const observe = (url: string, title: string | null, fact: string) => {
-    observations.push({ id: `o${observations.length + 1}`, url, title, fact, at });
+  const observe = (url: string, title: string | null, fact: string, origin: "listing" | "website" = "website", websiteState?: WebsiteState) => {
+    observations.push({ id: `o${observations.length + 1}`, url, title, fact, at, origin, ...(websiteState ? { websiteState } : {}) });
   };
   const socialSources = business.sourceUrls.filter((u) => SOCIAL_HOSTS.some((h) => hostOf(u) === h || hostOf(u).endsWith(`.${h}`)));
   const sourceUrl = business.sourceUrls[0] ?? "";
 
-  if (!business.websiteUrl) {
-    observe(sourceUrl, null, socialSources.length > 0 ? "No standalone website was found; the business is present on social media only." : "No standalone website was found for this business in the sources checked.");
-    return { signals: emptySignals({ socialOnly: socialSources.length > 0, socialLinks: socialSources }), observations, contact: { email: null, phone: null }, note: "no website" };
+  // Facts from the business listing itself (for example the OpenStreetMap entry), kept apart from what the business's own website shows.
+  if ((business.source === "local_osm" || business.source === "overpass") && sourceUrl) {
+    const where = typeof business.distanceKm === "number" ? `, ${business.distanceKm.toFixed(1)} km from the search centre` : "";
+    observe(sourceUrl, null, `Listed in OpenStreetMap${business.category ? ` as ${business.category}` : ""}${where}.`, "listing");
+    if (business.websiteUrl) observe(sourceUrl, null, "Website URL listed in OpenStreetMap.", "listing", "confirmed_website");
   }
 
-  const homeUrl = business.websiteUrl;
+  let websiteUrl = business.websiteUrl;
+  let websiteState: WebsiteState = defaultWebsiteState(business);
+  let discoveredUrl: string | null = null;
+  if (!websiteUrl) {
+    // Absence in a listing is not proof that no website exists, so the wording says only what the listing contains.
+    observe(sourceUrl, null, socialSources.length > 0 ? "No website URL is present in the available business listing; a social media page is listed instead." : "No website URL is present in the available business listing.", "listing");
+    // A few deterministic checks for an official website: probes of addresses derived from the name (and the listing's own email domain),
+    // each accepted only when the page itself confirms the business. A resolving domain is never enough.
+    const skip = deps.skipWebsiteDiscovery || business.synthetic || business.fixturePages;
+    const found = skip ? null : await discoverWebsite(business, (u, k) => (deps.fetchPage ?? ((x, kind) => fetchPublicPage(x, { kind: kind === "text" ? "text" : "html" })))(u, k), sleep);
+    if (found && found.url && (found.state === "confirmed_website" || found.state === "probable_website")) {
+      websiteState = found.state;
+      websiteUrl = found.url;
+      if (found.state === "confirmed_website") discoveredUrl = found.url;
+      observe(found.url, null, websiteStateFact(found.state, found.host), "website", found.state);
+    } else {
+      websiteState = found?.state ?? "unknown";
+      observe(sourceUrl, null, websiteStateFact(websiteState), websiteState === "no_website_found" ? "website" : "listing", websiteState);
+      return { signals: emptySignals({ socialOnly: socialSources.length > 0, socialLinks: socialSources }), observations, contact: { email: null, phone: null }, note: "no website", websiteState, discoveredUrl: null };
+    }
+  }
+
+  const homeUrl = websiteUrl;
   const fixture = business.fixturePages;
   const getPage = async (url: string): Promise<FetchResult> => {
     if (fixture) {
@@ -214,5 +242,42 @@ export async function analyzeWebsite(business: RawBusiness, deps: AnalyzeDeps = 
   if (home.truncated) observe(home.finalUrl, title, "The homepage was larger than the analysis limit, so only the first part was read.");
   if (signals.ctaFound && f0.viewport && https && observations.length === 0) observe(home.finalUrl, title, "No clear weaknesses were observed on the pages checked.");
 
-  return { signals, observations, contact: { email: emails[0] ?? null, phone: phones[0] ?? null }, note: null };
+  return { signals, observations, contact: { email: emails[0] ?? null, phone: phones[0] ?? null }, note: null, websiteState, discoveredUrl };
+}
+
+/* ---------------------------- Looking for an official website ---------------------------- */
+
+export type DiscoveredWebsite = { state: WebsiteState; url: string | null; host: string | null; probed: number };
+const DISCOVERY_BUDGET_MS = 20_000;
+
+/**
+ * For a listing without a website: probe the few likely addresses (see domainCandidates) and accept one ONLY when the page confirms the
+ * business (name plus phone or the listing's own email domain: confirmed; name plus locality: probable). Several answered probes with no
+ * match give no_website_found; too few answers give unknown. Never throws.
+ */
+export async function discoverWebsite(business: RawBusiness, fetchRaw: (url: string, kind: "html" | "text") => Promise<FetchResult>, sleep: (ms: number) => Promise<void> = async () => undefined): Promise<DiscoveredWebsite> {
+  const candidates = domainCandidates(business);
+  const started = Date.now();
+  let answered = 0;
+  for (const domain of candidates) {
+    if (Date.now() - started > DISCOVERY_BUDGET_MS) break;
+    const origin = `https://${domain}`;
+    const robots = await fetchRaw(`${origin}/robots.txt`, "text");
+    if (robots.ok && !isAllowedByRobots(robots.body, "/")) continue; // asked not to be read: neither a match nor an answer
+    let page = await fetchRaw(`${origin}/`, "html");
+    if (!page.ok && page.reason === "network") page = await fetchRaw(`http://${domain}/`, "html");
+    if (!page.ok) {
+      // A domain that does not exist, refuses, or serves an error is a definite "nothing here"; a timeout or a block is not an answer.
+      if (page.reason !== "timeout" && page.reason !== "blocked" && page.reason !== "invalid_url") answered++;
+      await sleep(100);
+      continue;
+    }
+    answered++;
+    const f = analyzeHtml(page.body);
+    const host = hostOf(page.finalUrl);
+    const verdict = verdictOf(corroborate(business, host, { title: f.title, text: text(page.body).slice(0, 120_000) }));
+    if (verdict) return { state: verdict, url: page.finalUrl, host, probed: answered };
+    await sleep(100);
+  }
+  return { state: answered >= 3 ? "no_website_found" : "unknown", url: null, host: null, probed: answered };
 }

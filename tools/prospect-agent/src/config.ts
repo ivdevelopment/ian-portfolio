@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { agentHome } from "./paths";
+import { DEFAULT_PRIORITIES, type Group } from "./osm/categories";
 
 /**
  * The agent's settings (not secrets). Stored in %LOCALAPPDATA%\IanProspectAgent\config.json; environment variables override them.
@@ -10,10 +11,30 @@ import { agentHome } from "./paths";
  *   model             CODEX_PROSPECT_MODEL: a model your plan supports; empty = Codex's own default
  *   effortQuick/Deep  reasoning effort per mode: low | medium | high
  */
-export type AgentConfig = { crmUrl: string; codexBin: string; model: string | null; effortQuick: Effort; effortDeep: Effort; pollSeconds: number };
+export type AgentConfig = {
+  crmUrl: string;
+  codexBin: string;
+  model: string | null;
+  effortQuick: Effort;
+  effortDeep: Effort;
+  pollSeconds: number;
+  /** Allow the public Overpass service as a fallback when the local business data is missing or very old. Off by default. */
+  overpassFallback: boolean;
+  /** Optional per-kind weights for "Any industry" searches (see osm/categories.ts DEFAULT_PRIORITIES). */
+  discoveryPriorities: Partial<Record<Group, number>>;
+};
 export type Effort = "low" | "medium" | "high";
 
-export const DEFAULT_CONFIG: AgentConfig = { crmUrl: "https://ianverlinden.com", codexBin: "codex", model: null, effortQuick: "medium", effortDeep: "high", pollSeconds: 5 };
+export const DEFAULT_CONFIG: AgentConfig = { crmUrl: "https://ianverlinden.com", codexBin: "codex", model: null, effortQuick: "medium", effortDeep: "high", pollSeconds: 5, overpassFallback: false, discoveryPriorities: {} };
+
+function priorities(v: unknown): Partial<Record<Group, number>> {
+  const out: Partial<Record<Group, number>> = {};
+  if (v && typeof v === "object") for (const g of Object.keys(DEFAULT_PRIORITIES) as Group[]) {
+    const n = Number((v as Record<string, unknown>)[g]);
+    if (Number.isFinite(n) && n >= 0 && n <= 1000) out[g] = n;
+  }
+  return out;
+}
 
 const EFFORTS = new Set<Effort>(["low", "medium", "high"]);
 /** Model and binary values end up as process arguments, so they are restricted to harmless characters. */
@@ -57,6 +78,8 @@ export function loadConfig(home = agentHome(), env: Record<string, string | unde
     effortQuick: effort(env.CODEX_PROSPECT_EFFORT_QUICK ?? file.effortQuick, DEFAULT_CONFIG.effortQuick),
     effortDeep: effort(env.CODEX_PROSPECT_EFFORT_DEEP ?? file.effortDeep, DEFAULT_CONFIG.effortDeep),
     pollSeconds: Number.isFinite(poll) && poll >= 2 && poll <= 120 ? poll : DEFAULT_CONFIG.pollSeconds,
+    overpassFallback: env.PROSPECT_AGENT_OVERPASS_FALLBACK ? env.PROSPECT_AGENT_OVERPASS_FALLBACK === "1" : file.overpassFallback === true,
+    discoveryPriorities: priorities(file.discoveryPriorities),
   };
 }
 

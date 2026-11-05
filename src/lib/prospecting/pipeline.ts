@@ -2,6 +2,7 @@ import { analyzeWebsite, type AnalyzeDeps } from "./analyze";
 import { businessKey, checkDuplicate, dropBatchDuplicates, type DedupeContext } from "./dedupe";
 import { ProviderUnavailableError, type BusinessSource, type ProspectAIProvider } from "./providers/types";
 import { meetsThreshold, qualify } from "./scoring";
+import { defaultWebsiteState, identityConfidence } from "./website-state";
 import type { AnalyzedBusiness, DiscoveryRequest, QualifiedCandidate, RawBusiness } from "./types";
 
 /**
@@ -133,10 +134,18 @@ export async function runPipeline(request: DiscoveryRequest, deps: PipelineDeps)
       for (const item of usable) if (!item.analysis.signals.reachable && item.business.websiteUrl) markSeen(businessKey(item.business), "unreachable", null);
       await deps.store.progress({ analyzed: counters.analyzed, errors });
 
+      // A listing whose name and category contradict each other is not a business we can be sure of: it is not sent to the AI and never proposed.
+      const identified = usable.filter((item) => {
+        const identity = identityConfidence(item.business, item.analysis.websiteState ?? defaultWebsiteState(item.business));
+        if (identity.confidence !== "low") return true;
+        note(`${item.business.companyName}: skipped (${identity.reasons[0] ?? "identity unclear"})`);
+        markSeen(businessKey(item.business), "skipped", null);
+        return false;
+      });
       await deps.store.progress({ stage: "Qualifying candidates…" });
       let assessments;
       try {
-        assessments = await deps.provider.qualifyBusinesses({ request, items: usable.filter((u) => u.analysis.signals.reachable || !u.business.websiteUrl) });
+        assessments = await deps.provider.qualifyBusinesses({ request, items: identified.filter((u) => u.analysis.signals.reachable || !u.business.websiteUrl) });
       } catch (error) {
         providerStopped = true;
         note(error instanceof ProviderUnavailableError ? error.message : "The AI provider stopped responding.");

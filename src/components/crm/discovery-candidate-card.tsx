@@ -7,6 +7,7 @@ import { Badge } from "@/components/admin/ui";
 import { Button } from "@/components/ui/button";
 import type { CandidateView } from "@/lib/prospecting/service";
 import { SCORE_CATEGORIES, SCORE_LABELS } from "@/lib/prospecting/types";
+import { websiteStateLabel } from "@/lib/prospecting/website-state";
 import { formatBrusselsDateTime } from "@/lib/preview/access-activity";
 import { usePendingAction } from "@/lib/use-pending-action";
 
@@ -30,6 +31,8 @@ export function DiscoveryCandidateCard({ item, onDone }: { item: CandidateView; 
   const [active, setActive] = useState<"add" | "ignore" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const place = [item.city, item.industry].filter(Boolean).join(" · ");
+  // What is known about the business's website: confirmed, probable, no official website found, or just not listed (unconfirmed).
+  const websiteState = item.evidence.find((e) => e.websiteState)?.websiteState ?? (item.website_url ? "confirmed_website" : "unknown");
 
   const decide = (kind: "add" | "ignore") =>
     run(async () => {
@@ -90,12 +93,12 @@ export function DiscoveryCandidateCard({ item, onDone }: { item: CandidateView; 
       )}
 
       <dl className="mt-3 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
-        {item.website_url && (
-          <>
-            <dt className="text-muted">Website</dt>
-            <dd className="break-all">{isHttp(item.website_url) && !item.synthetic ? <a href={item.website_url} target="_blank" rel="noopener noreferrer" className="text-accent underline-offset-4 hover:underline">{hostLabel(item.website_url)}</a> : hostLabel(item.website_url)}</dd>
-          </>
-        )}
+        <dt className="text-muted">Website</dt>
+        <dd className="break-all">
+          {item.website_url && (isHttp(item.website_url) && !item.synthetic ? <a href={item.website_url} target="_blank" rel="noopener noreferrer" className="text-accent underline-offset-4 hover:underline">{hostLabel(item.website_url)}</a> : hostLabel(item.website_url))}
+          {item.website_url && <span className="text-muted"> · </span>}
+          <span className={websiteState === "confirmed_website" ? "" : "text-muted"}>{websiteStateLabel(websiteState)}</span>
+        </dd>
         {(item.email || item.phone) && (
           <>
             <dt className="text-muted">Contact</dt>
@@ -134,6 +137,7 @@ export function DiscoveryCandidateCard({ item, onDone }: { item: CandidateView; 
               <ul className="mt-1 space-y-1.5 text-xs text-muted">
                 {item.evidence.map((e) => (
                   <li key={e.id}>
+                    {e.origin && <span className="mr-1 rounded border px-1 py-px text-[10px] uppercase tracking-wide text-subtle">{e.origin === "listing" ? "Listing" : e.origin === "ai" ? "AI" : "Website"}</span>}
                     {e.fact}{" "}
                     <span className="text-subtle">
                       {isHttp(e.url) && !item.synthetic ? (

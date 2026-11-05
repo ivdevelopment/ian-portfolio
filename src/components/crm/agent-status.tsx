@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Badge } from "@/components/admin/ui";
 import { ONLINE_WITHIN_MS, type AgentStatus } from "@/lib/prospecting/agent/service";
 import { failureMessage } from "@/lib/prospecting/agent/messages";
+import { businessDataIsOld, businessDataLabel } from "@/lib/prospecting/agent/business-data";
 
 /** "5 seconds ago", "3 minutes ago". Rendered after mount so server and browser never disagree, and refreshed every few seconds. */
 export function relativeTime(iso: string | null, now = Date.now()): string {
@@ -80,7 +81,15 @@ export function AgentSummary({ agent }: { agent: AgentStatus | null }) {
             <dd>{CODEX_STATE[agent.codexState]}</dd>
           </>
         )}
+        {agent.businessData && (
+          <>
+            <dt className="text-muted">Business data</dt>
+            <dd suppressHydrationWarning>{businessDataLabel(agent.businessData, now ?? undefined)}</dd>
+          </>
+        )}
       </dl>
+      {businessDataIsOld(agent.businessData, now ?? undefined) && <p className="mt-2 text-muted">The business data is more than a week old. Refresh it on the agent PC: npm run prospect-agent -- update-business-data</p>}
+      {agent.businessData?.state === "missing" && <p className="mt-2 text-muted">Local business data is not installed yet. On the agent PC run: npm run prospect-agent -- update-business-data</p>}
       {!online && <p className="mt-2 text-muted">Start Ian Prospect Agent on your computer.</p>}
       {online && problem && agent.codexState !== "ready" && <p className="mt-2 text-muted">{problem}</p>}
     </div>

@@ -1,9 +1,11 @@
 import { z } from "zod";
 import { websiteHost } from "@/lib/prospects/duplicates";
+import { isPlaceholderEmail, verifiedPhone } from "../contact";
 import { validatePublicUrl } from "../public-fetch";
 import { isDerogatory } from "../scoring";
 import { FAILURE_KINDS } from "./messages";
 import { SCORE_CATEGORIES, SCORE_MAX } from "../types";
+import { CONVERSION_GAP_CAP, WEBSITE_NEED_CAP, type WebsiteState } from "../website-state";
 
 /**
  * The server never trusts a result because it came from the agent. Everything a worker submits is re-validated here with the same rules the
@@ -20,6 +22,10 @@ const evidenceSchema = z.object({
   title: nullableText(200),
   fact: text(400).min(1),
   at: z.string().refine((v) => !Number.isNaN(Date.parse(v)), "invalid time"),
+  /** Where the fact comes from: the business listing (OpenStreetMap) or the business's own website. Older results have none. */
+  origin: z.enum(["listing", "website", "ai"]).optional(),
+  /** The one line that states what is known about the business's website (see website-state.ts). */
+  websiteState: z.enum(["confirmed_website", "probable_website", "no_website_found", "unknown"]).optional(),
 });
 
 const categorySchema = z.object({ score: z.number().int().min(0), max: z.number().int().min(1), reason: text(300).min(1), observations: z.array(text(20)).max(10) });
@@ -63,6 +69,9 @@ export function checkCandidate(input: unknown, opts: { threshold: number }): Can
   const c = parsed.data;
   if (/\(sample data\)/i.test(c.company_name)) return { ok: false, reason: "sample data is never accepted" };
   if (c.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email)) return { ok: false, reason: "invalid email" };
+  // A placeholder address ("gebruiker@domein.com") is not a contact: the candidate is kept, without an email.
+  if (c.email && isPlaceholderEmail(c.email)) c.email = null;
+  if (c.phone && !verifiedPhone(c.phone)) c.phone = null;
 
   let sum = 0;
   for (const cat of SCORE_CATEGORIES) {
@@ -81,6 +90,10 @@ export function checkCandidate(input: unknown, opts: { threshold: number }): Can
     const s = c.score_breakdown[cat];
     if (s.score > 0 && s.observations.length === 0) return { ok: false, reason: `${cat} points without evidence` };
   }
+  // The missing-website signal is capped by how well the website question was settled; no assessment can exceed it.
+  const state: WebsiteState = c.evidence.find((e) => e.websiteState)?.websiteState ?? (c.website_url ? "confirmed_website" : "unknown");
+  if (c.score_breakdown.website_need.score > WEBSITE_NEED_CAP[state]) return { ok: false, reason: "website need exceeds the cap for what is known about the website" };
+  if (c.score_breakdown.conversion_gap.score > CONVERSION_GAP_CAP[state]) return { ok: false, reason: "conversion gap exceeds the cap for what is known about the website" };
   const cap = (c.email ? 6 : 0) + (c.phone ? 2 : 0) + 2;
   if (c.score_breakdown.contactability.score > cap) return { ok: false, reason: "contactability exceeds the contact details found" };
 

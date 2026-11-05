@@ -127,6 +127,25 @@ describe.skipIf(!enabled)("local prospect agent (queue, token, lease)", () => {
     expect(await getAgentStatus(admin as never, Date.now() + 5 * 60_000)).toMatchObject({ online: false });
   });
 
+  it("heartbeat: the business-data summary is whitelisted and shown to the admin; an older agent without it keeps the last value", async () => {
+    const sent = { state: "ready", source: "Geofabrik Belgium", dataDate: "2026-11-04T10:00:00.000Z", businesses: 321000, freshness: "fresh", path: "C:\\secret" };
+    expect((await call("heartbeat", { codexVersion: "0.46.1", codexState: "ready", businessData: sent })).body).toMatchObject({ ok: true });
+    const status = await getAgentStatus(admin as never);
+    expect(status?.businessData).toEqual({ state: "ready", source: "Geofabrik Belgium", data_date: "2026-11-04T10:00:00.000Z", businesses: 321000, freshness: "fresh" });
+    expect(JSON.stringify(status?.businessData)).not.toContain("secret");
+    await call("heartbeat", { codexVersion: "0.46.1", codexState: "ready" });
+    expect((await getAgentStatus(admin as never))?.businessData).toMatchObject({ state: "ready", businesses: 321000 });
+    await call("heartbeat", { codexVersion: "0.46.1", codexState: "ready", businessData: { state: "missing", source: "Geofabrik Belgium", dataDate: null, businesses: null, freshness: "unknown" } });
+    expect((await getAgentStatus(admin as never))?.businessData).toEqual({ state: "missing", source: "Geofabrik Belgium", freshness: "unknown" });
+  });
+
+  it("fail: business_data_missing is a stored failure kind", async () => {
+    const id = await queue();
+    await call("claim", {});
+    expect((await call("fail", { runId: id, kind: "business_data_missing", message: "Local business data is not installed on the agent PC yet." })).body).toMatchObject({ ok: true });
+    expect(await getRun(admin as never, id)).toMatchObject({ status: "failed", failure_kind: "business_data_missing" });
+  });
+
   it("claim: an empty queue gives nothing; a queued run is claimed once, with its search parameters and an 'Picked up by' stage", async () => {
     expect((await call("claim", {})).body).toMatchObject({ ok: true, run: null });
     const id = await queue({ industry: "Car detailers" });

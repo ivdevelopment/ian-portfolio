@@ -1,3 +1,5 @@
+import { verifiedEmail, verifiedPhone } from "./contact";
+import { applyWebsiteCaps, defaultWebsiteState } from "./website-state";
 import { SCORE_CATEGORIES, SCORE_LABELS, SCORE_MAX, type AnalyzedBusiness, type Observation, type ProviderAssessment, type QualifiedCandidate, type ScoreBreakdown, type ScoreCategory } from "./types";
 
 /**
@@ -65,8 +67,11 @@ export function meetsThreshold(score: number, threshold: number): boolean {
 }
 
 /** Email 6, phone 2, a contact page 2: what a person could actually use to reach the business professionally. */
-export function contactabilityPoints(contact: { email: string | null; phone: string | null }, contactPageFound: boolean | null): number {
-  return (contact.email ? 6 : 0) + (contact.phone ? 2 : 0) + (contactPageFound ? 2 : 0);
+/** `trusted` is for the development sample data only (its `.invalid` addresses are placeholders by design); real businesses are always verified. */
+export function contactabilityPoints(contact: { email: string | null; phone: string | null }, contactPageFound: boolean | null, trusted = false): number {
+  const email = trusted ? contact.email : verifiedEmail(contact.email);
+  const phone = trusted ? contact.phone : verifiedPhone(contact.phone);
+  return (email ? 6 : 0) + (phone ? 2 : 0) + (contactPageFound ? 2 : 0);
 }
 
 function contactabilityReason(score: number): string {
@@ -87,23 +92,39 @@ export function reasonLines(breakdown: ScoreBreakdown, limit = 4): string[] {
 /** Assembles a candidate from a provider's assessment, after validation. The evidence kept is only what a reason points at (plus nothing else). */
 export function qualify(item: AnalyzedBusiness, assessment: ProviderAssessment): QualifiedCandidate {
   const { business, analysis } = item;
-  const breakdown = buildBreakdown(assessment, analysis.observations, contactabilityPoints(mergeContact(business, analysis), analysis.signals.contactPageFound));
+  // What is known about the business's website limits the website-dependent categories; the AI cannot exceed these caps.
+  const websiteState = analysis.websiteState ?? defaultWebsiteState(business);
+  const breakdown = applyWebsiteCaps(buildBreakdown(assessment, analysis.observations, contactabilityPoints(mergeContact(business, analysis), analysis.signals.contactPageFound, Boolean(business.synthetic))), websiteState);
   const cited = new Set(SCORE_CATEGORIES.flatMap((c) => breakdown[c].observations));
   const summary = isDerogatory(assessment.summary) ? "" : assessment.summary.replace(/\s+/g, " ").trim().slice(0, 600);
   const opportunity = isDerogatory(assessment.opportunity) ? "" : assessment.opportunity.replace(/\s+/g, " ").trim().slice(0, 280);
+  // The statement about the website is always kept (it explains the caps), whether or not a reason cites it.
+  const evidence = analysis.observations.filter((o) => cited.has(o.id) || o.websiteState !== undefined);
+  // The AI's interpretation is kept as its own evidence line, labelled "ai", so an observation (listing, website) is never mistaken for it.
+  const interpretationUrl = [business.websiteUrl, ...business.sourceUrls].find((u): u is string => typeof u === "string" && /^https?:\/\//i.test(u));
+  if (opportunity && interpretationUrl) {
+    evidence.push({ id: "ai1", url: interpretationUrl.slice(0, 500), title: "Codex interpretation", fact: `Interpretation: ${opportunity}`.slice(0, 400), at: analysis.observations[0]?.at ?? new Date().toISOString(), origin: "ai" });
+  }
   return {
-    business: { ...business, ...mergeContact(business, analysis) },
+    business: { ...business, ...mergeContact(business, analysis), websiteUrl: business.websiteUrl ?? analysis.discoveredUrl ?? null },
     score: totalScore(breakdown),
     breakdown,
     summary: summary || reasonLines(breakdown, 2).join(" "),
     opportunity: opportunity || "Not specified",
-    evidence: analysis.observations.filter((o) => cited.has(o.id)),
+    evidence,
   };
 }
 
-/** Contact details already known for the business win; the ones found on its own pages fill the gaps. */
-export function mergeContact(business: Pick<AnalyzedBusiness["business"], "email" | "phone">, analysis: AnalyzedBusiness["analysis"]) {
-  return { email: business.email ?? analysis.contact.email, phone: business.phone ?? analysis.contact.phone };
+/**
+ * Contact details already known for the business win; the ones found on its own pages fill the gaps. Only VERIFIED details count: a placeholder
+ * email ("gebruiker@domein.com") or an obviously fake phone number is treated as no email / no phone, never as a positive signal.
+ */
+export function mergeContact(business: Pick<AnalyzedBusiness["business"], "email" | "phone" | "synthetic">, analysis: AnalyzedBusiness["analysis"]) {
+  if (business.synthetic) return { email: business.email ?? analysis.contact.email, phone: business.phone ?? analysis.contact.phone };
+  return {
+    email: verifiedEmail(business.email) ?? verifiedEmail(analysis.contact.email),
+    phone: verifiedPhone(business.phone) ?? verifiedPhone(analysis.contact.phone),
+  };
 }
 
 export { SCORE_LABELS };

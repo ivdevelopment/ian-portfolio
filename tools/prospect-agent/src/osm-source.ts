@@ -84,10 +84,25 @@ export function toBusiness(el: Element, fallbackCity: string, region: string | n
     region,
     industry: kind ? kind.replace(/_/g, " ") : null,
     sourceUrls: [`https://www.openstreetmap.org/${el.type}/${el.id}`, ...social].slice(0, 5),
+    source: "overpass",
+    sourceRef: `${el.type}/${el.id}`,
   };
 }
 
-const CENTERS: Record<string, { lat: number; lon: number }> = { brugge: { lat: 51.2093, lon: 3.2247 } };
+export const CENTERS: Record<string, { lat: number; lon: number }> = { brugge: { lat: 51.2093, lon: 3.2247 } };
+
+/** One polite Nominatim lookup for a search centre (Belgium only). Used only when a place is not in the local data or the cache. */
+export async function geocodeNominatim(place: string, fetchImpl: Fetch = fetch, sleep: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms))): Promise<{ lat: number; lon: number } | null> {
+  const url = `${NOMINATIM}?format=jsonv2&limit=1&countrycodes=be&q=${encodeURIComponent(place)}`;
+  const res = await fetchImpl(url, { headers: { "user-agent": UA, accept: "application/json" }, signal: AbortSignal.timeout(15_000) });
+  await sleep(1100); // Nominatim's usage policy: at most one request per second.
+  if (!res.ok) return null;
+  const data = (await res.json()) as Array<{ lat: string; lon: string }>;
+  const hit = data[0];
+  const lat = Number(hit?.lat);
+  const lon = Number(hit?.lon);
+  return Number.isFinite(lat) && Number.isFinite(lon) ? { lat, lon } : null;
+}
 
 export class OsmBusinessSource implements BusinessSource {
   readonly id = "openstreetmap";
@@ -96,20 +111,13 @@ export class OsmBusinessSource implements BusinessSource {
     private readonly sleep: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms)),
     private readonly endpoints: readonly string[] = OVERPASS_ENDPOINTS,
     private readonly requestMs = 70_000,
+    /** Total time allowed for the Overpass query. The default is generous (it is the only source); as a fallback behind the local index it is short. */
+    private readonly budgetMs = DISCOVERY_BUDGET_MS,
   ) {}
 
   private async geocode(place: string): Promise<{ lat: number; lon: number } | null> {
     const known = CENTERS[place.trim().toLowerCase()];
-    if (known) return known;
-    const url = `${NOMINATIM}?format=jsonv2&limit=1&countrycodes=be&q=${encodeURIComponent(place)}`;
-    const res = await this.fetchImpl(url, { headers: { "user-agent": UA, accept: "application/json" }, signal: AbortSignal.timeout(15_000) });
-    await this.sleep(1100); // Nominatim's usage policy: at most one request per second (the next request is Overpass, but keep it polite).
-    if (!res.ok) return null;
-    const data = (await res.json()) as Array<{ lat: string; lon: string }>;
-    const hit = data[0];
-    const lat = Number(hit?.lat);
-    const lon = Number(hit?.lon);
-    return Number.isFinite(lat) && Number.isFinite(lon) ? { lat, lon } : null;
+    return known ?? geocodeNominatim(place, this.fetchImpl, this.sleep);
   }
 
   /** One Overpass query, retried across mirrors with a growing pause. Gives up after the time budget with a SourceError. */
@@ -118,7 +126,7 @@ export class OsmBusinessSource implements BusinessSource {
     let last = "no answer";
     for (let round = 0; round < 2; round++) {
       for (const endpoint of this.endpoints) {
-        if (Date.now() - started > DISCOVERY_BUDGET_MS) throw new SourceError(`OpenStreetMap did not answer in time (${last})`);
+        if (Date.now() - started > this.budgetMs) throw new SourceError(`OpenStreetMap did not answer in time (${last})`);
         try {
           const res = await this.fetchImpl(endpoint, { method: "POST", headers: { "user-agent": UA, "content-type": "application/x-www-form-urlencoded", accept: "application/json" }, body: `data=${encodeURIComponent(query)}`, signal: AbortSignal.timeout(this.requestMs) });
           if (!res.ok) {

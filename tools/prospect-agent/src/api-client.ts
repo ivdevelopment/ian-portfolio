@@ -2,6 +2,8 @@
  * The agent's only way to the CRM: outbound HTTPS requests to /api/prospect-agent/<op>, authenticated with the connection token. The CRM never
  * connects to this PC: there is no server here, no port, no tunnel.
  */
+import type { HeartbeatBusinessData } from "../../../src/lib/prospecting/agent/business-data";
+
 export class AgentApiError extends Error {
   constructor(readonly kind: "unauthorized" | "lease_lost" | "rate_limited" | "rejected" | "server" | "network", message: string, readonly status = 0) {
     super(message);
@@ -42,7 +44,7 @@ export class AgentApi {
     return data as T;
   }
 
-  heartbeat(body: { codexVersion: string | null; codexState: "ready" | "not_installed" | "not_authenticated" | "error"; failureKind: string | null }) {
+  heartbeat(body: { codexVersion: string | null; codexState: "ready" | "not_installed" | "not_authenticated" | "error"; failureKind: string | null; businessData?: HeartbeatBusinessData }) {
     return this.post<{ ok: true; device: string }>("heartbeat", body);
   }
   async claim(): Promise<RunParams | null> {

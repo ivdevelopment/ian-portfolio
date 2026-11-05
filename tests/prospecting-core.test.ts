@@ -66,7 +66,8 @@ describe("score", () => {
     const business = { companyName: "A", websiteUrl: "https://a.be", email: "info@a.be", phone: null, city: "Brugge", region: null, industry: null, sourceUrls: [] };
     const analysis = { signals: {} as never, observations: [obs("o1"), obs("o2")], contact: { email: null, phone: null }, note: null };
     const q = qualify({ business, analysis }, { companyName: "A", websiteUrl: "https://a.be", scores: { website_need: { score: 10, reason: "Dated markup.", observations: ["o2"] } }, summary: "s", opportunity: "o" });
-    expect(q.evidence.map((e) => e.id)).toEqual(["o2"]);
+    expect(q.evidence.filter((e) => e.origin !== "ai").map((e) => e.id)).toEqual(["o2"]);
+    expect(q.evidence.filter((e) => e.origin === "ai").map((e) => e.fact)).toEqual(["Interpretation: o"]); // the AI's own line, labelled as such
   });
 });
 
@@ -240,7 +241,7 @@ describe("website analysis", () => {
   it("a business without a website is recorded as such (social-only when found on a social page)", async () => {
     const a = await analyzeWebsite(business({ websiteUrl: null, sourceUrls: ["https://www.facebook.com/garage"] }), { now });
     expect(a.signals.socialOnly).toBe(true);
-    expect(a.observations[0].fact).toMatch(/social media only/);
+    expect(a.observations[0].fact).toMatch(/No website URL is present in the available business listing.*social media page is listed/);
   });
 
   it("reads at most the homepage plus three more pages", async () => {

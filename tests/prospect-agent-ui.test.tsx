@@ -37,7 +37,7 @@ afterEach(() => {
 });
 
 const now = Date.now();
-const agent = (over: Partial<AgentStatus> = {}): AgentStatus => ({ id: "a1", name: "Ian-PC", hint: "ipa_AbCd", createdAt: new Date(now - 86_400_000).toISOString(), lastSeenAt: new Date(now - 5000).toISOString(), online: true, codexVersion: "0.46.1", codexState: "ready", lastFailureKind: null, ...over });
+const agent = (over: Partial<AgentStatus> = {}): AgentStatus => ({ id: "a1", name: "Ian-PC", hint: "ipa_AbCd", createdAt: new Date(now - 86_400_000).toISOString(), lastSeenAt: new Date(now - 5000).toISOString(), online: true, codexVersion: "0.46.1", codexState: "ready", lastFailureKind: null, businessData: null, ...over });
 const env = { AI_PROSPECTING_PROVIDER: "local_codex" };
 const run = (over: Partial<RunRow> = {}): RunRow => ({ id: "r1", mode: "quick", location: "Brugge", area: null, industry: null, threshold: 70, requested_count: 5, status: "completed", stage: "3 strong prospects found", provider: "local_codex", raw_found: 12, analyzed: 8, qualified: 3, duplicates_removed: 1, skipped_cooldown: 0, errors: [], started_at: "2026-11-06T09:00:00.000Z", finished_at: "2026-11-06T09:05:00.000Z", failure_kind: null, lease_expires_at: null, cancel_requested: false, codex_ms: null, codex_calls: null, ...over });
 
@@ -56,6 +56,31 @@ describe("provider state for the local agent", () => {
   it("the other states are unchanged: disabled stays disabled, the sample stays local-only", () => {
     expect(getProviderStatus({}, null)).toMatchObject({ ready: false, flag: "disabled", queued: false });
     expect(getProviderStatus({ AI_PROSPECTING_PROVIDER: "mock", NODE_ENV: "production", NEXT_PUBLIC_SUPABASE_URL: "https://x.supabase.co" }, null)).toMatchObject({ ready: false });
+  });
+});
+
+describe("agent status: business data", () => {
+  it("shows the compact line with the age and no filesystem path", async () => {
+    const data = { state: "ready" as const, source: "Geofabrik Belgium", data_date: new Date(now - 2 * 86_400_000).toISOString(), businesses: 123456, freshness: "fresh" as const };
+    render(<AgentSummary agent={agent({ businessData: data })} />);
+    await tick();
+    expect(screen.getByText("Business data")).toBeTruthy();
+    expect(screen.getByText("Local Belgium index · updated 2 days ago")).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/AppData|LOCALAPPDATA|\\\\/);
+    expect(document.body.textContent).not.toMatch(/older than a week|more than a week/);
+  });
+
+  it("says to refresh when the data is more than a week old, and to install it when it is missing", async () => {
+    const old = { state: "ready" as const, source: "Geofabrik Belgium", data_date: new Date(now - 12 * 86_400_000).toISOString(), businesses: 10, freshness: "aging" as const };
+    const { unmount } = render(<AgentSummary agent={agent({ businessData: old })} />);
+    await tick();
+    expect(screen.getByText("Local Belgium index · updated 12 days ago")).toBeTruthy();
+    expect(screen.getByText(/more than a week old/)).toBeTruthy();
+    unmount();
+    render(<AgentSummary agent={agent({ businessData: { state: "missing" } })} />);
+    await tick();
+    expect(screen.getByText("Not installed on the agent PC yet")).toBeTruthy();
+    expect(screen.getByText(/Local business data is not installed yet/)).toBeTruthy();
   });
 });
 

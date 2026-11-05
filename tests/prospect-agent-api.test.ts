@@ -148,6 +148,10 @@ describe("the agent API", () => {
   it("heartbeat carries only diagnostics, progress only counters and short text", async () => {
     const hb = await run("heartbeat", { codexVersion: "0.46.1", codexState: "ready", failureKind: null });
     expect(hb.calls[0].args).toEqual({ p_token: TOKEN, p_codex_version: "0.46.1", p_codex_state: "ready", p_failure: null });
+    // P10.2: an agent that reports its local business data sends only the whitelisted summary; an older agent sends none
+    const bd = await run("heartbeat", { codexVersion: "0.46.1", codexState: "ready", failureKind: null, businessData: { state: "ready", source: "Geofabrik Belgium", dataDate: "2026-11-04T10:00:00.000Z", businesses: 123456, freshness: "fresh", path: "C:\\Users\\x\\secret" } });
+    expect(bd.calls[0].args).toEqual({ p_token: TOKEN, p_codex_version: "0.46.1", p_codex_state: "ready", p_failure: null, p_business_data: { state: "ready", source: "Geofabrik Belgium", data_date: "2026-11-04T10:00:00.000Z", businesses: 123456, freshness: "fresh" } });
+    expect((await run("heartbeat", { codexVersion: null, codexState: "ready", businessData: { state: "weird" } })).status).toBe(400);
     const pr = await run("progress", { runId: RUN_ID, status: "analyzing", stage: "Analyzing 5 websites…", counters: { raw_found: 12, analyzed: 4 }, errors: ["Garage: website unreachable"] });
     expect(pr.calls[0].args).toMatchObject({ p_run: RUN_ID, p_status: "analyzing", p_counters: { raw_found: 12, analyzed: 4 }, p_errors: ["Garage: website unreachable"] });
   });

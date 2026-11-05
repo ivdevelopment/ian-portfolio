@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
+import type { BusinessDataSummary } from "./business-data";
 import { generateAgentToken, hashAgentToken, tokenHint } from "./tokens";
 
 /**
@@ -22,6 +23,8 @@ export type AgentStatus = {
   codexVersion: string | null;
   codexState: "ready" | "not_installed" | "not_authenticated" | "error" | null;
   lastFailureKind: string | null;
+  /** The agent's local business data (OpenStreetMap index), as last reported. */
+  businessData: BusinessDataSummary | null;
 };
 
 export function isOnline(lastSeenAt: string | null, now = Date.now()): boolean {
@@ -31,7 +34,7 @@ export function isOnline(lastSeenAt: string | null, now = Date.now()): boolean {
 export async function getAgentStatus(db: Db, now = Date.now()): Promise<AgentStatus | null> {
   const { data } = await db
     .from("prospect_agents")
-    .select("id, display_name, token_hint, created_at, last_seen_at, codex_version, codex_state, last_failure_kind")
+    .select("id, display_name, token_hint, created_at, last_seen_at, codex_version, codex_state, last_failure_kind, business_data")
     .is("revoked_at", null)
     .limit(1)
     .maybeSingle();
@@ -46,6 +49,7 @@ export async function getAgentStatus(db: Db, now = Date.now()): Promise<AgentSta
     codexVersion: data.codex_version,
     codexState: data.codex_state as AgentStatus["codexState"],
     lastFailureKind: data.last_failure_kind,
+    businessData: data.business_data && typeof data.business_data === "object" && !Array.isArray(data.business_data) ? (data.business_data as unknown as BusinessDataSummary) : null,
   };
 }
 

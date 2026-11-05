@@ -247,14 +247,14 @@ isOneToOne: false
                   ]
                 },"prospect_agents": {
                   Row: {
-                    "codex_state": string | null,"codex_version": string | null,"created_at": string,"created_by": string | null,"display_name": string,"id": string,"last_failure_kind": string | null,"last_seen_at": string | null,"revoked_at": string | null,"token_hash": string,"token_hint": string
+                    "business_data": Json | null,"codex_state": string | null,"codex_version": string | null,"created_at": string,"created_by": string | null,"display_name": string,"id": string,"last_failure_kind": string | null,"last_seen_at": string | null,"revoked_at": string | null,"token_hash": string,"token_hint": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "codex_state"?: string | null,"codex_version"?: string | null,"created_at"?: string,"created_by"?: string | null,"display_name": string,"id"?: string,"last_failure_kind"?: string | null,"last_seen_at"?: string | null,"revoked_at"?: string | null,"token_hash": string,"token_hint": string
+                    "business_data"?: Json | null,"codex_state"?: string | null,"codex_version"?: string | null,"created_at"?: string,"created_by"?: string | null,"display_name": string,"id"?: string,"last_failure_kind"?: string | null,"last_seen_at"?: string | null,"revoked_at"?: string | null,"token_hash": string,"token_hint": string
                   }
                   Update: {
-                    "codex_state"?: string | null,"codex_version"?: string | null,"created_at"?: string,"created_by"?: string | null,"display_name"?: string,"id"?: string,"last_failure_kind"?: string | null,"last_seen_at"?: string | null,"revoked_at"?: string | null,"token_hash"?: string,"token_hint"?: string
+                    "business_data"?: Json | null,"codex_state"?: string | null,"codex_version"?: string | null,"created_at"?: string,"created_by"?: string | null,"display_name"?: string,"id"?: string,"last_failure_kind"?: string | null,"last_seen_at"?: string | null,"revoked_at"?: string | null,"token_hash"?: string,"token_hint"?: string
                   }
                   Relationships: [
                     
@@ -623,7 +623,7 @@ isOneToOne: false
 { Args: { "p_kind": string,"p_message": string,"p_run": string,"p_status"?: string,"p_token": string }; Returns: Json
                            },
 "agent_heartbeat":
-{ Args: { "p_codex_state": string,"p_codex_version": string,"p_failure": string,"p_token": string }; Returns: Json
+{ Args: { "p_business_data"?: Json,"p_codex_state": string,"p_codex_version": string,"p_failure": string,"p_token": string }; Returns: Json
                            },
 "agent_progress":
 { Args: { "p_counters": Json,"p_errors": Json,"p_lease_seconds"?: number,"p_run": string,"p_stage": string,"p_status": string,"p_token": string }; Returns: Json

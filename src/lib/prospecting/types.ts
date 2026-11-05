@@ -6,6 +6,8 @@
  * Nothing in here knows how an AI provider authenticates; see providers/types.ts.
  */
 
+import type { WebsiteState } from "./website-state";
+
 export const SEARCH_MODES = ["quick", "deep", "no_website", "redesign", "web_app", "industry"] as const;
 export type SearchMode = (typeof SEARCH_MODES)[number];
 
@@ -43,6 +45,13 @@ export type RawBusiness = {
   industry: string | null;
   /** Public pages the business was found on (listing, directory, social page, its own site). */
   sourceUrls: string[];
+  /** Where the listing came from ("local_osm", "overpass"...) and its identifier there (for example "node/123"). Provenance only. */
+  source?: string;
+  sourceRef?: string;
+  /** Great-circle distance from the search centre in km, computed deterministically by the source (never by an AI). */
+  distanceKm?: number | null;
+  /** The listing's own category, for example "shop=bicycle". */
+  category?: string;
   /** Development mock only: pages served from memory instead of the network. Never set by a real source. */
   fixturePages?: Record<string, string>;
   synthetic?: boolean;
@@ -56,6 +65,10 @@ export type Observation = {
   fact: string;
   /** ISO timestamp of when it was observed. */
   at: string;
+  /** Where the fact comes from: the business listing (OpenStreetMap), or the business's own website. */
+  origin?: "listing" | "website" | "ai";
+  /** Set on the one observation that states what is known about the business's website (see website-state.ts). */
+  websiteState?: WebsiteState;
 };
 
 export type SiteSignals = {
@@ -85,6 +98,10 @@ export type SiteAnalysis = {
   contact: { email: string | null; phone: string | null };
   /** Why the analysis was skipped or partial, if it was ("website unreachable", "blocked by robots.txt"). */
   note: string | null;
+  /** How sure we are that the business has a website, and where (see website-state.ts). Absent on older analyses: then derived from the listing. */
+  websiteState?: WebsiteState;
+  /** The address of a website found by the deterministic checks (only set when confirmed or probable). */
+  discoveredUrl?: string | null;
 };
 
 export type AnalyzedBusiness = { business: RawBusiness; analysis: SiteAnalysis };

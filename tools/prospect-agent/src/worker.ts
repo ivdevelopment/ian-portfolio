@@ -6,7 +6,8 @@ import type { AgentConfig } from "./config";
 import { runJob, type JobDeps } from "./job";
 import type { Logger } from "./logger";
 import { runsDir } from "./paths";
-import { OsmBusinessSource } from "./osm-source";
+import { CompositeBusinessSource } from "./discovery-source";
+import { heartbeatSummary } from "./osm/data-manager";
 
 /**
  * The worker loop: verify Codex, send heartbeats, poll for a queued run, run it, repeat. One job at a time (one Codex process). It only makes
@@ -66,7 +67,7 @@ export function startWorker(deps: WorkerDeps): WorkerHandle {
 
   const heartbeat = async () => {
     try {
-      await api.heartbeat({ codexVersion: diag.version, codexState: diag.state, failureKind: lastFailure });
+      await api.heartbeat({ codexVersion: diag.version, codexState: diag.state, failureKind: lastFailure, businessData: heartbeatSummary(deps.home) });
     } catch (e) {
       if (e instanceof AgentApiError && e.kind === "unauthorized") {
         fatal = true;
@@ -99,7 +100,7 @@ export function startWorker(deps: WorkerDeps): WorkerHandle {
             continue;
           }
           log.info("claimed run", { run: run.id, mode: run.mode, attempt: run.attempt });
-          const summary = await runJob(run, { api, config, log, source: deps.source ?? new OsmBusinessSource(), flags, runner: deps.runner, home: deps.home, stopping: () => stopping, ...deps.jobOverrides });
+          const summary = await runJob(run, { api, config, log, source: deps.source ?? new CompositeBusinessSource({ home: deps.home, allowOverpass: config.overpassFallback, local: { priorities: config.discoveryPriorities }, log: (m, f) => log.info(m, f) }), flags, runner: deps.runner, home: deps.home, stopping: () => stopping, ...deps.jobOverrides });
           lastFailure = summary.kind;
           pruneRuns(deps.home);
           await heartbeat();

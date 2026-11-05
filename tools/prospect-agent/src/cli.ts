@@ -8,7 +8,10 @@ import { createLogger } from "./logger";
 import { agentHome } from "./paths";
 import { forgetToken, loadToken, saveToken } from "./secret-store";
 import { MockBusinessSource } from "../../../src/lib/prospecting/providers/mock";
-import { OsmBusinessSource } from "./osm-source";
+import { CompositeBusinessSource } from "./discovery-source";
+import { businessDataStatus, statusLine, updateBusinessData } from "./osm/data-manager";
+import { SOURCE_NAME } from "./osm/geofabrik";
+import type { LocalOsmBusinessSource } from "./osm/local-osm-source";
 import { startWorker } from "./worker";
 
 /**
@@ -45,8 +48,64 @@ async function main(argv: string[]): Promise<number> {
   const log = createLogger();
 
   if (cmd === "help" || cmd === "--help" || cmd === "-h") {
-    console.log("Ian Prospect Agent\n\n  prospect-agent setup       connect this PC to the CRM\n  prospect-agent start       run the agent (Ctrl+C to stop)\n  prospect-agent status      show configuration and Codex readiness\n  prospect-agent test-codex  tiny structured Codex call\n  prospect-agent doctor      diagnostics\n  prospect-agent forget      remove the stored token\n");
+    console.log("Ian Prospect Agent\n\n  prospect-agent setup       connect this PC to the CRM\n  prospect-agent start       run the agent (Ctrl+C to stop)\n  prospect-agent update-business-data   download/refresh the local Belgium business data [--force]\n  prospect-agent discover    dry-run a local business search [--location Brugge --area \"Brugge + 30 km\" --industry bike --count 5]\n  prospect-agent status      show configuration and Codex readiness\n  prospect-agent test-codex  tiny structured Codex call\n  prospect-agent doctor      diagnostics\n  prospect-agent forget      remove the stored token\n");
     return 0;
+  }
+
+  if (cmd === "update-business-data") {
+    const force = argv.includes("--force");
+    console.log(`Checking Geofabrik (${SOURCE_NAME}) for the current Belgium extract...`);
+    const res = await updateBusinessData({ force, log: (m) => console.log(`  ${m}`) });
+    if (res.outcome === "failed") {
+      console.error(`\n${res.message}`);
+      return 1;
+    }
+    if (res.outcome === "up_to_date") {
+      console.log(`\nThe local business data is already the newest version (${statusLine(res.status)}). Use --force to rebuild the index anyway.`);
+      return 0;
+    }
+    const s = res.status;
+    console.log(`\nLocal business data is ready.\n  Source:        ${s.source}\n  Data date:     ${s.dataDate ?? "unknown"}\n  Businesses:    ${s.businesses.toLocaleString("en")} indexed (${s.places.toLocaleString("en")} places for search centres)\n  Download:      ${res.reusedExtract ? "reused the extract already on disk" : `${(res.downloadedBytes / 1e6).toFixed(0)} MB in ${res.downloadSeconds} s`}\n  Index size:    ${(s.indexBytes / 1e6).toFixed(0)} MB (import took ${res.build.seconds} s)\n  Attribution:   ${s.attribution}`);
+    return 0;
+  }
+
+  if (cmd === "discover") {
+    // A dry run of discovery only: no Codex, no CRM, nothing is stored. Prints what the local index returns for a search.
+    const arg = (name: string, fallback: string | null) => {
+      const i = argv.indexOf(`--${name}`);
+      return i >= 0 && argv[i + 1] ? argv[i + 1] : fallback;
+    };
+    const location = arg("location", "Brugge") as string;
+    const area = arg("area", `${location} + 30 km`);
+    const industry = arg("industry", null);
+    const count = Math.min(20, Math.max(1, Number(arg("count", "5")) || 5));
+    const mode = arg("mode", "quick") as "quick";
+    const source = new CompositeBusinessSource({ allowOverpass: config.overpassFallback, local: { priorities: config.discoveryPriorities }, log: (m) => console.log(`  ${m}`) });
+    const started = Date.now();
+    try {
+      const found = await source.discover({ mode, location, area, industry, threshold: 70, count, excludeResearched: true });
+      const ms = Date.now() - started;
+      const report = (source.local as LocalOsmBusinessSource).last;
+      console.log(`Source: ${source.used}  ·  ${found.length} businesses  ·  ${ms} ms${report ? `  ·  ${report.inRadius} in range (${report.radiusKm} km, centre via ${report.centreVia})` : ""}`);
+      if (report?.pool && report.inRange) {
+        const labels = report.pool.bandLabels;
+        const fmt = (o: Record<string, number>) => Object.entries(o).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} x${n}`).join(", ") || "none";
+        console.log(`In range (eligible): ${report.inRadius}   by distance: ${labels.map((l, i) => `${l} ${report.inRange!.bands[i]}`).join(" | ")}`);
+        console.log(`Left out as non-commercial (public / non-profit by OSM tags): ${report.inRange.excludedNonCommercial}`);
+        console.log(`Eligible by class: ${fmt(report.inRange.commercial)}`);
+        console.log(`Preselected: ${report.pool.bands.reduce((a, b) => a + b, 0)}   by distance: ${labels.map((l, i) => `${l} ${report.pool!.bands[i]}`).join(" | ")}   (min ${report.pool.distance.min} km, median ${report.pool.distance.median} km, p90 ${report.pool.distance.p90} km, max ${report.pool.distance.max} km)`);
+        console.log(`Preselected by class: ${fmt(report.pool.commercial)}`);
+        console.log(`Categories: ${fmt(report.pool.categories)}`);
+        console.log(`With website listed: ${report.pool.withWebsite}, without: ${report.pool.withoutWebsite}`);
+      } else {
+        console.log(`With website listed: ${found.filter((b) => b.websiteUrl).length}, without: ${found.filter((b) => !b.websiteUrl).length}`);
+      }
+      for (const b of found.slice(0, 40)) console.log(`  ${(b.distanceKm ?? 0).toFixed(1).padStart(5)} km  ${b.companyName.slice(0, 40).padEnd(40)} ${(b.category ?? "").padEnd(24)} ${b.city ?? ""}  ${b.websiteUrl ?? "(no website listed)"}`);
+      return 0;
+    } catch (e) {
+      console.error(e instanceof Error ? e.message : "Discovery failed.");
+      return 1;
+    }
   }
 
   if (cmd === "forget") {
@@ -83,12 +142,15 @@ async function main(argv: string[]): Promise<number> {
   if (cmd === "status") {
     const token = await loadToken();
     const d = await diagnose(config.codexBin);
-    console.log(`Home:    ${agentHome()}\nCRM:     ${config.crmUrl}\nToken:   ${token ? "stored" : "not set (run setup)"}\nModel:   ${config.model ?? "Codex default"}\nEffort:  quick=${config.effortQuick}, deep=${config.effortDeep}\nCodex:   ${d.state}${d.version ? ` (${d.version})` : ""}${d.note ? ` - ${d.note}` : ""}\nExe:     ${resolveExecutableCached(config.codexBin) ?? "not found"}`);
+    console.log(`Business data: ${statusLine(businessDataStatus())}`);
+    console.log(`Home:    ${agentHome()}\nCRM:    ${config.crmUrl}\nToken:   ${token ? "stored" : "not set (run setup)"}\nModel:   ${config.model ?? "Codex default"}\nEffort:  quick=${config.effortQuick}, deep=${config.effortDeep}\nCodex:   ${d.state}${d.version ? ` (${d.version})` : ""}${d.note ? ` - ${d.note}` : ""}\nExe:     ${resolveExecutableCached(config.codexBin) ?? "not found"}`);
     return d.state === "ready" && token ? 0 : 1;
   }
 
   if (cmd === "doctor") {
     const d = await diagnose(config.codexBin);
+    const bd = businessDataStatus();
+    console.log(`Business data\n  Installed:          ${bd.indexReady ? "yes" : "no"}\n  Source:             ${bd.source}\n  Data date:          ${bd.dataDate ?? "unknown"}${bd.ageDays !== null ? ` (${bd.ageDays} ${bd.ageDays === 1 ? "day" : "days"} old, ${bd.freshness})` : ""}\n  Index ready:        ${bd.indexReady ? "yes" : "no"}\n  Businesses indexed: ${bd.businesses.toLocaleString("en")}\n  Attribution:        ${bd.attribution}${bd.indexReady ? "" : `\n  ${statusLine(bd)}`}\n`);
     console.log(`Agent check: ${d.state}${d.version ? ` (codex ${d.version})` : ""}${d.note ? `\n  ${d.note}` : ""}\n  Executable: ${resolveExecutableCached(config.codexBin) ?? "not found"}`);
     if (d.state === "not_installed") console.log("  Install Codex CLI: npm install -g @openai/codex   (or the installer from the Codex docs), then run: codex");
     if (d.state === "not_authenticated") console.log("  Sign in: run `codex` and choose Sign in with ChatGPT.");
@@ -124,7 +186,10 @@ async function main(argv: string[]): Promise<number> {
     // Development only: PROSPECT_AGENT_SOURCE=sample uses invented businesses, and only while talking to a LOCAL CRM (never the real one).
     const sample = process.env.PROSPECT_AGENT_SOURCE === "sample" && /^http:\/\/(localhost|127\.0\.0\.1|[a-z0-9-]+\.localhost)(:|$)/.test(config.crmUrl);
     if (process.env.PROSPECT_AGENT_SOURCE === "sample" && !sample) log.warn("PROSPECT_AGENT_SOURCE=sample is ignored: it only works against a local CRM");
-    const handle = startWorker({ api, config, log, source: sample ? new MockBusinessSource() : new OsmBusinessSource() });
+    const handle = startWorker({ api, config, log, source: sample ? new MockBusinessSource() : undefined });
+    const bd = businessDataStatus();
+    log.info("business data", { ready: bd.indexReady, source: bd.source, dataDate: bd.dataDate ?? "", businesses: bd.businesses, freshness: bd.freshness });
+    if (!bd.indexReady && !sample) log.warn(statusLine(bd));
     let signals = 0;
     const onSignal = () => {
       signals++;

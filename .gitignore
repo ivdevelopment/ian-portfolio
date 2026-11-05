@@ -54,3 +54,7 @@ scripts/prospects-legacy/data/
 # Zoho client hand-off (never committed)
 .zoho-client.env
 fake-codex.mode
+
+# Local business data (P10.2): OpenStreetMap extracts and indexes live outside the repository; never commit them
+*.osm.pbf
+business-index*.sqlite

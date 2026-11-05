@@ -99,13 +99,90 @@ At start the agent runs `codex --version`, **reads the installed `codex exec --h
 Progress shown in the CRM is real: `Queued → Picked up by Ian-PC → Finding businesses… → Checking duplicates… → Analyzing N websites… → Qualifying candidates… → N strong prospects found`. **Cancel run** stops a queued run at once
 and an active one between steps, keeping the candidates already found. Review, Add prospect (Researching, never Contacted) and Ignore are the unchanged P10 flow.
 
-### Discovery source (OpenStreetMap)
+### Discovery source (OpenStreetMap) — Overpass, now only the fallback
+
+*Since P10.2 the preferred source is the local Belgium index described in the next section; what follows is the public Overpass source, used only as an explicitly enabled fallback.*
 
 P10 had no business source, so P10.1 adds one that is public, legal to query and keyless: **OpenStreetMap via Nominatim (geocoding Brugge is built in) and Overpass**, one polite request each with an identifying `User-Agent`.
 It reads only the tags a business chose to publish (name, website, phone, email, social pages), skips chains (`brand` tag) and dedupes by name + city. **Coverage depends on mapping volunteers**, so it is a starting list, not a directory.
 The public Overpass servers are shared and sometimes at capacity (HTTP 502/504), so the agent tries three mirrors, pauses between rounds, and gives up after 3 minutes with the dedicated failure kind **`source_error`**
 ("The public business source (OpenStreetMap) is busy or unreachable. Try again in a few minutes."), never blaming Codex. A search-engine or directory adapter can replace it behind the same `BusinessSource` interface.
 Codex is **not** asked to browse: deterministic discovery and website checks stay authoritative; Codex only judges the evidence. (Whether Codex's web search is available under the plan was not assumed and is not used.)
+
+### Local business data (P10.2): the preferred discovery source
+
+Public Overpass servers were too unreliable for a search that must start within seconds, so discovery now reads a **local copy of the Belgian OpenStreetMap extract** (Geofabrik `belgium-latest.osm.pbf`) kept on the agent PC.
+Overpass is only a fallback (below). The local data never goes to Vercel, Supabase or Git; only the normalised candidates a run finds reach the CRM.
+
+**Install and update** (run on the PC, not part of a search; the extract is never downloaded per search):
+
+```bash
+npm run prospect-agent -- update-business-data          # first install, or refresh when Geofabrik has a newer extract
+npm run prospect-agent -- update-business-data --force  # rebuild the index from the extract already on disk
+npm run prospect-agent -- discover --location Brugge --area "Brugge + 30 km" --count 5   # dry run: no Codex, no CRM, nothing stored
+```
+
+The update checks what Geofabrik publishes (size, date, MD5), does nothing when the installed data is already that version, otherwise downloads to a temporary file and verifies size and MD5; builds the **new index beside the old one**, checks that it opens,
+passes SQLite's integrity check and holds a plausible number of businesses, and only then renames it into place (the previous index is kept as `business-index.previous.sqlite`). Any failure leaves the working index exactly as it was.
+
+Everything lives in `%LOCALAPPDATA%\IanProspectAgent\data\osm\`: `belgium-latest.osm.pbf` (source, ~700 MB), `business-index.sqlite` (~30 MB), `metadata.json` (source, MD5, data date, counts, last check/update) and `geocode-cache.json`. `*.osm.pbf` and `business-index*.sqlite` are git-ignored.
+
+**What is indexed.** A built-in, dependency-free PBF reader (no GDAL/osmium/Docker) streams the extract twice without holding it in memory and keeps only **named businesses**: `shop`, `craft`, selected `office` / `amenity` / `tourism` / `healthcare` / `leisure` values
+(see `tools/prospect-agent/src/osm/categories.ts`), with their OSM id (`node/…` or `way/…`), position, public contact tags (website, phone, email, Facebook, Instagram), address city and the category. Buildings use the centre of their nodes.
+No contributor metadata (user, changeset, timestamps) is read or stored. Chain branches (`brand` tag) are indexed but excluded from searches. The index also holds named places (city, town, village…) so a search centre such as "Brugge" is found locally.
+OSM tags are untrusted input: URLs must be public `http(s)` addresses without credentials (max 500 characters), emails must look like emails, names/phones are length-limited and control characters removed; nothing from a tag is ever executed or used as shell syntax.
+
+**A search** geocodes the centre (built-in Brugge coordinates, then the geocode cache, then the local place list, and only for an unknown place one Nominatim lookup), takes every indexed business within the radius using an R*Tree box plus the exact great-circle distance
+(the radius comes from the request, e.g. "Brugge + 30 km", default 30 km, and is never chosen by an AI), filters by industry, ranks and returns up to `clamp(count × 12, 30, 200)` businesses. Typical time for Brugge + 30 km on the full Belgian index: about 0.1 s.
+
+* **Industry mapping is a fixed table** (`INDUSTRY_RULES`): bike → `shop=bicycle`, restaurant → `amenity=restaurant`, car detailing → `shop=car_repair|car|car_parts|tyres`, `craft=car_painter`, `amenity=car_wash`, roofing → `craft=roofer|tinsmith`, and so on. An industry with no entry is matched against the listing's category words and name. **OpenStreetMap coverage is incomplete**: a business is only found if a volunteer mapped it with a name and a category, and some trades share a generic tag.
+* **Any industry** is not a dump: kinds of business are visited in a fixed, configurable order of usefulness for web work (trades 100, automotive 95, professional services 90, beauty & wellness 85, hospitality 75, retail 70, health 60, services 50), one from each kind in turn, businesses with a website first (for **No Website** mode: without), then the nearest. Override the weights in `config.json`: `"discoveryPriorities": { "hospitality": 120 }`.
+* **No website listed** is kept (key: name + locality) and recorded as the listing fact `No website URL is present in the available business listing.` That says what the listing contains; it is not proof that no website exists.
+* The **P10 pipeline is unchanged and not part of the source**: CRM duplicate checks, ignored memory, 60-day cooldown, SSRF-safe website analysis, Codex qualification, scoring, threshold and server-side validation all run as before.
+* **Provenance**: each business carries `source = local_osm`, the OSM object id and its OpenStreetMap link; each piece of evidence says whether it is a **Listing** fact (OpenStreetMap), a **Website** observation, and the score reasons are Codex's interpretation of exactly that evidence.
+
+**Freshness and fallback.** Data up to 7 days old is *fresh*; older data still works and the agent, `status`, `doctor` and the CRM say it can be refreshed (a manual command; there is no automatic download on start). If the index is **missing**, a search fails immediately with
+`Local business data is not installed yet. Run: npm run prospect-agent -- update-business-data` (failure kind `business_data_missing`) instead of waiting minutes on a public server. The public Overpass service is used **only** when explicitly allowed
+(`"overpassFallback": true` in `config.json`, or `PROSPECT_AGENT_OVERPASS_FALLBACK=1`) and only when the local data is missing or older than 60 days, with a 45-second budget; if it does not answer, older local data is still used. A healthy local index never contacts Overpass.
+
+**Not integrated (room left).** A future `kbo_validation` step could confirm a business against the Belgian company register (KBO/BCE) behind the same provider interface. It is not part of this milestone, and natural-person data must not be collected for direct marketing.
+
+**Licence.** Data © OpenStreetMap contributors, available under the Open Database License (ODbL); extract provided by Geofabrik GmbH (https://download.geofabrik.de). Listings in the CRM link back to their OpenStreetMap object, and `doctor`/`update-business-data` print the attribution.
+
+### Result quality rules (P10.2.1 and P10.2.2)
+
+All deterministic; none of it is decided by an AI.
+
+* **Placeholder contacts** (`src/lib/prospecting/contact.ts`). `gebruiker@domein.com`, `name@example.com`, `john@doe.com`, `info@yourdomain.*`, reserved example TLDs and template local parts (`voornaam.achternaam`, `yourname`...) are "no verified email": never a contact, never contactability points, dropped by the website extractor, the OSM import and the server. `info@`, `mail@`, `test@realcompany.be` are kept. Obviously fake phone numbers (all one digit, `123456...`) are treated the same way.
+* **Which businesses go forward** (`osm/select.ts`). The pipeline analyses the list in order and stops at enough candidates, so the order is what matters. The search radius is split into three bands (0–5, 5–15, 15–30 km at 30 km) and one business is taken from each in turn; inside a band the kinds of business rotate in the configured order with at most 3 of one category per band (the cap rises evenly only if an area is thin); equal listings are visited spread along the distance, not nearest-first. Website presence is not a ranking key: businesses with and without a listed website alternate (No Website mode lists the ones without first). Distance only enforces the requested area; it never lowers a business's rank.
+* **Commercial or not** (`osm/categories.ts`, stored per object in the index, schema 2). `commercial` (explicitly private), `likely_commercial` (a shop, craft, restaurant, professional office...), `unknown` (sports centre, clinic, music school... with no operator tag, ranked last), `non_commercial` (town hall, police, fire station, library, school, government office, `operator:type`/`ownership` public or non-profit, charity shop, official government web address; excluded). A privately operated school, gym or care business stays commercial. Names are never used for this.
+* **Evidence origins.** Each evidence line is labelled `listing` (OpenStreetMap), `website` (observed on the business's own pages) or `ai` (Codex's interpretation, kept as its own line). The server keeps these labels.
+
+**Missing-website confidence (`src/lib/prospecting/website-state.ts`).** "No website URL in the OSM listing" is not "this business has no website". Each business gets a website state:
+
+| State | Meaning |
+| --- | --- |
+| `confirmed_website` | The listing has the URL, or a probed address was corroborated by the business's own details: its name AND its phone number, or its name AND the domain of the listing's own (non-Gmail/ISP) email. |
+| `probable_website` | A probed address carries the business name and its locality, nothing stronger. Analysed, with lower confidence; not recorded as the business's website. |
+| `no_website_found` | At least 3 address probes were answered and none matched. Still not proof. |
+| `unknown` | The checks could not settle it (nothing to probe, or timeouts). |
+
+Probes are a few homepage requests (robots.txt respected, SSRF-safe fetcher, no search engine, no paid API): the listing's own email domain, the name joined/hyphenated (`cloetens.be`, `new-cars.be`, `cloetensbv.be`) and the name on the listing's own Facebook/Instagram page. A resolving domain is never enough; matching is exact (whole words, digit strings, the domain), never fuzzy. False attribution is treated as worse than "unknown".
+
+**Score caps (cannot be overridden by the AI; enforced again by the server).** website need (of 25) / conversion gap (of 15): `confirmed_website` 25 / 15 (the site analysis decides), `probable_website` 15 / 9, `no_website_found` 18 / 8, `unknown` 8 / 0. So an OSM-only missing website can add at most 8 points. The other categories and the 100-point model are unchanged. The evidence says exactly what is known ("OSM does not list a website. Website availability remains unconfirmed." / "...and no matching official website was found during the deterministic checks."), and the candidate card shows **Website: Confirmed / Probable / No official website found / Not listed / unconfirmed**.
+
+**Identity confidence** (`high` / `medium` / `low`). Low when a name clearly names one kind of business and the category is another (a business called "New-Cars" tagged `amenity=bicycle_rental`) and no website confirms it. A low-identity listing is not sent to Codex and is never proposed (it is remembered as "skipped").
+
+**Cooldown rule.** A business enters the 60-day cooldown only when it received a complete assessment (candidate or below threshold) or was a confirmed duplicate; a business whose analysis was cut off by a cancel is not remembered. Recommended refinement (needs the context call to carry the outcome, so a database change): remember `unreachable` and `skipped` outcomes for 7–14 days only, since they are usually temporary.
+
+**Real-run evidence behind these rules** (Brugge, 30 km, Any industry, Quick Find): the first run returned only city-centre businesses and a placeholder email; the second showed that 4 of 5 candidates qualified mainly because OpenStreetMap listed no website (one of them, Clicteur, turned out to have a site that the new probes confirm); the third, with all rules active, returned 3 candidates spread over 1.8 / 14.4 / 21.6 km, two with concrete website evidence and one held to the capped missing-website signal.
+
+### Follow-up items (P10.3, deliberately not implemented yet)
+
+1. **Apply the cooldown before the 60-business preselection cap.** The pool is chosen first and the cooldown filter runs after, so repeated searches in the same area spend part of the pool on businesses researched in the last 60 days (36 of 60 in the third real run). Filter first, then cap.
+2. **Handle personal Gmail/Hotmail business contacts.** Sole traders list personal-looking mailbox addresses (for example `firstname.lastname@hotmail.com`). They should be flagged as personal data and treated more cautiously for outreach, and not count as a full "professional email".
+3. **Make local-relevance scoring deterministic.** Codex currently scores local relevance 5-6 out of 10 at 14-22 km although the business is inside the requested radius; relevance should be computed from the radius, not left to the AI, so distance inside the requested area is not over-penalised.
+4. **Shorter cooldowns for `unreachable` and `skipped` outcomes** (7-14 days instead of 60), since they are usually temporary. This needs the outcome to be carried in the agent context call.
 
 ## 5. Failures and usage limits
 
@@ -120,6 +197,7 @@ Only a fixed set of kinds ever reaches the CRM; the words are in `src/lib/prospe
 | `invalid_output` | Codex returned an answer that could not be used. | batches with bad answers are skipped (noted); retry |
 | `network_error` | Codex could not reach its service. | check the connection |
 | `source_error` | The public business source (OpenStreetMap) is busy… | retry in a few minutes |
+| `business_data_missing` | Local business data is not installed on the agent PC yet. Run: `npm run prospect-agent -- update-business-data` | run that command once |
 | `agent_error` | The agent stopped with an error. | see the local log |
 
 **There is no fallback.** If the plan allowance is exhausted the run stops (a *partial* run keeps the candidates already found); nothing switches to the OpenAI API or another paid model.

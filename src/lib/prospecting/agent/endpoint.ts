@@ -20,7 +20,21 @@ const text = (max: number) => z.string().trim().max(max);
 const runId = z.uuid();
 
 const schemas = {
-  heartbeat: z.object({ codexVersion: text(60).nullish(), codexState: z.enum(["ready", "not_installed", "not_authenticated", "error"]), failureKind: text(40).nullish() }),
+  heartbeat: z.object({
+    codexVersion: text(60).nullish(),
+    codexState: z.enum(["ready", "not_installed", "not_authenticated", "error"]),
+    failureKind: text(40).nullish(),
+    /** The state of the agent's local business data (P10.2). Optional: an older agent sends none. */
+    businessData: z
+      .object({
+        state: z.enum(["ready", "missing"]),
+        source: text(60).nullish(),
+        dataDate: text(40).nullish(),
+        businesses: z.number().int().min(0).max(100_000_000).nullish(),
+        freshness: z.enum(["fresh", "aging", "stale", "unknown"]).default("unknown"),
+      })
+      .optional(),
+  }),
   claim: z.object({}).passthrough(),
   context: z.object({ runId }),
   progress: z.object({
@@ -64,7 +78,16 @@ export async function handleAgentOp(op: AgentOp, token: string, rawBody: string,
     case "heartbeat": {
       const p = schemas.heartbeat.safeParse(json);
       if (!p.success) return invalid();
-      return reply(await call("agent_heartbeat", { p_token: token, p_codex_version: p.data.codexVersion ?? null, p_codex_state: p.data.codexState, p_failure: p.data.failureKind ?? null }));
+      const bd = p.data.businessData;
+      return reply(
+        await call("agent_heartbeat", {
+          p_token: token,
+          p_codex_version: p.data.codexVersion ?? null,
+          p_codex_state: p.data.codexState,
+          p_failure: p.data.failureKind ?? null,
+          ...(bd ? { p_business_data: { state: bd.state, source: bd.source ?? null, data_date: bd.dataDate ?? null, businesses: bd.businesses ?? null, freshness: bd.freshness } } : {}),
+        }),
+      );
     }
     case "claim": {
       if (!schemas.claim.safeParse(json).success) return invalid();
