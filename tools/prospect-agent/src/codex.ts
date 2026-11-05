@@ -20,11 +20,77 @@ export type { FailureKind };
 
 export const LIMITS = { maxStreamBytes: 200_000, maxResultBytes: 200_000 } as const;
 
-const ENV_ALLOW = ["PATH", "Path", "PATHEXT", "SystemRoot", "SYSTEMROOT", "windir", "ComSpec", "TEMP", "TMP", "USERPROFILE", "HOME", "HOMEDRIVE", "HOMEPATH", "APPDATA", "LOCALAPPDATA", "ProgramData", "ProgramFiles", "ProgramFiles(x86)", "CODEX_HOME", "USERNAME", "LANG", "TERM"];
+/**
+ * What Codex gets from the parent environment: the Windows/user basics it needs to start and find its own sign-in (PATH/PATHEXT, SystemRoot,
+ * ComSpec, USERPROFILE/HOME, APPDATA/LOCALAPPDATA, TEMP/TMP, CODEX_HOME) and, only if already set, the proxy and certificate variables a
+ * proxied network needs. Nothing else: no connection token, no Supabase key, no Vercel or project variable, no API key of any kind.
+ * Windows variable names are case-insensitive, so each is copied once, under the spelling the parent used.
+ */
+const ENV_ALLOW = [
+  "PATH", "PATHEXT", "SystemRoot", "SystemDrive", "windir", "ComSpec", "TEMP", "TMP", "USERPROFILE", "HOME", "HOMEDRIVE", "HOMEPATH", "APPDATA", "LOCALAPPDATA",
+  "ProgramData", "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432", "PROCESSOR_ARCHITECTURE", "OS", "USERNAME", "CODEX_HOME", "LANG", "TERM",
+  "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "ALL_PROXY", "NODE_EXTRA_CA_CERTS", "SSL_CERT_FILE",
+] as const;
 export function childEnv(env: Record<string, string | undefined> = process.env): Record<string, string | undefined> {
+  const wanted = new Set(ENV_ALLOW.map((k) => k.toLowerCase()));
   const out: Record<string, string | undefined> = {};
-  for (const key of ENV_ALLOW) if (env[key] !== undefined) out[key] = env[key];
+  const seen = new Set<string>();
+  for (const [key, value] of Object.entries(env)) {
+    const lower = key.toLowerCase();
+    if (value === undefined || !wanted.has(lower) || seen.has(lower)) continue;
+    seen.add(lower);
+    out[key] = value;
+  }
   return out;
+}
+
+/* --------------------------- finding the Codex executable --------------------------- */
+
+/**
+ * `spawn("codex")` cannot work on Windows: CreateProcess does not apply PATHEXT, and an npm install of Codex provides `codex.cmd` (plus an
+ * extensionless script), never `codex.exe`. So the executable is resolved first, with the PARENT environment (where.exe), to an absolute path:
+ * a native `.exe` is preferred, then the `.cmd`/`.bat` shim (started through cmd.exe, see resolveCommand). The extensionless file is a
+ * shell script and is ignored. The result is then started with the restricted environment above.
+ */
+const EXT_RANK = [".exe", ".cmd", ".bat"] as const;
+const BARE_NAME = /^[A-Za-z0-9._-]{1,60}$/;
+
+export type ResolveDeps = { platform?: NodeJS.Platform; env?: Record<string, string | undefined>; where?: (name: string, env: Record<string, string | undefined>) => string[]; exists?: (path: string) => boolean };
+
+const whereExe = (name: string, env: Record<string, string | undefined>): string[] => {
+  const r = spawnSync("where.exe", [name], { encoding: "utf8", windowsHide: true, timeout: 10_000, env: env as NodeJS.ProcessEnv });
+  return r.status === 0 ? r.stdout.split(/\r?\n/).map((l) => l.trim()).filter(Boolean) : [];
+};
+
+/** The absolute path to start for `bin`, or null when it cannot be found. Off Windows `bin` is returned as is (spawn resolves PATH itself). */
+export function resolveExecutable(bin: string, deps: ResolveDeps = {}): string | null {
+  const platform = deps.platform ?? process.platform;
+  if (platform !== "win32") return bin;
+  const env = deps.env ?? process.env;
+  const exists = deps.exists ?? existsSync;
+  const hasExt = /\.[A-Za-z0-9]{1,4}$/.test(bin);
+  if (/[\\/]/.test(bin) || /^[A-Za-z]:/.test(bin)) {
+    // A path the person configured: use it, adding the extension an npm shim would have when it was left off.
+    if (hasExt && exists(bin)) return bin;
+    for (const ext of EXT_RANK) if (exists(`${bin}${ext}`)) return `${bin}${ext}`;
+    return exists(bin) ? bin : null;
+  }
+  if (!BARE_NAME.test(bin)) return null;
+  const found = (deps.where ?? whereExe)(bin, env).filter((p) => EXT_RANK.some((ext) => p.toLowerCase().endsWith(ext)));
+  for (const ext of EXT_RANK) {
+    const hit = found.find((p) => p.toLowerCase().endsWith(ext));
+    if (hit) return hit;
+  }
+  return null;
+}
+
+const resolvedCache = new Map<string, string | null>();
+/** Resolution is cached per name for the life of the process (a diagnostics run asks several times). */
+export function resolveExecutableCached(bin: string): string | null {
+  if (!resolvedCache.has(bin)) resolvedCache.set(bin, resolveExecutable(bin));
+  const hit = resolvedCache.get(bin) ?? null;
+  if (hit === null) resolvedCache.delete(bin); // a failed lookup is retried next time (Codex may be installed while the agent runs)
+  return hit;
 }
 
 /** On Windows the npm install of Codex is a `.cmd` shim, which cannot be spawned directly; it is started through cmd.exe with the same fixed arguments. */
@@ -54,7 +120,10 @@ export const runProcess: ProcRunner = (bin, args, opts) =>
   new Promise((resolve) => {
     let child;
     try {
-      const { cmd, args: argv, verbatim } = resolveCommand(bin, args);
+      // Find the real file with the PARENT environment, then start it with the restricted one.
+      const exe = resolveExecutableCached(bin);
+      if (exe === null) return resolve({ code: null, stdout: "", stderr: "", timedOut: false, truncated: false, spawnError: "ENOENT" });
+      const { cmd, args: argv, verbatim } = resolveCommand(exe, args);
       child = spawn(cmd, argv, { cwd: opts.cwd, shell: false, windowsHide: true, windowsVerbatimArguments: verbatim, env: childEnv() as NodeJS.ProcessEnv, stdio: ["pipe", "pipe", "pipe"], detached: process.platform !== "win32" });
     } catch (error) {
       return resolve({ code: null, stdout: "", stderr: "", timedOut: false, truncated: false, spawnError: (error as NodeJS.ErrnoException).code ?? "spawn" });

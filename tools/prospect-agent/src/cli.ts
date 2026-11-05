@@ -1,7 +1,7 @@
 import { createInterface } from "node:readline";
 import { Writable } from "node:stream";
 import { AgentApi, AgentApiError } from "./api-client";
-import { diagnose, execStructured, KIND_MESSAGES, parseVersion, runProcess, supportedFlags } from "./codex";
+import { diagnose, execStructured, KIND_MESSAGES, parseVersion, resolveExecutableCached, runProcess, supportedFlags } from "./codex";
 import { TEST_SCHEMA } from "./codex-provider";
 import { loadConfig, saveConfig, validateCrmUrl } from "./config";
 import { createLogger } from "./logger";
@@ -83,13 +83,13 @@ async function main(argv: string[]): Promise<number> {
   if (cmd === "status") {
     const token = await loadToken();
     const d = await diagnose(config.codexBin);
-    console.log(`Home:    ${agentHome()}\nCRM:     ${config.crmUrl}\nToken:   ${token ? "stored" : "not set (run setup)"}\nModel:   ${config.model ?? "Codex default"}\nEffort:  quick=${config.effortQuick}, deep=${config.effortDeep}\nCodex:   ${d.state}${d.version ? ` (${d.version})` : ""}${d.note ? ` - ${d.note}` : ""}`);
+    console.log(`Home:    ${agentHome()}\nCRM:     ${config.crmUrl}\nToken:   ${token ? "stored" : "not set (run setup)"}\nModel:   ${config.model ?? "Codex default"}\nEffort:  quick=${config.effortQuick}, deep=${config.effortDeep}\nCodex:   ${d.state}${d.version ? ` (${d.version})` : ""}${d.note ? ` - ${d.note}` : ""}\nExe:     ${resolveExecutableCached(config.codexBin) ?? "not found"}`);
     return d.state === "ready" && token ? 0 : 1;
   }
 
   if (cmd === "doctor") {
     const d = await diagnose(config.codexBin);
-    console.log(`Agent check: ${d.state}${d.version ? ` (codex ${d.version})` : ""}${d.note ? `\n  ${d.note}` : ""}`);
+    console.log(`Agent check: ${d.state}${d.version ? ` (codex ${d.version})` : ""}${d.note ? `\n  ${d.note}` : ""}\n  Executable: ${resolveExecutableCached(config.codexBin) ?? "not found"}`);
     if (d.state === "not_installed") console.log("  Install Codex CLI: npm install -g @openai/codex   (or the installer from the Codex docs), then run: codex");
     if (d.state === "not_authenticated") console.log("  Sign in: run `codex` and choose Sign in with ChatGPT.");
     const r = await runProcess(config.codexBin, ["doctor", "--summary"], { cwd: process.cwd(), stdin: "", timeoutMs: 60_000, maxBytes: 50_000 });
@@ -106,7 +106,7 @@ async function main(argv: string[]): Promise<number> {
     const flags = await supportedFlags(config.codexBin);
     const res = await execStructured({ bin: config.codexBin, dir: `${agentHome()}/runs/test-${Date.now()}`, prompt: 'Return the JSON object {"ok": true}. Do not run any commands.', schema: TEST_SCHEMA as unknown as Record<string, unknown>, model: config.model, effort: "low", timeoutMs: 120_000, flags });
     if (res.ok && (res.value as { ok?: unknown })?.ok === true) {
-      console.log(`Codex ${d.version ?? ""} works: headless exec, ChatGPT sign-in and structured output are fine (${res.ms} ms).`);
+      console.log(`Codex ${d.version ?? ""} works: headless exec, ChatGPT sign-in and structured output are fine (${res.ms} ms).\nExecutable: ${resolveExecutableCached(config.codexBin) ?? "?"}`);
       return 0;
     }
     console.error(res.ok ? "Codex answered, but not with the expected structure." : `${res.message} (${res.kind})`);

@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 import { AgentApi, AgentApiError, backoffMs, type RunParams } from "../tools/prospect-agent/src/api-client";
-import { KIND_MESSAGES, LIMITS, childEnv, classify, diagnose, execStructured, parseJsonObject, parseVersion, resolveCommand, runProcess, supportedFlags, type ProcResult, type ProcRunner } from "../tools/prospect-agent/src/codex";
+import { KIND_MESSAGES, LIMITS, childEnv, classify, diagnose, execStructured, parseJsonObject, parseVersion, resolveCommand, resolveExecutable, runProcess, supportedFlags, type ProcResult, type ProcRunner } from "../tools/prospect-agent/src/codex";
 import { BATCH_SIZE, CodexProvider, OUTPUT_SCHEMA, buildPrompt } from "../tools/prospect-agent/src/codex-provider";
 import { DEFAULT_CONFIG, effortFor, loadConfig, validateCrmUrl } from "../tools/prospect-agent/src/config";
 import { runJob } from "../tools/prospect-agent/src/job";
@@ -137,6 +137,71 @@ describe("running Codex safely", () => {
     expect(parseJsonObject('{"a":')).toBeUndefined();
     expect(parseVersion("codex-cli 0.46.1")).toBe("0.46.1");
   });
+});
+
+describe("finding the Codex executable", () => {
+  const win = (where: string[], existing: string[] = []) => ({ platform: "win32" as const, env: { PATH: "x" }, where: () => where, exists: (p: string) => existing.includes(p) });
+
+  it("picks the native .exe first, then the .cmd shim, and ignores the extensionless script an npm install also creates", () => {
+    expect(resolveExecutable("codex", win(["C:\\n\\codex", "C:\\n\\codex.cmd"]))).toBe("C:\\n\\codex.cmd");
+    expect(resolveExecutable("codex", win(["C:\\n\\codex.cmd", "C:\\app\\codex.exe"]))).toBe("C:\\app\\codex.exe");
+    expect(resolveExecutable("codex", win(["C:\\n\\codex"]))).toBeNull();
+    expect(resolveExecutable("codex", win([]))).toBeNull();
+  });
+
+  it("uses a configured path as given, adds the shim's extension when it was left off, and refuses a bare name that is not a plain word", () => {
+    expect(resolveExecutable("C:\\n\\codex.cmd", win([], ["C:\\n\\codex.cmd"]))).toBe("C:\\n\\codex.cmd");
+    expect(resolveExecutable("C:\\n\\codex", win([], ["C:\\n\\codex.cmd"]))).toBe("C:\\n\\codex.cmd");
+    expect(resolveExecutable("C:\\nope\\codex", win([], []))).toBeNull();
+    for (const bad of ["codex && calc", "co dex", "codex;x", "", "a".repeat(80)]) expect(resolveExecutable(bad, win(["C:\\x\\a.exe"])), bad).toBeNull();
+  });
+
+  it("off Windows the name is left for spawn to resolve", () => {
+    expect(resolveExecutable("codex", { platform: "linux" })).toBe("codex");
+  });
+
+  it("the restricted environment keeps what Codex needs, passes proxy settings only when they exist, and copies each variable once", () => {
+    const env = childEnv({ Path: "p", PATH: "p", PATHEXT: ".EXE;.CMD", SystemRoot: "s", ComSpec: "c", USERPROFILE: "u", APPDATA: "a", LOCALAPPDATA: "l", TEMP: "t", TMP: "t", HTTPS_PROXY: "http://proxy:8080", NO_PROXY: "localhost", OPENAI_API_KEY: "sk-nope", SUPABASE_SERVICE_ROLE_KEY: "svc", PROSPECT_AGENT_TOKEN: "ipa_nope", VERCEL_TOKEN: "v", NEXT_PUBLIC_X: "1" });
+    expect(Object.keys(env).filter((k) => k.toLowerCase() === "path")).toHaveLength(1);
+    expect(env).toMatchObject({ PATHEXT: ".EXE;.CMD", SystemRoot: "s", ComSpec: "c", USERPROFILE: "u", APPDATA: "a", LOCALAPPDATA: "l", TEMP: "t", TMP: "t", HTTPS_PROXY: "http://proxy:8080", NO_PROXY: "localhost" });
+    expect(Object.keys(env).some((k) => /OPENAI|SUPABASE|PROSPECT|VERCEL|NEXT/i.test(k))).toBe(false);
+    expect(Object.keys(childEnv({ PATH: "p" }))).toEqual(["PATH"]);
+  });
+});
+
+describe.runIf(process.platform === "win32")("the failure that blocked the first real Codex test: a bare name whose only launcher is an npm-style .cmd shim", () => {
+  const devDir = join(process.cwd(), "tools", "prospect-agent", "dev");
+  it("resolves through the real where.exe to the absolute .cmd, and starts it with the restricted environment", async () => {
+    const dir = home();
+    writeFileSync(join(dir, "shimtool.cmd"), "@echo off\r\necho shim-ok %*\r\n");
+    writeFileSync(join(dir, "shimtool"), "#!/bin/sh\necho extensionless\n"); // the extra file npm creates next to the .cmd
+    const path = `${dir};${process.env.PATH ?? ""}`;
+    expect(resolveExecutable("shimtool", { env: { ...process.env, PATH: path } })).toBe(join(dir, "shimtool.cmd"));
+    expect(resolveExecutable("definitely-no-such-tool-xyz", { env: { ...process.env, PATH: path } })).toBeNull();
+    const saved = process.env.PATH;
+    process.env.PATH = path;
+    try {
+      const r = await runProcess("shimtool", ["hello"], { cwd: dir, stdin: "", timeoutMs: 15_000, maxBytes: 10_000 });
+      expect(r).toMatchObject({ code: 0, spawnError: null });
+      expect(r.stdout).toContain("shim-ok hello");
+    } finally {
+      process.env.PATH = saved;
+    }
+  }, 60_000);
+
+  it("`codex`-style discovery works end to end for the fake Codex found by name on PATH (version, flags, login, structured exec)", async () => {
+    const saved = process.env.PATH;
+    process.env.PATH = `${devDir};${saved ?? ""}`;
+    try {
+      expect(resolveExecutable("fake-codex")).toBe(join(devDir, "fake-codex.cmd"));
+      expect(await diagnose("fake-codex")).toMatchObject({ state: "ready", version: "0.0.0-fake" });
+      const flags = await supportedFlags("fake-codex");
+      const out = await execStructured({ bin: "fake-codex", dir: join(home(), "run"), prompt: "[]", schema: { type: "object" }, model: null, effort: "low", timeoutMs: 30_000, flags });
+      expect(out).toMatchObject({ ok: true, value: { assessments: [] } });
+    } finally {
+      process.env.PATH = saved;
+    }
+  }, 90_000);
 });
 
 describe.runIf(process.platform === "win32")("a real Windows .cmd shim in a folder with a space in its name", () => {
