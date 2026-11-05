@@ -349,12 +349,16 @@ export class ProspectAgentService {
   }
 
   private hooks(firstBeat: () => void): WorkerHooks {
+    // A heartbeat or claim that was still in flight when the worker stopped can answer afterwards; it must not bring the old state back.
+    const live = () => this.handle !== null;
     return {
       onDiagnostics: (d) =>
+        live() &&
         this.patch((s) => {
           s.codex = { ...s.codex, state: s.codex.state === "usage_limit" && d.state === "ready" ? "usage_limit" : d.state, version: d.version, note: d.note, checkedAt: this.now() };
         }),
       onHeartbeat: (o) => {
+        if (!live()) return;
         this.patch((s) => {
           if (o.ok) {
             s.crm = { state: "connected", device: o.device, lastHeartbeat: this.now() };
@@ -365,6 +369,7 @@ export class ProspectAgentService {
         firstBeat();
       },
       onClaim: (o) =>
+        live() &&
         this.patch((s) => {
           if (o.ok && s.crm.state !== "rejected") s.crm.state = "connected";
           else if (!o.ok && o.kind !== "unauthorized") s.crm.state = "offline";
@@ -485,7 +490,7 @@ export class ProspectAgentService {
         const u = s.tasks.businessUpdate;
         u.state = st.stage === "done" ? "idle" : "running";
         u.stage = st.stage;
-        u.label = UPDATE_LABELS[st.stage];
+        u.label = st.stage === "verifying" && st.detail === "index" ? "Verifying index…" : UPDATE_LABELS[st.stage];
         u.percent = st.stage === "building" ? Math.round(st.percent) : st.stage === "downloading" && st.total ? Math.min(100, Math.round((st.bytes / st.total) * 100)) : null;
         u.bytes = st.stage === "downloading" ? st.bytes : null;
         u.total = st.stage === "downloading" ? st.total : null;

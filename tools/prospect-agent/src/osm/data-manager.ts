@@ -140,7 +140,7 @@ export function md5File(path: string): Promise<string> {
 /** The real stages of an update, for a UI that shows progress. `percent` is of the whole update only where it is known (download, build). */
 export type UpdateStage =
   | { stage: "checking" }
-  | { stage: "verifying"; detail: "existing_extract" | "download" }
+  | { stage: "verifying"; detail: "existing_extract" | "download" | "index" }
   | { stage: "downloading"; bytes: number; total: number | null }
   | { stage: "building"; percent: number }
   | { stage: "installing" }
@@ -254,6 +254,7 @@ export async function updateBusinessData(deps: UpdateDeps = {}): Promise<UpdateR
     stats = (deps.build ?? buildIndex)({ pbfPath, outPath: p.building, log: buildLog, extraMeta: { source: SOURCE_NAME } });
     const min = deps.minBusinesses ?? 1000;
     if (stats.businesses < min) throw new Error(`the new index has only ${stats.businesses} businesses (expected at least ${min})`);
+    stage({ stage: "verifying", detail: "index" });
     const db = openIndex(p.building);
     try {
       const check = db.prepare("pragma quick_check").get() as { quick_check?: string } | undefined;

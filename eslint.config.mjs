@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // The Windows tray application is its own package (own dependencies, own build output).
+    "tools/prospect-agent-desktop/dist/**",
+    "tools/prospect-agent-desktop/release/**",
   ]),
 ]);
 

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:;">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ian Prospect Agent</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header>
+  <div class="title">
+    <h1>Ian Prospect Agent</h1>
+    <span id="version" class="muted"></span>
+  </div>
+  <div id="pill" class="pill" data-level="gray"><span class="dot" aria-hidden="true"></span><span id="pill-text">Stopped</span></div>
+</header>
+
+<main>
+  <p id="detail" class="detail"></p>
+
+  <section id="setup" class="card" hidden>
+    <h2>Setup required</h2>
+    <ol>
+      <li>Connect this device from CRM Settings</li>
+      <li>Sign in to Codex with ChatGPT</li>
+      <li>Install business data</li>
+    </ol>
+    <div class="row-buttons">
+      <button id="btn-crm-settings" class="primary" type="button">Open CRM Settings</button>
+    </div>
+  </section>
+
+  <section class="card" aria-label="Status">
+    <dl class="rows">
+      <div class="r"><dt>CRM</dt><dd><span id="crm-text" class="v"></span><span id="crm-sub" class="sub"></span></dd></div>
+      <div class="r"><dt>Codex</dt><dd><span id="codex-text" class="v"></span><span id="codex-sub" class="sub"></span><button id="btn-codex-login" class="link" type="button" hidden>Open Codex Login</button></dd></div>
+      <div class="r"><dt>Business data</dt><dd><span id="data-title" class="v"></span><span id="data-l1" class="sub"></span><span id="data-l2" class="sub"></span><span id="data-health" class="sub"></span></dd></div>
+      <div class="r"><dt>Worker</dt><dd><span id="worker-text" class="v"></span><span id="worker-error" class="sub err"></span></dd></div>
+    </dl>
+  </section>
+
+  <section id="active" class="card" hidden aria-label="Active search">
+    <h2>Active search</h2>
+    <p id="active-title" class="v"></p>
+    <p class="sub"><span id="active-stage"></span> <span id="active-progress" class="num"></span></p>
+    <div id="active-bar" class="bar" hidden><span></span></div>
+    <div class="row-buttons"><button id="btn-open-crm-active" type="button">Open CRM</button></div>
+  </section>
+
+  <section class="buttons">
+    <div class="row-buttons">
+      <button id="btn-start" class="primary" type="button">Start Agent</button>
+      <button id="btn-stop" type="button">Stop Agent</button>
+    </div>
+    <div class="row-buttons">
+      <button id="btn-test" type="button">Test Codex</button>
+      <button id="btn-update" type="button">Update business data</button>
+    </div>
+    <p id="test-result" class="result" hidden></p>
+    <div id="update" class="update" hidden>
+      <div class="sub"><span id="update-label"></span> <span id="update-detail" class="num"></span></div>
+      <div id="update-bar" class="bar"><span></span></div>
+    </div>
+    <p id="update-note" class="result bad" hidden></p>
+    <div class="row-buttons"><button id="btn-open-crm" type="button">Open CRM</button></div>
+  </section>
+
+  <section class="settings" aria-label="Start-up">
+    <label class="check"><input id="chk-app" type="checkbox"><span>Start app with Windows</span></label>
+    <label class="check"><input id="chk-agent" type="checkbox"><span>Start agent automatically</span></label>
+    <p id="autostart-note" class="sub" hidden></p>
+  </section>
+
+  <details class="diag">
+    <summary>Diagnostics</summary>
+    <pre id="diag-text" tabindex="0"></pre>
+    <div class="row-buttons">
+      <button id="btn-copy" type="button">Copy diagnostics</button>
+      <button id="btn-logs" type="button">Open logs folder</button>
+    </div>
+    <p id="copy-note" class="sub" hidden>Copied. It contains no passwords or tokens.</p>
+  </details>
+</main>
+
+<div id="modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div class="modal-box">
+    <h2 id="modal-title">A prospecting run is currently active.</h2>
+    <p>Stopping now may interrupt it.</p>
+    <div class="row-buttons">
+      <button id="modal-cancel" type="button">Cancel</button>
+      <button id="modal-stop" class="danger" type="button">Stop anyway</button>
+    </div>
+  </div>
+</div>
+
+<script src="model.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

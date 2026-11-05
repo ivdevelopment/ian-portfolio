@@ -1,0 +1,22 @@
+{
+  "name": "ian-prospect-agent-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Ian Prospect Agent: Windows tray application for the local prospect worker",
+  "author": "Ian Verlinden",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "build": "node build.mjs",
+    "start": "node build.mjs && electron .",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "postinstall": "node node_modules/electron/install.js"
+  },
+  "devDependencies": {
+    "electron": "45.2.3",
+    "electron-builder": "26.18.0",
+    "esbuild": "0.28.2"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}

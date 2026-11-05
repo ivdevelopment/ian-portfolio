@@ -58,3 +58,8 @@ fake-codex.mode
 # Local business data (P10.2): OpenStreetMap extracts and indexes live outside the repository; never commit them
 *.osm.pbf
 business-index*.sqlite
+
+# Ian Prospect Agent (Windows tray app): dependencies and build output are never committed
+/tools/prospect-agent-desktop/node_modules/
+/tools/prospect-agent-desktop/dist/
+/tools/prospect-agent-desktop/release/

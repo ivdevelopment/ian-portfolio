@@ -172,6 +172,23 @@ describe("ProspectAgentService: start, state and stop", () => {
     expect(await service.stop()).toEqual({ ok: true }); // stopping a stopped agent is harmless
   });
 
+  it("a heartbeat that answers after the worker has stopped does not bring the old state back", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    let calls = 0;
+    const f = fakeApi({ heartbeat: async () => { if (++calls > 1) await gate; return { ok: true as const, device: "Ian-PC" }; } });
+    const { service } = make(f.api, fakeCodex().runner);
+    await running(service);
+    await vi.waitFor(() => expect(calls).toBeGreaterThan(1)); // a later heartbeat is now in flight
+    await service.stop();
+    const stopped = service.getState();
+    expect(stopped).toMatchObject({ worker: "stopped", crm: { state: "unknown" } });
+    release();
+    await new Promise((r) => setTimeout(r, 30));
+    expect(service.getState().crm).toEqual(stopped.crm); // the late answer changed nothing
+    expect(service.getState().worker).toBe("stopped");
+  });
+
   it("a revoked device (token rejected) ends in an error state with a plain message, and the lock is released", async () => {
     const h = home();
     const f = fakeApi({ heartbeat: async () => { throw new AgentApiError("unauthorized", "x", 401); } });
@@ -474,7 +491,7 @@ describe("Update business data", () => {
       },
     });
     expect(out.outcome).toBe("updated");
-    expect(stages.map((s) => s.stage)).toEqual(["checking", "downloading", "downloading", "verifying", "building", "building", "building", "installing", "done"]);
+    expect(stages.map((s) => s.stage)).toEqual(["checking", "downloading", "downloading", "verifying", "building", "building", "building", "verifying", "installing", "done"]);
     expect(stages.filter((s) => s.stage === "building").map((s) => (s as { percent: number }).percent)).toEqual([0, 25, 100]);
     expect(stages.at(-1)).toEqual({ stage: "done", outcome: "updated" });
     // A UI callback that throws cannot break the update.
