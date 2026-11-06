@@ -81,6 +81,7 @@ function fakeApi(o: FakeApiOpts = {}) {
   let claimN = 0;
   const api = {
     heartbeat: async (b: Record<string, unknown>) => (calls.push(["heartbeat", b]), o.heartbeat ? await o.heartbeat() : { ok: true as const, device: "Ian-PC" }),
+    mailClaim: async () => null,
     claim: async () => {
       calls.push(["claim", {}]);
       const next = o.claims?.[claimN++] ?? null;

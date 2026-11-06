@@ -27,6 +27,26 @@ if (args[0] === "exec") {
     const out = args.indexOf("--output-last-message");
     const respond = (text) => { if (out >= 0) fs.writeFileSync(args[out + 1], text); else process.stdout.write(text); process.exit(0); };
     if (mode === "garbage") respond("this is not json");
+    // Mail Assistant (P10.5): a canned, rule-abiding draft chosen from the request's own context (action type and language). Development only.
+    if (input.includes("You write ONE email draft")) {
+      const ctx = JSON.parse(input.trim().split("\n").at(-1));
+      const nl = ctx.language === "nl";
+      const hi = ctx.prospect.contact_name ? (nl ? "Dag " : "Hi ") + ctx.prospect.contact_name.split(" ")[0] + "," : nl ? "Dag," : "Hi,";
+      const sign = nl ? "Groeten,\nIan" : "Best,\nIan";
+      const lastSubject = (ctx.history.find((h) => h.subject) || {}).subject;
+      const re = (s) => (lastSubject ? (/^re:/i.test(lastSubject) ? lastSubject : "Re: " + lastSubject) : s);
+      const hasPoint = ctx.observations && ctx.observations.points[0];
+      const point = hasPoint ? (nl ? "Ik merkte dat de reservatie- of contactflow een stuk directer zou kunnen." : "I noticed the reservation or contact flow could be a bit more direct.") : nl ? "Ik help lokale zaken met hun website en reservaties." : "I help local businesses with their website and bookings.";
+      const T = {
+        first_outreach: [nl ? "Een kleine suggestie voor jullie site" : "A small idea for your site", nl ? point + " Ik heb daar een kleine suggestie voor, en toon ze graag als je interesse hebt." : point + " I have a small idea for it and would be happy to show it if you are interested."],
+        follow_up: [re(nl ? "Een kleine suggestie voor jullie site" : "A small idea for your site"), ctx.action.is_final ? (nl ? "Ik kom nog een laatste keer terug op mijn vorige mail. Geen probleem als het niet past; je weet me te vinden." : "One last note on my earlier email. No problem if it is not a fit; you know where to find me.") : nl ? "Ik wou even terugkomen op mijn vorige mail. Als het iets is waar je over nadenkt, toon ik graag wat ik in gedachten had." : "Just following up on my earlier email. If it is something you are considering, I am happy to show what I had in mind."],
+        reply: [re(nl ? "Je bericht" : "Your message"), nl ? "Bedankt voor je antwoord. Graag bespreek ik het verder; laat maar weten wanneer het je past, dan stem ik me daarop af." : "Thanks for getting back to me. I would be glad to discuss it further; let me know what suits you and I will adapt."],
+        concept_follow_up: [re(nl ? "Het concept" : "The concept"), nl ? "Ik wou even terugkomen op het concept dat ik doorstuurde. Had je al de tijd om ernaar te kijken, of heb je vragen?" : "I wanted to quickly follow up on the concept I sent over. Did you get a chance to look at it, or do you have any questions?"],
+        quote_follow_up: [re(nl ? "Offerte" : "Quote"), nl ? "Ik wou even nagaan of je al tijd had om de offerte te bekijken. Als er vragen zijn over de inhoud, bespreek ik die graag." : "I wanted to check whether you had time to go through the quote. If there are questions about the scope, I am happy to go over them."],
+        meeting_follow_up: [re(nl ? "Ons gesprek" : "Our meeting"), nl ? "Bedankt voor het gesprek. Ik wou even afstemmen wat de volgende stap is voor jullie." : "Thanks for the meeting. I wanted to agree on the next step with you."],
+      }[ctx.action.type] || ["x", "x"];
+      respond(JSON.stringify({ action_type: ctx.action.type, recommended_send_at: null, should_send_now: true, subject: T[0], body: hi + "\n\n" + T[1] + "\n\n" + sign, reason_summary: "Canned development draft for " + ctx.action.type + "." }));
+    }
     const businesses = JSON.parse(input.trim().split("\n").at(-1));
     if (!Array.isArray(businesses)) respond(JSON.stringify({ ok: true }));
     const cat = (score, obs) => ({ score, reason: "Observed from the data provided.", observations: obs });

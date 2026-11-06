@@ -12,6 +12,8 @@ export class AgentApiError extends Error {
 
 export type Fetch = typeof fetch;
 export type RunParams = { id: string; mode: string; location: string; area: string | null; industry: string | null; threshold: number; count: number; excludeResearched: boolean; attempt: number };
+/** A Mail Assistant request: the plan decided by the CRM and the minimal context for one draft. */
+export type MailJob = { id: string; plan: unknown; context: unknown; attempt: number };
 export type Counters = { raw_found: number; analyzed: number; qualified: number; duplicates_removed: number; skipped_cooldown: number };
 
 export class AgentApi {
@@ -59,6 +61,25 @@ export class AgentApi {
   }
   result(body: Record<string, unknown>) {
     return this.post<{ ok: true; inserted: number; skipped_known: number; rejected: number }>("result", body);
+  }
+  /** The next queued draft request, or null. A CRM that predates the Mail Assistant answers "not found": that simply means there is none. */
+  async mailClaim(): Promise<MailJob | null> {
+    try {
+      const r = await this.post<{ ok: true; job: MailJob | null }>("mail_claim", {});
+      return r.job;
+    } catch (e) {
+      if (e instanceof AgentApiError && e.kind === "rejected") return null;
+      throw e;
+    }
+  }
+  mailProgress(jobId: string) {
+    return this.post<{ ok: true; cancel: boolean }>("mail_progress", { jobId });
+  }
+  mailResult(body: { jobId: string; result: unknown; codexMs: number }) {
+    return this.post<{ ok: true }>("mail_result", body);
+  }
+  mailFail(body: { jobId: string; kind: string }) {
+    return this.post<{ ok: true }>("mail_fail", body);
   }
   fail(body: { runId: string; kind: string; message: string; status?: "failed" | "partial" | "cancelled" }) {
     return this.post<{ ok: true }>("fail", body);

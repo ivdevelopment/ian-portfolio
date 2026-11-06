@@ -68,7 +68,7 @@ export type ServiceDeps = {
   startTimeoutMs?: number;
 };
 
-export const MODE_LABELS: Record<string, string> = { quick: "Quick Find", deep: "Deep Find", redesign: "Website Redesign", no_website: "No Website", web_app: "Web App", industry: "Industry Hunt" };
+export const MODE_LABELS: Record<string, string> = { mail: "Mail Assistant", quick: "Quick Find", deep: "Deep Find", redesign: "Website Redesign", no_website: "No Website", web_app: "Web App", industry: "Industry Hunt" };
 
 const UPDATE_LABELS: Record<UpdateStage["stage"], string> = {
   checking: "Checking current data…",
@@ -396,6 +396,15 @@ export class ProspectAgentService {
         });
         if (summary.status !== "cancelled" && summary.status !== "abandoned") this.event({ type: "run_finished", status: summary.status, candidates: summary.candidates, kind: summary.kind, message });
       },
+      onMailStart: (jobId) =>
+        this.patch((s) => {
+          s.activeRun = { id: jobId, mode: "mail", modeLabel: MODE_LABELS.mail, location: "", stage: "Generating draft…", done: null, total: null, startedAt: this.now() };
+        }),
+      onMailEnd: (_jobId, summary) =>
+        this.patch((s) => {
+          s.activeRun = null;
+          if (summary.kind === "codex_usage_limit") s.codex.state = "usage_limit";
+        }),
       onPause: (until) =>
         this.patch((s) => {
           s.codex.pausedUntil = until;

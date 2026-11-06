@@ -511,6 +511,7 @@ function fakeApi(over: { cancelAfter?: number; leaseLostAfter?: number; context?
     fail: async (b: Record<string, unknown>) => (calls.push(["fail", b]), { ok: true as const }),
     heartbeat: async (b: Record<string, unknown>) => (calls.push(["heartbeat", b]), { ok: true as const, device: "Ian-PC" }),
     claim: async () => null,
+    mailClaim: async () => null,
   };
   return { api: api as unknown as AgentApi, calls, of: (name: string) => calls.filter(([n]) => n === name).map(([, b]) => b) };
 }

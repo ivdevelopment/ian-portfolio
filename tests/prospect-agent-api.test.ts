@@ -123,8 +123,8 @@ const run = (op: Parameters<typeof handleAgentOp>[0], body: unknown, answers?: R
 };
 
 describe("the agent API", () => {
-  it("has exactly the six operations a worker needs", () => {
-    expect([...AGENT_OPS]).toEqual(["heartbeat", "claim", "context", "progress", "result", "fail"]);
+  it("has exactly the six search operations and the four Mail Assistant operations, and nothing else", () => {
+    expect([...AGENT_OPS]).toEqual(["heartbeat", "claim", "context", "progress", "result", "fail", "mail_claim", "mail_progress", "mail_result", "mail_fail"]);
   });
 
   it("refuses broken or oversized bodies before touching the database", async () => {

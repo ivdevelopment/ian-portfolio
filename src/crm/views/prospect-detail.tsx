@@ -9,7 +9,10 @@ import { ProspectNotes } from "@/components/admin/prospect-notes";
 import { DeliveryBadge, FollowUpCell, PriorityBadge, ProspectStatusBadge } from "@/components/admin/prospect-ui";
 import { QuoteStatusBadge } from "@/components/admin/quote-ui";
 import { Badge, EmptyState, Panel, formatDateTime } from "@/components/admin/ui";
+import { MailAssistantPanel } from "@/components/crm/mail-assistant";
 import { MailSyncButton } from "@/components/crm/mail-sync-button";
+import { requireAdmin } from "@/lib/auth";
+import { getAssistantView } from "@/lib/mail-assistant/service";
 import { ProspectStatusSelect } from "@/components/crm/prospect-status-select";
 import { Timeline } from "@/components/crm/timeline";
 import { SectionSkeleton } from "@/components/ui/loading";
@@ -35,6 +38,7 @@ const TABS = [
   { id: "overview", label: "Overview" },
   { id: "activity", label: "Activity" },
   { id: "email", label: "Email" },
+  { id: "assistant", label: "Mail Assistant" },
   { id: "quotes", label: "Quotes" },
   { id: "projects", label: "Projects" },
   { id: "preview", label: "Preview" },
@@ -131,6 +135,7 @@ export default async function ProspectDossierPage({ params, searchParams }: Prop
         {tab === "overview" && <OverviewTab prospect={prospect} P={P} today={today} />}
         {tab === "activity" && <ActivityTab prospect={prospect} P={P} />}
         {tab === "email" && <EmailTab prospect={prospect} />}
+        {tab === "assistant" && <AssistantTab prospect={prospect} />}
         {tab === "quotes" && <QuotesTab prospect={prospect} P={P} />}
         {tab === "projects" && <ProjectsTab prospect={prospect} P={P} />}
         {tab === "preview" && <PreviewTab prospect={prospect} P={P} />}
@@ -320,6 +325,15 @@ async function EmailTab({ prospect }: { prospect: ProspectRecord }) {
       )}
     </Panel>
   );
+}
+
+/* ------------------------------ mail assistant ------------------------------ */
+
+async function AssistantTab({ prospect }: { prospect: ProspectRecord }) {
+  const { supabase } = await requireAdmin();
+  const view = await getAssistantView(supabase, prospect.id);
+  if (!view) return <Panel title="Mail Assistant"><EmptyState>This prospect could not be loaded.</EmptyState></Panel>;
+  return <MailAssistantPanel initial={view} prospectStatus={prospect.status} />;
 }
 
 /* ------------------------------ quotes ------------------------------ */

@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { FAILURE_KINDS } from "./messages";
+import { brusselsDayOf } from "@/lib/mail-assistant/timing";
+import { ACTION_TYPES, STEPS } from "@/lib/mail-assistant/types";
+import { checkMailResult } from "@/lib/mail-assistant/validate";
 import { checkCandidate, resultSchema } from "./validate";
 
 /**
@@ -8,7 +11,7 @@ import { checkCandidate, resultSchema } from "./validate";
  * database. It never touches cookies or a session: an agent request is authorised ONLY by its connection token, checked inside the database
  * functions on every call (so a revoked token stops working at once), and it can do nothing but the six operations below.
  */
-export const AGENT_OPS = ["heartbeat", "claim", "context", "progress", "result", "fail"] as const;
+export const AGENT_OPS = ["heartbeat", "claim", "context", "progress", "result", "fail", "mail_claim", "mail_progress", "mail_result", "mail_fail"] as const;
 export type AgentOp = (typeof AGENT_OPS)[number];
 export const MAX_BODY_BYTES = 1_500_000;
 export const LEASE_SECONDS = 90;
@@ -45,7 +48,26 @@ const schemas = {
     errors: z.array(text(200)).max(25).default([]),
   }),
   fail: z.object({ runId, kind: z.enum([...FAILURE_KINDS, "cancelled"]), message: text(200).default(""), status: z.enum(["failed", "partial", "cancelled"]).default("failed") }),
+  /** Mail Assistant (P10.5): the same device and token, a separate small queue of draft requests. */
+  mailClaim: z.object({}).passthrough(),
+  mailProgress: z.object({ jobId: z.uuid() }),
+  mailResult: z.object({ jobId: z.uuid(), result: z.unknown(), codexMs: z.number().int().min(0).max(86_400_000).default(0) }),
+  mailFail: z.object({ jobId: z.uuid(), kind: z.enum([...FAILURE_KINDS, "not_allowed", "cancelled"]) }),
 } as const;
+
+/** The plan as stored with a request. Parsed loosely: the database wrote it, but it is still not trusted blindly. */
+const storedPlan = z.object({
+  action: z.enum(ACTION_TYPES),
+  then: z.enum(ACTION_TYPES).nullable(),
+  step: z.enum(STEPS),
+  is_final: z.boolean(),
+  recommended_on: z.string().nullable(),
+  reason: z.string(),
+  needs_ai: z.boolean(),
+  blocked: z.enum(["more_context_needed"]).nullable(),
+  language: z.enum(["nl", "en"]),
+  warnings: z.array(z.string()),
+});
 
 const ERRORS: Record<string, number> = { unauthorized: 401, lease_lost: 409 };
 
@@ -107,6 +129,36 @@ export async function handleAgentOp(op: AgentOp, token: string, rawBody: string,
       const p = schemas.fail.safeParse(json);
       if (!p.success) return invalid();
       return reply(await call("agent_fail", { p_token: token, p_run: p.data.runId, p_kind: p.data.kind, p_message: p.data.message, p_status: p.data.status }));
+    }
+    case "mail_claim": {
+      if (!schemas.mailClaim.safeParse(json).success) return invalid();
+      return reply(await call("agent_mail_claim", { p_token: token, p_lease_seconds: LEASE_SECONDS }));
+    }
+    case "mail_progress": {
+      const p = schemas.mailProgress.safeParse(json);
+      if (!p.success) return invalid();
+      return reply(await call("agent_mail_progress", { p_token: token, p_job: p.data.jobId, p_lease_seconds: LEASE_SECONDS }));
+    }
+    case "mail_fail": {
+      const p = schemas.mailFail.safeParse(json);
+      if (!p.success) return invalid();
+      return reply(await call("agent_mail_fail", { p_token: token, p_job: p.data.jobId, p_kind: p.data.kind }));
+    }
+    case "mail_result": {
+      const p = schemas.mailResult.safeParse(json);
+      if (!p.success) return invalid();
+      // The plan the request was made for decides what is acceptable: the agent's own idea of it is not consulted.
+      const params = (await call("agent_mail_params", { p_token: token, p_job: p.data.jobId })) as { ok?: boolean; error?: string; plan?: unknown };
+      if (params?.ok !== true) return reply(params);
+      const plan = storedPlan.safeParse(params.plan);
+      if (!plan.success) return invalid();
+      const verdict = checkMailResult(p.data.result, plan.data, brusselsDayOf(new Date()));
+      if (!verdict.ok) {
+        // An answer the guardrails reject never becomes a recommendation: the request is failed so the CRM stops waiting for it.
+        await call("agent_mail_fail", { p_token: token, p_job: p.data.jobId, p_kind: verdict.kind });
+        return { status: 422, body: { ok: false, error: "rejected", reason: verdict.reason } };
+      }
+      return reply(await call("agent_mail_submit", { p_token: token, p_job: p.data.jobId, p_result: verdict.recommendation, p_codex_ms: p.data.codexMs }));
     }
     case "result": {
       const p = resultSchema.safeParse(json);

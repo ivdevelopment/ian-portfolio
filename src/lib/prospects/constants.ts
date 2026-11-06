@@ -120,6 +120,7 @@ export const ACTIVITY_TYPES = [
   "won",
   "lost",
   "other",
+  "mail_assistant_used",
 ] as const;
 export type ActivityType = (typeof ACTIVITY_TYPES)[number];
 

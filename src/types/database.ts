@@ -345,6 +345,26 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"prospect_mail_recommendations": {
+                  Row: {
+                    "action_type": string | null,"agent_id": string | null,"attempts": number,"body": string | null,"codex_ms": number | null,"context": NonNullable<Json>,"context_fingerprint": string,"dismissed_at": string | null,"failure_kind": string | null,"fingerprint_parts": NonNullable<Json>,"generated_at": string | null,"id": string,"language": string | null,"lease_expires_at": string | null,"plan": NonNullable<Json>,"prospect_id": string,"reason_summary": string | null,"recommended_send_at": string | null,"requested_at": string,"requested_by": string | null,"should_send_now": boolean | null,"status": string,"subject": string | null,"superseded_at": string | null,"used_at": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "action_type"?: string | null,"agent_id"?: string | null,"attempts"?: number,"body"?: string | null,"codex_ms"?: number | null,"context": NonNullable<Json>,"context_fingerprint": string,"dismissed_at"?: string | null,"failure_kind"?: string | null,"fingerprint_parts"?: NonNullable<Json>,"generated_at"?: string | null,"id"?: string,"language"?: string | null,"lease_expires_at"?: string | null,"plan": NonNullable<Json>,"prospect_id": string,"reason_summary"?: string | null,"recommended_send_at"?: string | null,"requested_at"?: string,"requested_by"?: string | null,"should_send_now"?: boolean | null,"status"?: string,"subject"?: string | null,"superseded_at"?: string | null,"used_at"?: string | null
+                  }
+                  Update: {
+                    "action_type"?: string | null,"agent_id"?: string | null,"attempts"?: number,"body"?: string | null,"codex_ms"?: number | null,"context"?: NonNullable<Json>,"context_fingerprint"?: string,"dismissed_at"?: string | null,"failure_kind"?: string | null,"fingerprint_parts"?: NonNullable<Json>,"generated_at"?: string | null,"id"?: string,"language"?: string | null,"lease_expires_at"?: string | null,"plan"?: NonNullable<Json>,"prospect_id"?: string,"reason_summary"?: string | null,"recommended_send_at"?: string | null,"requested_at"?: string,"requested_by"?: string | null,"should_send_now"?: boolean | null,"status"?: string,"subject"?: string | null,"superseded_at"?: string | null,"used_at"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "prospect_mail_recommendations_prospect_id_fkey"
+      columns: ["prospect_id"]
+isOneToOne: false
+      referencedRelation: "prospects"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"prospects": {
                   Row: {
                     "city": string | null,"company_name": string,"contact_delivery_status": string,"contact_name": string | null,"created_at": string,"email": string | null,"estimated_value_eur": number | null,"first_contact_on": string | null,"id": string,"last_activity_on": string | null,"last_activity_title": string | null,"last_contact_on": string | null,"legacy_ref": string | null,"linked_preview_id": string | null,"linked_project_id": string | null,"next_follow_up_on": string | null,"notes": string | null,"phone": string | null,"priority": string,"priority_order": number | null,"quote_value_eur": number | null,"sector": string | null,"source": string | null,"status": string,"status_order": number | null,"updated_at": string,"website_url": string | null
@@ -624,6 +644,21 @@ isOneToOne: false
                            },
 "agent_heartbeat":
 { Args: { "p_business_data"?: Json,"p_codex_state": string,"p_codex_version": string,"p_failure": string,"p_token": string }; Returns: Json
+                           },
+"agent_mail_claim":
+{ Args: { "p_lease_seconds"?: number,"p_token": string }; Returns: Json
+                           },
+"agent_mail_fail":
+{ Args: { "p_job": string,"p_kind": string,"p_token": string }; Returns: Json
+                           },
+"agent_mail_params":
+{ Args: { "p_job": string,"p_token": string }; Returns: Json
+                           },
+"agent_mail_progress":
+{ Args: { "p_job": string,"p_lease_seconds"?: number,"p_token": string }; Returns: Json
+                           },
+"agent_mail_submit":
+{ Args: { "p_codex_ms"?: number,"p_job": string,"p_result": Json,"p_token": string }; Returns: Json
                            },
 "agent_progress":
 { Args: { "p_counters": Json,"p_errors": Json,"p_lease_seconds"?: number,"p_run": string,"p_stage": string,"p_status": string,"p_token": string }; Returns: Json

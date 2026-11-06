@@ -75,7 +75,7 @@
     var a = s.activeRun;
     if (!a) return null;
     var progress = a.total ? a.done + " / " + a.total : null;
-    return { title: a.modeLabel + " · " + a.location, stage: a.stage, progressText: progress, percent: a.total ? Math.round((a.done / a.total) * 100) : null };
+    return { title: a.location ? a.modeLabel + " · " + a.location : a.modeLabel, stage: a.stage, progressText: progress, percent: a.total ? Math.round((a.done / a.total) * 100) : null };
   }
 
   function describeTest(s) {

@@ -4,6 +4,7 @@ import { AgentApi, AgentApiError, backoffMs, type Counters, type RunParams } fro
 import { diagnose, supportedFlags, type Diagnostics, type ProcRunner } from "./codex";
 import type { AgentConfig } from "./config";
 import { runJob, type JobDeps, type JobSummary } from "./job";
+import { runMailJob, type MailJobSummary } from "./mail-job";
 import type { Logger } from "./logger";
 import { runsDir } from "./paths";
 import { CompositeBusinessSource } from "./discovery-source";
@@ -27,6 +28,9 @@ export type WorkerHooks = {
   onRunStart?(run: RunParams): void;
   onRunProgress?(run: RunParams, progress: { status?: "discovering" | "analyzing" | "qualifying"; stage: string; counters: Partial<Counters> }): void;
   onRunEnd?(run: RunParams, summary: JobSummary): void;
+  /** A Mail Assistant draft request was picked up / finished (it writes one email draft; nothing is sent). */
+  onMailStart?(jobId: string): void;
+  onMailEnd?(jobId: string, summary: MailJobSummary): void;
   /** Claiming is paused (Codex usage limit) until the given time, or resumed (null). */
   onPause?(until: number | null): void;
 };
@@ -149,6 +153,22 @@ export function startWorker(deps: WorkerDeps): WorkerHandle {
           failures = 0;
           hook("onClaim", { ok: true });
           if (!run) {
+            // No search to do: a Mail Assistant draft request may be waiting (same device, same Codex, one job at a time).
+            const mail = await api.mailClaim();
+            if (mail) {
+              log.info("claimed mail draft", { job: mail.id, attempt: mail.attempt });
+              hook("onMailStart", mail.id);
+              const mailSummary = await runMailJob(mail, { api, config, log, flags, runner: deps.runner, home: deps.home, signal: runAbort.signal });
+              lastFailure = mailSummary.kind === "not_allowed" ? lastFailure : mailSummary.kind;
+              hook("onMailEnd", mail.id, mailSummary);
+              if (mailSummary.kind === "codex_usage_limit") {
+                pausedUntil = Date.now() + (deps.usageLimitPauseMs ?? 30 * 60_000);
+                hook("onPause", pausedUntil);
+              }
+              pruneRuns(deps.home);
+              await heartbeat();
+              continue;
+            }
             await sleep(config.pollSeconds * 1000);
             continue;
           }
