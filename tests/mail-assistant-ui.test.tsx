@@ -21,7 +21,7 @@ import { computeFingerprint } from "@/lib/mail-assistant/context";
 import { computeFacts } from "@/lib/mail-assistant/facts";
 import { decidePlan } from "@/lib/mail-assistant/plan";
 import type { AssistantInputs, Plan } from "@/lib/mail-assistant/types";
-import { buildAssistantView, type AgentInfo, type AssistantView, type RecommendationRow } from "@/lib/mail-assistant/view";
+import { buildAssistantView, toneBadge, type AgentInfo, type AssistantView, type RecommendationRow } from "@/lib/mail-assistant/view";
 
 const NOW = new Date("2026-11-05T09:00:00Z"); // Thursday 10:00 in Brussels
 const TODAY = "2026-11-05";
@@ -371,6 +371,15 @@ describe("Regenerate mail and tone controls", () => {
     fireEvent.click(screen.getByRole("button", { name: "Generate draft" }));
     await flush();
     expect(actions.requestMailRecommendationAction).toHaveBeenCalledWith("p1", undefined);
+  });
+
+  it("the draft's tone badge shows what was picked: Custom for the custom chip, the preset name otherwise", () => {
+    expect(toneBadge("casual", "More Flemish.")).toBe("Custom");
+    expect(toneBadge("casual", null)).toBe("Casual");
+    expect(toneBadge("casual", "  ")).toBe("Casual");
+    expect(toneBadge("very_short", null)).toBe("Very short");
+    expect(toneBadge("very_short", "More Flemish.")).toBe("Very short");
+    expect(toneBadge(undefined, null)).toBe("Casual");
   });
 
   it("is not offered when there is nothing to regenerate: waiting, finished, outdated or no draft yet", () => {

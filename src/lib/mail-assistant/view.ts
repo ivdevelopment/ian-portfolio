@@ -34,6 +34,12 @@ export type Availability = { state: "ready" | "disabled" | "agent_offline" | "co
 export const UNAVAILABLE_MESSAGE = "Mail Assistant unavailable";
 export const START_AGENT_MESSAGE = "Start Ian Prospect Agent on your PC.";
 
+/** The "Custom" chip is stored as the casual base style plus an instruction, so casual + an instruction is shown as Custom (what the user picked). */
+export function toneBadge(preset: string | null | undefined, instruction: string | null | undefined): string {
+  const p: TonePreset = isTonePreset(preset) ? preset : "casual";
+  return p === "casual" && instruction && instruction.trim() ? "Custom" : TONE_LABELS[p];
+}
+
 export function availability(providerIsLocalCodex: boolean, agent: AgentInfo | null): Availability {
   if (!providerIsLocalCodex) return { state: "disabled", message: "The Mail Assistant is not switched on for this CRM." };
   if (!agent || !agent.registered || !agent.online) return { state: "agent_offline", message: `${UNAVAILABLE_MESSAGE}. ${START_AGENT_MESSAGE}` };
@@ -141,7 +147,7 @@ export function buildAssistantView(o: {
     },
     availability: avail,
     draft: shown && shown.subject !== null && shown.body !== null
-      ? { id: shown.id, used: shown.status === "used", usedAt: shown.used_at, subject: shown.subject, body: shown.body, reasonSummary: shown.reason_summary, generatedAt: shown.generated_at, actionLabel: ACTION_LABELS[shown.action_type ?? "no_action"], language: shown.language, toneLabel: TONE_LABELS[isTonePreset(shown.tone_preset) ? shown.tone_preset : "casual"], customInstruction: shown.custom_instruction ?? null, stale: stale! }
+      ? { id: shown.id, used: shown.status === "used", usedAt: shown.used_at, subject: shown.subject, body: shown.body, reasonSummary: shown.reason_summary, generatedAt: shown.generated_at, actionLabel: ACTION_LABELS[shown.action_type ?? "no_action"], language: shown.language, toneLabel: toneBadge(shown.tone_preset, shown.custom_instruction), customInstruction: shown.custom_instruction ?? null, stale: stale! }
       : null,
     job: open ? { id: open.id, stage: open.status === "generating" ? "generating" : "waiting_agent", stuck: open.status === "queued" && o.now.getTime() - Date.parse(open.requested_at) > STUCK_AFTER_MS } : null,
     failure: !open && latestFailed && (!current || latestFailed.requested_at > (current.generated_at ?? current.requested_at)) && (!used || latestFailed.requested_at > (used.used_at ?? "")) ? { message: failureText(latestFailed.failure_kind), kind: latestFailed.failure_kind } : null,
