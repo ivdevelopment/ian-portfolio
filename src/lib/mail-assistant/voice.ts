@@ -76,3 +76,19 @@ export const VOICE_FOLLOW_UP_EXAMPLES_NL: readonly string[] = [
 export function voiceProfile(language: "nl" | "en"): readonly string[] {
   return language === "nl" ? IAN_VOICE_NL : IAN_VOICE_EN;
 }
+
+/**
+ * The approved `Professional` reference (P10.5.3). Ian called this exactly the tone he wants: polished but human, slightly formal Belgian Dutch, short paragraphs,
+ * one concrete observation, one practical suggestion, a restrained explanation of what he does, a low-pressure close. It is a CALIBRATION example: the model
+ * must not copy its wording or structure; the observation, the idea and the phrasing come from the prospect's own data and vary from mail to mail.
+ * The business name is generic here on purpose (no company facts travel from one prospect to another).
+ */
+export const PROFESSIONAL_REFERENCE_NL =
+  "Beste,\n\nIk bekeek de website van {bedrijf} en zag dat er op de homepage niet meteen een duidelijke mogelijkheid is om een fiets te reserveren of een aanvraag door te sturen.\n\nEen eenvoudige reservatieknop met een kort formulier zou dat proces een stuk toegankelijker kunnen maken voor bezoekers.\n\nIk werk als freelance webdeveloper en help lokale bedrijven met websites en praktische weboplossingen. Indien gewenst kan ik vrijblijvend eens tonen hoe ik zo'n reservatieflow voor jullie website zou aanpakken.\n\nMet vriendelijke groeten,\nIan";
+
+export const PROFESSIONAL_STYLE_NL: readonly string[] = [
+  "Professional is Ian's slightly formal, polished voice: still human, still short, never corporate.",
+  "Greet with \"Beste,\" (or \"Beste {voornaam},\" when a contact name is given) and close with \"Met vriendelijke groeten,\" on its own line, then \"Ian\" on the next line.",
+  "Short paragraphs. One concrete observation, one practical suggestion, a restrained explanation of what Ian does (\"Ik werk als freelance webdeveloper...\" is his natural way to introduce himself) and a low-pressure close (for example \"Indien gewenst kan ik vrijblijvend eens tonen...\"). No hype, no marketing jargon, no fake friendliness.",
+  "Use the reference below as the main calibration for this tone: it carries more weight than the generic voice rules. Do NOT copy its wording or structure mechanically; vary the sentences, the opening and the closing line from prospect to prospect so it never becomes a copy-paste template.",
+];

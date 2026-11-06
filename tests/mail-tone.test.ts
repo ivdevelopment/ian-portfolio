@@ -8,7 +8,7 @@ import { decidePlan } from "../src/lib/mail-assistant/plan";
 import { buildMailPrompt } from "../src/lib/mail-assistant/prompt";
 import { DEFAULT_TONE, parseToneChoice, sanitizeCustomInstruction, TONE_PRESETS } from "../src/lib/mail-assistant/tone";
 import type { AssistantInputs } from "../src/lib/mail-assistant/types";
-import { VOICE_EXAMPLES_NL, VOICE_FOLLOW_UP_EXAMPLES_NL, openingLean } from "../src/lib/mail-assistant/voice";
+import { PROFESSIONAL_REFERENCE_NL, VOICE_EXAMPLES_NL, VOICE_FOLLOW_UP_EXAMPLES_NL, openingLean } from "../src/lib/mail-assistant/voice";
 import { checkMailResult, forbiddenIn } from "../src/lib/mail-assistant/validate";
 import { handleAgentOp, type Rpc } from "../src/lib/prospecting/agent/endpoint";
 
@@ -48,7 +48,7 @@ describe("tone presets", () => {
   it("the presets ask for different things", () => {
     const p = (preset: (typeof TONE_PRESETS)[number]) => buildMailPrompt(ctxOf(base(), { preset, custom_instruction: null }));
     expect(p("friendly")).toContain("warmer");
-    expect(p("professional")).toContain("cleaner version of Ian");
+    expect(p("professional")).toContain("slightly formal version of Ian");
     expect(p("direct")).toContain("shorter version of Ian");
     expect(p("soft_sales")).toContain("never pushy");
     expect(p("very_short")).toContain("two or three short sentences");
@@ -205,5 +205,41 @@ describe("server validation of a regenerated draft", () => {
   it("a request made before tone existed (no tone in its plan) validates as casual; an invalid stored tone is refused", async () => {
     expect((await run(undefined, ans())).r.status).toBe(200);
     expect((await run("sarcastic", ans())).r.status).toBe(400);
+  });
+});
+
+describe("Professional carries Ian's approved reference (P10.5.3)", () => {
+  const pro = (c = base()) => buildMailPrompt(ctxOf(c, { preset: "professional", custom_instruction: null }));
+  it("first outreach: the approved reference is the main calibration, with the preferred greeting and closing", () => {
+    const p = pro();
+    expect(p).toContain("Approved Professional reference");
+    expect(p).toContain("Ik werk als freelance webdeveloper");
+    expect(p).toContain("Indien gewenst kan ik vrijblijvend eens tonen");
+    expect(p).toContain("Beste,");
+    expect(p).toContain("Met vriendelijke groeten,");
+    expect(p).toContain("carries more weight than the generic voice rules");
+    expect(p).toContain("Do NOT copy its wording");
+    expect(p).toContain("vary the sentences");
+    expect(p).not.toContain("Close with a short sign-off such as \"Groeten,\""); // the casual sign-off is replaced
+    expect((p.match(/--- example \d ---/g) ?? []).length).toBe(0); // the generic casual examples give way to the reference
+  });
+  it("the reference carries no real company facts and passes our own guardrails", () => {
+    expect(PROFESSIONAL_REFERENCE_NL).toContain("{bedrijf}");
+    expect(PROFESSIONAL_REFERENCE_NL).not.toMatch(/brugse|bike rental/i);
+    expect(forbiddenIn(PROFESSIONAL_REFERENCE_NL.replace("{bedrijf}", "een fietsverhuurder"))).toBeNull();
+  });
+  it("only Professional gets it: the other presets keep the casual greeting, closing and examples", () => {
+    for (const t of TONE_PRESETS.filter((x) => x !== "professional")) {
+      const p = buildMailPrompt(ctxOf(base(), { preset: t, custom_instruction: null }));
+      expect(p, t).not.toContain("Approved Professional reference");
+      expect(p, t).toContain("Close with a short sign-off such as \"Groeten,\"");
+      expect((p.match(/--- example \d ---/g) ?? []).length, t).toBe(3);
+    }
+  });
+  it("a follow-up in Professional follows the style lines but gets no casual example or sign-off", () => {
+    const p = pro(base({ mail: [mail("o", "outgoing", "2026-10-30T10:00:00Z")] }));
+    expect(p).toContain("Met vriendelijke groeten,");
+    expect(p).not.toContain("Approved Professional reference");
+    expect((p.match(/--- example \d ---/g) ?? []).length).toBe(0);
   });
 });

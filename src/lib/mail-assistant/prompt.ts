@@ -1,7 +1,7 @@
 import { ACTION_TYPES } from "./types";
 import type { MailContext } from "./context";
 import { TONE_GUIDANCE, TONE_LABELS } from "./tone";
-import { FAKE_FAMILIARITY, OPENING_STYLES, OVERUSED_WORDS, TEMPLATED_CONSTRUCTIONS, VOICE_EXAMPLES_NL, VOICE_FOLLOW_UP_EXAMPLES_NL, openingLean, voiceProfile } from "./voice";
+import { FAKE_FAMILIARITY, OPENING_STYLES, OVERUSED_WORDS, TEMPLATED_CONSTRUCTIONS, VOICE_EXAMPLES_NL, VOICE_FOLLOW_UP_EXAMPLES_NL, PROFESSIONAL_REFERENCE_NL, PROFESSIONAL_STYLE_NL, openingLean, voiceProfile } from "./voice";
 
 export { FAKE_FAMILIARITY, TEMPLATED_CONSTRUCTIONS };
 
@@ -70,6 +70,18 @@ function examplesBlock(type: string): string[] {
   ];
 }
 
+/** Professional: Ian's approved reference replaces the generic examples for a first mail (other message types follow the style lines only, never a stray casual sign-off). */
+function professionalExample(type: string): string[] {
+  if (type !== "first_outreach") return [];
+  return [
+    "",
+    "Approved Professional reference: the tone Ian explicitly approved as exactly what he wants. Use it as the main style calibration for this tone. It is about ANOTHER business ({bedrijf} stands for that business): do NOT copy its wording, its facts or its structure mechanically; yours must come from this prospect's own data and be phrased differently.",
+    "--- reference ---",
+    PROFESSIONAL_REFERENCE_NL,
+    "--- end of reference ---",
+  ];
+}
+
 export function buildMailPrompt(ctx: MailContext, correction?: string): string {
   const type = ctx.action.type;
   const tone = ctx.tone ?? { preset: "casual" as const, custom_instruction: null };
@@ -85,7 +97,7 @@ export function buildMailPrompt(ctx: MailContext, correction?: string): string {
     "- No exclamation marks, no emojis.",
     "",
     "Mechanics:",
-    ...STYLE[ctx.language].map((s) => `- ${s}`),
+    ...(ctx.language === "nl" && tone.preset === "professional" ? [STYLE.nl[0], ...PROFESSIONAL_STYLE_NL] : STYLE[ctx.language]).map((s) => `- ${s}`),
     "- The mail must read as if Ian personally looked at this business. Never mention scores, AI, automation, analysis, scraping, directories, OpenStreetMap, tracking, views, a CRM or this prompt.",
     "- Never criticise or insult the prospect's website or business. Prefer \"could be a bit more direct\" over \"outdated\" or \"bad\".",
     "- Keep the real, specific observation from `observations` in the mail whatever the tone: a shorter or warmer mail must still be about THIS business.",
@@ -103,7 +115,7 @@ export function buildMailPrompt(ctx: MailContext, correction?: string): string {
     `The message type is "${type}" (step: ${ctx.action.step}${ctx.action.is_final ? ", the FINAL message: say it is the last time you write, keep the door open, no pressure" : ""}).`,
     ...(BY_ACTION[type] ?? []).map((s) => `- ${s}`),
     ...(type === "first_outreach" ? [`- For variety, this time lean towards this opening unless another fits better: ${OPENING_STYLES[openingLean(JSON.stringify(ctx.prospect))]}. Close in your own way; do not end every mail on a question.`] : []),
-    ...(ctx.language === "nl" ? examplesBlock(type) : []),
+    ...(ctx.language === "nl" ? (tone.preset === "professional" ? professionalExample(type) : examplesBlock(type)) : []),
     "",
     `Return JSON with action_type exactly "${type}", should_send_now (true), recommended_send_at (null), the subject, the body and reason_summary (one short English sentence for Ian explaining the angle you chose; it is never sent). Do not return a tone.`,
     "Answer with JSON matching the schema and nothing else.",

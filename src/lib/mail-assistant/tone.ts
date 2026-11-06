@@ -24,7 +24,7 @@ export const isTonePreset = (v: unknown): v is TonePreset => typeof v === "strin
 export const TONE_GUIDANCE: Record<TonePreset, string> = {
   casual: "Ian's voice as it is: relaxed, plain, the way he normally types an email. This is the default.",
   friendly: "A warmer version of Ian's voice: a bit more personal, still short and natural. A friendly touch, not gushing or enthusiastic.",
-  professional: "A cleaner version of Ian's voice: slightly tidier sentences, a bit less slang. Still Ian, still natural, never corporate or stiff.",
+  professional: "A cleaner, slightly formal version of Ian's voice: polished but human, short paragraphs, restrained. Still Ian, still natural, never corporate or stiff.",
   direct: "A shorter version of Ian's voice: fewer words, straight to the point, still in his own phrasing.",
   soft_sales: "A slightly more persuasive version of Ian's voice: say a little more about why the idea could help, but never pushy: no pressure, no urgency, no promises, no marketing language.",
   very_short: "A compressed version of Ian's voice: two or three short sentences at most, written in his words. Greeting and sign-off still apply.",
