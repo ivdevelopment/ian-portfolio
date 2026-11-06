@@ -5,25 +5,16 @@ import { getInsightForProspect } from "@/lib/prospecting/service";
 import type { Database } from "@/types/database";
 import { buildContext, computeFingerprint, type Fingerprint } from "./context";
 import { computeFacts } from "./facts";
+import { insightFromCandidate } from "./insight";
 import { decidePlan } from "./plan";
 import { brusselsDayOf } from "./timing";
-import type { AssistantInputs, Facts, InsightInput, Plan, ProspectInput } from "./types";
+import type { AssistantInputs, Facts, Plan, ProspectInput } from "./types";
 import { buildAssistantView, type AgentInfo, type AssistantView, type RecommendationRow } from "./view";
 
 type Db = SupabaseClient<Database>;
 
 const PROSPECT_COLUMNS = "id, company_name, contact_name, sector, city, website_url, email, status, priority, source, first_contact_on, last_contact_on, next_follow_up_on, linked_preview_id, linked_project_id";
 const ROW_COLUMNS = "id, status, action_type, recommended_send_at, subject, body, reason_summary, language, context_fingerprint, fingerprint_parts, requested_at, generated_at, used_at, failure_kind, attempts";
-
-/** Facts about the business that are fine to put in a mail. Listing plumbing, search distances and technical page details are left out. */
-const NOT_FOR_A_MAIL = /openstreetmap|\bosm\b|search centre|search center|km from|robots\.txt|could not be (checked|reached)|not allowed to be contacted|no clear weaknesses|meta description|copyright year|markup|mobile viewport|plain http|\bhttp\b|\bscore\b|\bAI\b|listing/i;
-
-function insightInput(insight: Awaited<ReturnType<typeof getInsightForProspect>>): InsightInput | null {
-  if (!insight || insight.synthetic) return null;
-  const clean = (t: string | null) => (t && !NOT_FOR_A_MAIL.test(t) ? t : null);
-  const observations = insight.evidence.filter((e) => e.origin === "website" && !NOT_FOR_A_MAIL.test(e.fact)).map((e) => e.fact);
-  return { summary: clean(insight.summary), opportunity: clean(insight.opportunity), observations };
-}
 
 export type LoadedAssistant = { inputs: AssistantInputs; facts: Facts; plan: Plan; fingerprint: Fingerprint };
 
@@ -51,7 +42,7 @@ export async function loadAssistant(db: Db, prospectId: string, now = new Date()
     activities: (activities.data ?? []).map((a) => ({ id: a.id, type: a.type, title: a.title, occurred_on: a.occurred_on, occurred_at: a.occurred_at, created_at: a.created_at })),
     quotes: (quotes.data ?? []).map((q) => ({ id: q.id, status: q.status, sentAt: q.sent_at, createdAt: q.created_at, title: q.title })),
     preview: preview.data ? { linked: true, id: preview.data.id, firstAccessedAt: preview.data.first_accessed_at, lastAccessedAt: preview.data.last_accessed_at, accessCount: preview.data.successful_access_count } : p.linked_preview_id ? { linked: true, id: p.linked_preview_id, firstAccessedAt: null, lastAccessedAt: null, accessCount: 0 } : null,
-    insight: insightInput(insight),
+    insight: insightFromCandidate(insight),
     project: project.data ? { title: project.data.title, published: project.data.published } : null,
   };
   const facts = computeFacts(inputs);

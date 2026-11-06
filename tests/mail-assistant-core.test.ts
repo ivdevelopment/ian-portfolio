@@ -352,3 +352,48 @@ describe("server-side guardrails on the model's answer", () => {
     expect(checkMailResult(answer({ body: long }), followUpNow, "2026-11-05").ok).toBe(false);
   });
 });
+
+/* ------------------------------------------ discovery insight for a mail ------------------------------------------ */
+
+import { insightFromCandidate, originOf } from "../src/lib/mail-assistant/insight";
+
+describe("which discovery findings may reach a draft", () => {
+  // The real evidence of a candidate stored by an earlier version of the Prospect Finder: no `origin` on any line.
+  const stored = [
+    { fact: "Listed in OpenStreetMap as shop=rental, 0.1 km from the search centre." },
+    { fact: "The website is served over plain http (no https)." },
+    { fact: "No call-to-action for a quote, booking or enquiry was found on the pages checked (1 page checked)." },
+    { fact: "No booking or reservation link was found on the pages checked (3 pages checked)." },
+    { fact: "No contact page link was found in the homepage navigation." },
+    { fact: "The homepage has no meta description for search results." },
+    { fact: "Interpretation: Reservation flow" },
+  ];
+
+  it("infers where an untagged finding came from, and trusts a tag when there is one", () => {
+    expect(originOf({ fact: stored[0].fact })).toBe("listing");
+    expect(originOf({ fact: stored[6].fact })).toBe("ai");
+    expect(originOf({ fact: stored[2].fact })).toBe("website");
+    expect(originOf({ fact: "anything", origin: "listing" })).toBe("listing");
+  });
+
+  it("keeps only what a person looking at the business could have noticed: the enquiry and booking flow, without bookkeeping", () => {
+    const i = insightFromCandidate({ summary: "Strong potential fit for website modernisation and a reservation flow. Findings are limited to one checked page.", opportunity: "HTTPS modernisation + reservation and enquiry flow", evidence: stored, synthetic: false })!;
+    expect(i.observations).toEqual([
+      "No call-to-action for a quote, booking or enquiry was found on the pages checked.",
+      "No booking or reservation link was found on the pages checked.",
+      "No contact page link was found in the homepage navigation.",
+    ]);
+    expect(i.opportunity).toBe("HTTPS modernisation + reservation and enquiry flow");
+    expect(i.summary).toContain("reservation flow");
+  });
+
+  it("leaves out listing text, the model's own lines, technical page details and analysis wording; never uses sample data", () => {
+    const i = insightFromCandidate({ summary: "Car repair business 1.4 km from the search centre, listed in OpenStreetMap, score 80.", opportunity: "AI-assisted redesign", evidence: stored, synthetic: false })!;
+    expect(i.summary).toBeNull();
+    expect(i.opportunity).toBeNull();
+    const text = JSON.stringify(i);
+    for (const leak of ["OpenStreetMap", "search centre", "plain http", "meta description", "Interpretation", "score"]) expect(text, leak).not.toContain(leak);
+    expect(insightFromCandidate({ summary: "x", opportunity: "y", evidence: stored, synthetic: true })).toBeNull();
+    expect(insightFromCandidate(null)).toBeNull();
+  });
+});
