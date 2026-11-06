@@ -8,6 +8,7 @@ import { decidePlan } from "../src/lib/mail-assistant/plan";
 import { buildMailPrompt } from "../src/lib/mail-assistant/prompt";
 import { DEFAULT_TONE, parseToneChoice, sanitizeCustomInstruction, TONE_PRESETS } from "../src/lib/mail-assistant/tone";
 import type { AssistantInputs } from "../src/lib/mail-assistant/types";
+import { VOICE_EXAMPLES_NL, VOICE_FOLLOW_UP_EXAMPLES_NL, openingLean } from "../src/lib/mail-assistant/voice";
 import { checkMailResult, forbiddenIn } from "../src/lib/mail-assistant/validate";
 import { handleAgentOp, type Rpc } from "../src/lib/prospecting/agent/endpoint";
 
@@ -47,10 +48,11 @@ describe("tone presets", () => {
   it("the presets ask for different things", () => {
     const p = (preset: (typeof TONE_PRESETS)[number]) => buildMailPrompt(ctxOf(base(), { preset, custom_instruction: null }));
     expect(p("friendly")).toContain("warmer");
-    expect(p("professional")).toContain("never an essay");
-    expect(p("direct")).toContain("minimal fluff");
+    expect(p("professional")).toContain("cleaner version of Ian");
+    expect(p("direct")).toContain("shorter version of Ian");
     expect(p("soft_sales")).toContain("never pushy");
     expect(p("very_short")).toContain("two or three short sentences");
+    for (const t of TONE_PRESETS) expect(p(t), t).toContain("Ian's own voice and never turns into generic marketing copy");
   });
 
   it("an unknown preset is refused, not silently replaced", () => {
@@ -62,31 +64,54 @@ describe("tone presets", () => {
 
 describe("human writing guidance", () => {
   const prompt = buildMailPrompt(ctxOf(base()));
-  it("describes a real Belgian freelancer, short and unpolished, and the shape: one observation, one idea, one question", () => {
-    expect(prompt).toContain("real Belgian freelance web developer sending a normal personal email");
-    expect(prompt).toContain("Not agency copy");
-    expect(prompt).toContain("one concrete observation");
-    expect(prompt).toContain("one low-pressure question");
-    expect(prompt).toContain("do not make every paragraph perfectly structured");
+  it("describes Ian's voice and has no fixed observation-solution-pitch-CTA structure", () => {
+    expect(prompt).toContain("IAN'S WRITING VOICE");
+    expect(prompt).toContain("Write as Ian himself");
+    expect(prompt).toContain("Not agency copy, not corporate, not sales language");
+    expect(prompt).toContain("There is NO fixed structure");
+    expect(prompt).toContain("Ik kwam jullie website tegen");
+    expect(prompt).toContain("Laat gerust iets weten");
+    expect(prompt).not.toContain("one low-pressure question");
   });
   it("names the stock phrases and the fake familiarity to avoid, and the overused words, without banning words globally", () => {
     for (const phrase of ["Als dat voor jullie interessant is", "Ik bouw websites en reservatieflows", "digitale aanwezigheid", "op maat gemaakte oplossing", "efficiënte workflow", "streamlinen", "gerichte oplossing", "graag licht ik dit verder toe", "Hopelijk gaat alles goed", "Ik volg jullie al een tijdje", "Ik ben fan van wat jullie doen"]) expect(prompt, phrase).toContain(phrase);
     for (const word of ["duidelijk", "eenvoudig", "interessant", "direct", "oplossing"]) expect(prompt).toContain(`"${word}"`);
     expect(prompt).toContain("everyday words");
   });
-  it("carries the style example as calibration only, and keeps the real evidence in", () => {
-    expect(prompt).toContain("do NOT copy its wording or its facts");
+  it("carries varied few-shot voice examples as calibration only, and keeps the real evidence in", () => {
+    expect(prompt).toContain("Voice calibration");
+    expect(prompt).toContain("Do NOT copy their wording");
+    expect((prompt.match(/--- example [0-9] ---/g) ?? []).length).toBe(3);
     expect(prompt).toContain("Keep the real, specific observation");
     expect(JSON.stringify(ctxOf(base()))).toContain("No booking or reservation link");
-    expect(buildMailPrompt(ctxOf(base({ mail: [mail("o", "outgoing", "2026-10-30T10:00:00Z")] })))).not.toContain("Style calibration only"); // only the first outreach gets the example
+    const follow = buildMailPrompt(ctxOf(base({ mail: [mail("o", "outgoing", "2026-10-30T10:00:00Z")] })));
+    expect((follow.match(/--- example [0-9] ---/g) ?? []).length).toBe(2); // follow-ups get the short follow-up examples
+    expect(follow).not.toContain("lean towards this opening");
+  });
+  it("the examples carry no real company facts and are not all the same shape", () => {
+    for (const e of [...VOICE_EXAMPLES_NL, ...VOICE_FOLLOW_UP_EXAMPLES_NL]) expect(e).not.toMatch(/brugse bike|zoho|openstreetmap|score/i);
+    expect(new Set(VOICE_EXAMPLES_NL.map((e) => e.split("\n\n")[1].split(" ").slice(0, 2).join(" "))).size).toBeGreaterThan(1); // different openings
+  });
+  it("suggests a varying opening for a first mail, deterministically per prospect", () => {
+    const a = buildMailPrompt(ctxOf(base()));
+    expect(a).toContain("lean towards this opening");
+    expect(buildMailPrompt(ctxOf(base()))).toBe(a);
+    const seen = new Set(["a", "b", "c", "d", "e", "f", "g", "h"].map((k) => openingLean(k)));
+    expect(seen.size).toBeGreaterThan(1);
+  });
+  it("every tone reuses the same voice, and a custom instruction sits on top of it", () => {
+    for (const t of TONE_PRESETS) expect(buildMailPrompt(ctxOf(base(), { preset: t, custom_instruction: null })), t).toContain("IAN'S WRITING VOICE");
+    const custom = buildMailPrompt(ctxOf(base(), { preset: "casual", custom_instruction: "Make it less AI-like." }));
+    expect(custom).toContain("IAN'S WRITING VOICE");
+    expect(custom).toContain("<<<Make it less AI-like.>>>");
   });
 });
 
 describe("the stock phrases are rejected as constructions, everyday words are not", () => {
-  const bad = ["Als dat voor jullie interessant is, laat het maar weten.", "Ik bouw websites en reservatieflows voor lokale zaken.", "Meer aandacht voor jullie digitale aanwezigheid.", "Een op maat gemaakte oplossing voor jullie.", "Een efficiënte workflow.", "We kunnen alles streamlinen.", "Graag licht ik dit verder toe.", "Hopelijk gaat alles goed bij jullie.", "Ik volg jullie al een tijdje.", "Ik ben fan van wat jullie doen."];
+  const bad = ["Zou je het fijn vinden als ik iets toon?", "Zou zoiets voor jullie van pas komen?", "Zou dit interessant zijn?", "Dag,\n\nIk had een klein idee voor jullie site.", "Hoe we jullie website optimaliseren.", "Als dat voor jullie interessant is, laat het maar weten.", "Ik bouw websites en reservatieflows voor lokale zaken.", "Meer aandacht voor jullie digitale aanwezigheid.", "Een op maat gemaakte oplossing voor jullie.", "Een efficiënte workflow.", "We kunnen alles streamlinen.", "Graag licht ik dit verder toe.", "Hopelijk gaat alles goed bij jullie.", "Ik volg jullie al een tijdje.", "Ik ben fan van wat jullie doen."];
   it.each(bad)("rejects: %s", (sentence) => expect(forbiddenIn(sentence)).not.toBeNull());
   it("does not ban normal Dutch words", () => {
-    for (const ok of ["Een duidelijke knop is eenvoudig te maken.", "Dat lijkt me interessant, direct contact is prima.", "Misschien een oplossing met een kort formulier."]) expect(forbiddenIn(ok), ok).toBeNull();
+    for (const ok of ["Een duidelijke knop is eenvoudig te maken.", "Dat lijkt me interessant, direct contact is prima.", "Misschien een oplossing met een kort formulier.", "Ik dacht aan een kleine verbetering; ik had er al een idee over.", "Ik zou dat eerst nog eens goed bekijken, de gebruikerservaring op mobiel viel me op."]) expect(forbiddenIn(ok), ok).toBeNull();
   });
 });
 

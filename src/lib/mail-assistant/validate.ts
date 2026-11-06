@@ -38,6 +38,8 @@ const FORBIDDEN: Array<[RegExp, string]> = [
   [/https?:\/\/|www\./i, "contains a link"],
   // Stock sales-copy constructions and fake familiarity (everyday single words such as "duidelijk" are NOT banned).
   [/als dat (voor jullie |voor u )?interessant is|ik bouw websites en reservatieflows|digitale aanwezigheid|op maat gemaakte oplossing|effici[eë]nte workflow|streamlin\w*|gerichte oplossing|graag licht ik (dit|het) verder toe|verbeteren van de conversie|gebruikerservaring (te )?optimaliseren/i, "uses stock sales-copy wording"],
+  // Templated constructions Ian does not write (P10.5.2). The opener is only rejected as the very start of a paragraph, where it becomes a template.
+  [/zou je het fijn vinden|zou (dit|zoiets|dat) (voor jullie )?(van pas komen|interessant zijn)|(^|\n)\s*ik had een klein (idee|voorstel)|(website|site|conversie|processen) (te )?optimaliseren|optimaliseren van (jullie|de|uw) /i, "uses a templated phrasing that is not Ian's own wording"],
   [/hopelijk gaat alles goed|ik volg jullie al (een tijdje|lang)|ik ben (een )?fan van (wat|jullie)/i, "claims a familiarity that is not in the data"],
   [/[[\]{}<>]|\{\{|\}\}|lorem ipsum|xxx/i, "contains a placeholder"],
   [/!{1,}/, "uses an exclamation mark"],

@@ -48,7 +48,7 @@ if (args[0] === "exec") {
       // Tone (P10.5.1): canned variations so the presets visibly differ in local runs. Style only: the action and language are untouched.
       const tone = (ctx.tone && ctx.tone.preset) || "casual";
       const first = ctx.action.type === "first_outreach";
-      if (tone === "very_short") T[1] = first ? (nl ? "Ik had een klein idee voor jullie site. Mag ik het eens tonen?" : "I had a small idea for your site. May I show you?") : nl ? "Even terugkomen op mijn vorige mail. Laat gerust iets weten." : "Just a quick follow-up on my earlier mail. Let me know.";
+      if (tone === "very_short") T[1] = first ? (nl ? "Ik zag niet meteen hoe je bij jullie kan reserveren. Als je wilt, toon ik eens hoe ik dat zou aanpakken." : "I did not see right away how to book on your site. If you like, I can show how I would handle it.") : nl ? "Even terugkomen op mijn vorige mail. Laat gerust iets weten." : "Just a quick follow-up on my earlier mail. Let me know.";
       else if (tone === "professional") T[1] = (nl ? "Naar aanleiding van mijn eerdere bericht neem ik graag opnieuw contact op. " : "Following my earlier message, I am getting in touch again. ") + T[1];
       else if (tone === "friendly") T[1] = T[1] + (nl ? " Fijne dag verder." : " Have a good day.");
       else if (tone === "direct") T[1] = T[1].split(". ").slice(0, 2).join(". ").replace(/\.?$/, ".");

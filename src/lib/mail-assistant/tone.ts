@@ -17,14 +17,17 @@ export const TONE_LABELS: Record<TonePreset, string> = {
 
 export const isTonePreset = (v: unknown): v is TonePreset => typeof v === "string" && (TONE_PRESETS as readonly string[]).includes(v);
 
-/** What each preset asks for. The default, casual, is also what a plain "Generate" uses. */
+/**
+ * What each preset asks for. Every preset is a variation of Ian's own writing voice (voice.ts), never a different, generic style.
+ * The default, casual, is Ian's voice as is, and also what a plain "Generate" uses.
+ */
 export const TONE_GUIDANCE: Record<TonePreset, string> = {
-  casual: "Casual and human, like a freelancer typing a normal personal email: simple sentences, relaxed, slightly informal is fine. This is the default.",
-  friendly: "A little warmer and more personal than casual, still short and natural. A friendly touch, not gushing.",
-  professional: "A bit cleaner and more formal, still natural and still short. Never stiff, never an essay.",
-  direct: "Short, clear, minimal fluff: say what you noticed, what you suggest, and ask.",
-  soft_sales: "Slightly more persuasive about the benefit of the idea, but never pushy: no pressure, no urgency, no promises.",
-  very_short: "As short as possible: two or three short sentences at most. Greeting and sign-off still apply.",
+  casual: "Ian's voice as it is: relaxed, plain, the way he normally types an email. This is the default.",
+  friendly: "A warmer version of Ian's voice: a bit more personal, still short and natural. A friendly touch, not gushing or enthusiastic.",
+  professional: "A cleaner version of Ian's voice: slightly tidier sentences, a bit less slang. Still Ian, still natural, never corporate or stiff.",
+  direct: "A shorter version of Ian's voice: fewer words, straight to the point, still in his own phrasing.",
+  soft_sales: "A slightly more persuasive version of Ian's voice: say a little more about why the idea could help, but never pushy: no pressure, no urgency, no promises, no marketing language.",
+  very_short: "A compressed version of Ian's voice: two or three short sentences at most, written in his words. Greeting and sign-off still apply.",
 };
 
 export const CUSTOM_INSTRUCTION_MAX = 200;
