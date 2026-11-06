@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { detectLanguage } from "./language";
+import { DEFAULT_TONE, type TonePreset } from "./tone";
 import { ACTION_TYPES, isDraftAction, type ActionType, type Plan, type Recommendation } from "./types";
 
 /**
@@ -22,6 +23,8 @@ export const LIMITS = {
   /** A follow-up is deliberately much shorter than a first message. */
   body: { first_outreach: 1100, reply: 1500, default: 750, min: 25 },
   reason: 300,
+  /** A very short mail is much shorter still. No preset ever allows more than the limits above. */
+  veryShort: { first_outreach: 450, reply: 700, default: 300 },
 } as const;
 
 /** Things a draft must never contain. Each has a plain reason that is shown to Ian when a draft is rejected. */
@@ -33,6 +36,9 @@ const FORBIDDEN: Array<[RegExp, string]> = [
   [/\b(tracking|tracked|getrackt|analytics|pixel)\b/i, "mentions tracking"],
   [/\b(outdated|out-of-date|verouderd|ouderwets|ugly|lelijk|terrible|awful|slecht(e)?|bad (website|site|design)|amateur\w*|rommelig|messy)\b/i, "criticises the prospect's website"],
   [/https?:\/\/|www\./i, "contains a link"],
+  // Stock sales-copy constructions and fake familiarity (everyday single words such as "duidelijk" are NOT banned).
+  [/als dat (voor jullie |voor u )?interessant is|ik bouw websites en reservatieflows|digitale aanwezigheid|op maat gemaakte oplossing|effici[eë]nte workflow|streamlin\w*|gerichte oplossing|graag licht ik (dit|het) verder toe|verbeteren van de conversie|gebruikerservaring (te )?optimaliseren/i, "uses stock sales-copy wording"],
+  [/hopelijk gaat alles goed|ik volg jullie al (een tijdje|lang)|ik ben (een )?fan van (wat|jullie)/i, "claims a familiarity that is not in the data"],
   [/[[\]{}<>]|\{\{|\}\}|lorem ipsum|xxx/i, "contains a placeholder"],
   [/!{1,}/, "uses an exclamation mark"],
   [/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u, "contains an emoji"],
@@ -69,7 +75,7 @@ const fail = (reason: string, kind: "invalid_output" | "not_allowed" = "invalid_
  *  - The action must be the plan's action, and the date and "send now" come from the plan, whatever the model said.
  *  - Subject and body must be clean, in the right language, free of tracking talk, scores, insults and placeholders, and short enough.
  */
-export function checkMailResult(raw: unknown, plan: Plan, today: string): Verdict {
+export function checkMailResult(raw: unknown, plan: Plan, today: string, tone: TonePreset = DEFAULT_TONE): Verdict {
   const parsed = mailResultSchema.safeParse(raw);
   if (!parsed.success) return fail("The answer did not have the required structure.");
   const r = parsed.data;
@@ -82,7 +88,8 @@ export function checkMailResult(raw: unknown, plan: Plan, today: string): Verdic
   if (subject.length < LIMITS.subject.min || subject.length > LIMITS.subject.max) return fail("The subject must be between 3 and 120 characters.");
   if (/[\r\n]/.test(r.subject.trim())) return fail("The subject must be one line.");
   if (body.length < LIMITS.body.min) return fail("The body is empty or too short.");
-  const max = plan.action === "first_outreach" ? LIMITS.body.first_outreach : plan.action === "reply" ? LIMITS.body.reply : LIMITS.body.default;
+  const table = tone === "very_short" ? LIMITS.veryShort : LIMITS.body;
+  const max = plan.action === "first_outreach" ? table.first_outreach : plan.action === "reply" ? table.reply : table.default;
   if (body.length > max) return fail(`The body is too long for this kind of message (${body.length} characters, at most ${max}).`);
 
   for (const [label, text] of [["subject", subject], ["body", body]] as const) {

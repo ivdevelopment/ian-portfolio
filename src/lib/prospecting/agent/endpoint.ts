@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { FAILURE_KINDS } from "./messages";
 import { brusselsDayOf } from "@/lib/mail-assistant/timing";
+import { TONE_PRESETS } from "@/lib/mail-assistant/tone";
 import { ACTION_TYPES, STEPS } from "@/lib/mail-assistant/types";
 import { checkMailResult } from "@/lib/mail-assistant/validate";
 import { checkCandidate, resultSchema } from "./validate";
@@ -67,6 +68,8 @@ const storedPlan = z.object({
   blocked: z.enum(["more_context_needed"]).nullable(),
   language: z.enum(["nl", "en"]),
   warnings: z.array(z.string()),
+  /** The tone the request was made with (style only). Absent on requests made before tone controls existed: casual. */
+  tone: z.enum(TONE_PRESETS).optional(),
 });
 
 const ERRORS: Record<string, number> = { unauthorized: 401, lease_lost: 409 };
@@ -152,7 +155,7 @@ export async function handleAgentOp(op: AgentOp, token: string, rawBody: string,
       if (params?.ok !== true) return reply(params);
       const plan = storedPlan.safeParse(params.plan);
       if (!plan.success) return invalid();
-      const verdict = checkMailResult(p.data.result, plan.data, brusselsDayOf(new Date()));
+      const verdict = checkMailResult(p.data.result, plan.data, brusselsDayOf(new Date()), plan.data.tone);
       if (!verdict.ok) {
         // An answer the guardrails reject never becomes a recommendation: the request is failed so the CRM stops waiting for it.
         await call("agent_mail_fail", { p_token: token, p_job: p.data.jobId, p_kind: verdict.kind });

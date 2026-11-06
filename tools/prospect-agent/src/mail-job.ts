@@ -97,7 +97,7 @@ export async function runMailJob(job: MailJob, deps: MailJobDeps): Promise<MailJ
         }
         return await fail(res.kind);
       }
-      const verdict = checkMailResult(res.value, plan, brusselsDayOf(now()));
+      const verdict = checkMailResult(res.value, plan, brusselsDayOf(now()), context.tone?.preset);
       if (!verdict.ok) {
         if (verdict.kind === "not_allowed") return await fail("not_allowed");
         if (attempt === 1) {

@@ -85,6 +85,17 @@ now call for another step. Opening the page never calls Codex; only Generate, Re
 Tab **Mail Assistant** after Email: suggested action, recommended timing, why, loading states (*Checking history…*, *Waiting for Ian Prospect Agent…*, *Generating draft…*, *Draft ready*; no fake percentages),
 editable subject and body (edits are never overwritten by refreshes), **Copy subject / Copy body / Copy both**, **Regenerate**, **Mark as used**, **Dismiss**, **Cancel request**.
 
+### 7a. Tone and Regenerate mail (P10.5.1)
+
+Style only. The action, language, timing and every guardrail stay deterministic; tone never changes them.
+
+- **Default tone is Casual / Human** (also for plain *Generate draft*): natural Belgian Dutch, short, personal, like a freelance developer writing by hand; one concrete observation, one practical idea, one low-pressure question.
+  The prompt names the stock sales phrases to avoid (*als dat voor jullie interessant is*, *digitale aanwezigheid*, *op maat gemaakte oplossing*, *efficiënte workflow*, *streamlinen*, …) and fake familiarity; the validator rejects them as multi-word phrases (normal Dutch words stay allowed).
+- **Regenerate mail** (next to Mark as used / Dismiss, only when a current draft exists and the recommendation is not `wait`/outdated) opens presets **Casual, Friendly, Professional, Direct, Soft sales, Very short, Custom** and an optional custom instruction (≤ 200 chars). *Custom* = casual + the instruction.
+- `tone_preset` and `custom_instruction` are stored on the recommendation and travel in the stored plan and the Codex job input (`context.tone`). Codex never returns a tone. The new draft supersedes the previous one (history kept); nothing is marked used and the prospect status is unchanged.
+- The custom instruction is an **untrusted style preference**: sanitised, fenced in the prompt, and unable to change action, language, facts, timing or rules. Follow-ups stay shorter than first outreach; *Very short* uses stricter length limits (first 450, reply 700, other 300 chars); an unknown preset is rejected.
+- Migration `20261109000000_mail_tone.sql` only adds the two columns and the insert grant. The worker bundles the prompt and validator, so **rebuild and reinstall the tray app** after deploying.
+
 ## 8. Tests and local QA
 
 `tests/mail-assistant-core.test.ts` (timing, facts, plan, language, fingerprint, guardrails), `mail-assistant-agent.test.ts` (API, agent job with a scripted Codex, worker, tray), `mail-assistant-ui.test.tsx` (view model and component),

@@ -45,7 +45,16 @@ if (args[0] === "exec") {
         quote_follow_up: [re(nl ? "Offerte" : "Quote"), nl ? "Ik wou even nagaan of je al tijd had om de offerte te bekijken. Als er vragen zijn over de inhoud, bespreek ik die graag." : "I wanted to check whether you had time to go through the quote. If there are questions about the scope, I am happy to go over them."],
         meeting_follow_up: [re(nl ? "Ons gesprek" : "Our meeting"), nl ? "Bedankt voor het gesprek. Ik wou even afstemmen wat de volgende stap is voor jullie." : "Thanks for the meeting. I wanted to agree on the next step with you."],
       }[ctx.action.type] || ["x", "x"];
-      respond(JSON.stringify({ action_type: ctx.action.type, recommended_send_at: null, should_send_now: true, subject: T[0], body: hi + "\n\n" + T[1] + "\n\n" + sign, reason_summary: "Canned development draft for " + ctx.action.type + "." }));
+      // Tone (P10.5.1): canned variations so the presets visibly differ in local runs. Style only: the action and language are untouched.
+      const tone = (ctx.tone && ctx.tone.preset) || "casual";
+      const first = ctx.action.type === "first_outreach";
+      if (tone === "very_short") T[1] = first ? (nl ? "Ik had een klein idee voor jullie site. Mag ik het eens tonen?" : "I had a small idea for your site. May I show you?") : nl ? "Even terugkomen op mijn vorige mail. Laat gerust iets weten." : "Just a quick follow-up on my earlier mail. Let me know.";
+      else if (tone === "professional") T[1] = (nl ? "Naar aanleiding van mijn eerdere bericht neem ik graag opnieuw contact op. " : "Following my earlier message, I am getting in touch again. ") + T[1];
+      else if (tone === "friendly") T[1] = T[1] + (nl ? " Fijne dag verder." : " Have a good day.");
+      else if (tone === "direct") T[1] = T[1].split(". ").slice(0, 2).join(". ").replace(/\.?$/, ".");
+      else if (tone === "soft_sales") T[1] = T[1] + (nl ? " Het kan jullie misschien wat extra aanvragen opleveren." : " It might bring you a few extra enquiries.");
+      const custom = ctx.tone && ctx.tone.custom_instruction ? " Custom instruction applied: " + ctx.tone.custom_instruction : "";
+      respond(JSON.stringify({ action_type: ctx.action.type, recommended_send_at: null, should_send_now: true, subject: T[0], body: hi + "\n\n" + T[1] + "\n\n" + sign, reason_summary: "Canned development draft for " + ctx.action.type + ", tone " + tone + "." + custom }));
     }
     const businesses = JSON.parse(input.trim().split("\n").at(-1));
     if (!Array.isArray(businesses)) respond(JSON.stringify({ ok: true }));

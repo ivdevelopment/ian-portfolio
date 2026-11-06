@@ -161,7 +161,7 @@ describe("the Mail Assistant tab", () => {
     fireEvent.click(screen.getByRole("button", { name: "Generate draft" }));
     await flush();
     expect(actions.requestMailRecommendationAction).toHaveBeenCalledTimes(1);
-    expect(actions.requestMailRecommendationAction).toHaveBeenCalledWith("p1");
+    expect(actions.requestMailRecommendationAction).toHaveBeenCalledWith("p1", undefined);
     expect(screen.getByText("Waiting for Ian Prospect Agent…")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Generate draft" })).toBeNull(); // no second click while one is open
     expect(screen.getByRole("button", { name: "Cancel request" })).toBeTruthy();
@@ -237,7 +237,7 @@ describe("the Mail Assistant tab", () => {
     actions.dismissMailRecommendationAction.mockResolvedValue({ ok: true });
     actions.getMailAssistantViewAction.mockResolvedValue({ ok: true, view: viewOf(i, []) });
     panel(viewOf(i, [rowOf(i)]));
-    expect(screen.getByRole("button", { name: "Regenerate" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Regenerate mail" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
     await flush();
     expect(actions.dismissMailRecommendationAction).toHaveBeenCalledWith("r1");
@@ -312,5 +312,96 @@ describe("the Mail Assistant tab", () => {
     panel(viewOf({ ...i, preview: { linked: true, id: "pv", firstAccessedAt: "2026-11-02T14:37:00Z", lastAccessedAt: "2026-11-03T09:00:00Z", accessCount: 4 } }));
     const text = document.body.textContent ?? "";
     expect(text).not.toMatch(/14:37|viewed|score|openstreetmap|osm/i);
+  });
+});
+
+/* ------------------------------------------- tone controls and Regenerate mail (P10.5.1) ------------------------------------------- */
+
+describe("Regenerate mail and tone controls", () => {
+  const withDraft = () => {
+    const i = base();
+    return { i, v: viewOf(i, [rowOf(i)]) };
+  };
+  const open = () => fireEvent.click(screen.getByRole("button", { name: "Regenerate mail" }));
+
+  it("'Regenerate mail' sits with the draft actions and opens the options instead of regenerating at once", () => {
+    const { v } = withDraft();
+    panel(v);
+    expect(screen.queryByRole("radiogroup", { name: "Tone" })).toBeNull();
+    open();
+    expect(actions.requestMailRecommendationAction).not.toHaveBeenCalled();
+    const group = screen.getByRole("radiogroup", { name: "Tone" });
+    expect([...group.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["Casual", "Friendly", "Professional", "Direct", "Soft sales", "Very short", "Custom"]);
+    expect(screen.getByRole("radio", { name: "Casual" }).getAttribute("aria-checked")).toBe("true"); // the default
+    expect(screen.getByLabelText(/Custom instruction/)).toBeTruthy();
+    expect(screen.getByText(/cannot change the kind of message, the language or the rules/)).toBeTruthy();
+  });
+
+  it("regenerates with the chosen preset and instruction, shows 'Regenerating mail…', and does not mark or change anything", async () => {
+    const { i, v } = withDraft();
+    const waiting = viewOf(i, [rowOf(i), rowOf(i, { id: "r2", status: "generating", subject: null, body: null, generated_at: null, action_type: null })]);
+    actions.requestMailRecommendationAction.mockResolvedValue({ ok: true, alreadyOpen: false });
+    actions.getMailAssistantViewAction.mockResolvedValue({ ok: true, view: waiting });
+    panel(v);
+    open();
+    fireEvent.click(screen.getByRole("radio", { name: "Very short" }));
+    fireEvent.change(screen.getByLabelText(/Custom instruction/), { target: { value: "More Flemish." } });
+    fireEvent.click(screen.getByRole("button", { name: "Regenerate" }));
+    await flush();
+    expect(actions.requestMailRecommendationAction).toHaveBeenCalledTimes(1);
+    expect(actions.requestMailRecommendationAction).toHaveBeenCalledWith("p1", { preset: "very_short", customInstruction: "More Flemish." });
+    expect(screen.getByText("Regenerating mail…")).toBeTruthy();
+    expect(actions.markMailDraftUsedAction).not.toHaveBeenCalled();
+    expect(status.setStatusAction).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Regenerate" })).toBeNull(); // no second click while one is open
+  });
+
+  it("'Custom' needs an instruction; a plain Generate sends no tone at all (the default casual applies)", async () => {
+    const { v } = withDraft();
+    panel(v);
+    open();
+    fireEvent.click(screen.getByRole("radio", { name: "Custom" }));
+    expect((screen.getByRole("button", { name: "Regenerate" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText(/Custom instruction/), { target: { value: "Make it less AI-like." } });
+    expect((screen.getByRole("button", { name: "Regenerate" }) as HTMLButtonElement).disabled).toBe(false);
+    cleanup();
+    actions.requestMailRecommendationAction.mockResolvedValue({ ok: true, alreadyOpen: false });
+    actions.getMailAssistantViewAction.mockResolvedValue({ ok: true, view: viewOf(base()) });
+    panel(viewOf(base()));
+    fireEvent.click(screen.getByRole("button", { name: "Generate draft" }));
+    await flush();
+    expect(actions.requestMailRecommendationAction).toHaveBeenCalledWith("p1", undefined);
+  });
+
+  it("is not offered when there is nothing to regenerate: waiting, finished, outdated or no draft yet", () => {
+    panel(viewOf({ ...base(), mail: [sentMail("m", "outgoing", "2026-11-04T10:00:00Z")] }));
+    expect(screen.queryByRole("button", { name: /Regenerate/ })).toBeNull();
+    cleanup();
+    panel(viewOf({ ...base(), prospect: { ...base().prospect, status: "lost" } }));
+    expect(screen.queryByRole("button", { name: /Regenerate/ })).toBeNull();
+    cleanup();
+    panel(viewOf(base()));
+    expect(screen.queryByRole("button", { name: /Regenerate/ })).toBeNull();
+    cleanup();
+    const i = base();
+    const later = { ...i, mail: [sentMail("m", "incoming", "2026-11-04T08:00:00Z", "Dag Ian, bedankt voor je bericht. Kunnen we volgende week eens bellen?")] };
+    panel(viewOf(later, [rowOf(i)]));
+    expect(screen.queryByRole("button", { name: "Regenerate mail" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Refresh recommendation" })).toBeTruthy(); // stale behaviour is unchanged
+  });
+
+  it("the draft shows the tone it was written with", () => {
+    const i = base();
+    panel(viewOf(i, [rowOf(i, { tone_preset: "very_short", custom_instruction: "More Flemish." })]));
+    expect(screen.getByText("Tone: Very short")).toBeTruthy();
+    cleanup();
+    panel(viewOf(i, [rowOf(i)]));
+    expect(screen.getByText("Tone: Casual")).toBeTruthy();
+  });
+
+  it("the old 'Regenerate' button is gone from the page footer (one clear control instead)", () => {
+    const { v } = withDraft();
+    panel(v);
+    expect(screen.getAllByRole("button", { name: /Regenerate/ })).toHaveLength(1);
   });
 });

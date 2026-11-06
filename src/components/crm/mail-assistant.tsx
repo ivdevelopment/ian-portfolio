@@ -9,6 +9,7 @@ import { Spinner } from "@/components/ui/loading";
 import { dismissMailRecommendationAction, getMailAssistantViewAction, markMailDraftUsedAction, requestMailRecommendationAction } from "@/crm/actions/mail-assistant";
 import { useAppPaths } from "@/lib/crm/paths-context";
 import type { AssistantView } from "@/lib/mail-assistant/view";
+import { CUSTOM_INSTRUCTION_MAX, DEFAULT_TONE, TONE_LABELS, TONE_PRESETS, type TonePreset } from "@/lib/mail-assistant/tone";
 import { PRE_CONTACT_STATUSES, type ProspectStatus } from "@/lib/prospects/constants";
 import { usePendingAction } from "@/lib/use-pending-action";
 import { cn } from "@/lib/utils";
@@ -33,6 +34,10 @@ export function MailAssistantPanel({ initial, prospectStatus }: { initial: Assis
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [ready, setReady] = useState(false);
+  const [showRegen, setShowRegen] = useState(false);
+  const [choice, setChoice] = useState<TonePreset | "custom">(DEFAULT_TONE);
+  const [custom, setCustom] = useState("");
+  const [regenerating, setRegenerating] = useState(false);
   const { pending, run } = usePendingAction();
   const hadJob = useRef(Boolean(initial.job));
   const prospectId = initial.prospectId;
@@ -56,18 +61,23 @@ export function MailAssistantPanel({ initial, prospectStatus }: { initial: Assis
     return () => clearInterval(t);
   }, [open, refresh]);
 
-  const generate = () =>
+  const generate = (tone?: { preset: TonePreset; customInstruction: string }, isRegen = false) =>
     run(async () => {
       setError(null);
       setChecking(true);
+      setRegenerating(isRegen);
       try {
-        const r = await requestMailRecommendationAction(prospectId);
+        const r = await requestMailRecommendationAction(prospectId, tone);
         if (!r.ok) setError(r.error);
+        else setShowRegen(false);
         await refresh();
       } finally {
         setChecking(false);
       }
     });
+
+  const regenerate = () => void generate({ preset: choice === "custom" ? DEFAULT_TONE : choice, customInstruction: custom }, true);
+  const customMissing = choice === "custom" && custom.trim().length === 0;
 
   const cancelRequest = (id: string) =>
     run(async () => {
@@ -127,7 +137,7 @@ export function MailAssistantPanel({ initial, prospectStatus }: { initial: Assis
         <div aria-live="polite" className="min-h-6 text-sm">
           {checking && !job && (
             <span className="inline-flex items-center gap-2 text-muted">
-              <Spinner className="size-3.5" /> Checking history…
+              <Spinner className="size-3.5" /> {regenerating ? "Regenerating mail…" : "Checking history…"}
             </span>
           )}
           {job?.stage === "waiting_agent" && (
@@ -143,7 +153,7 @@ export function MailAssistantPanel({ initial, prospectStatus }: { initial: Assis
           )}
           {job?.stage === "generating" && (
             <span className="inline-flex items-center gap-2 text-muted">
-              <Spinner className="size-3.5" /> Generating draft…
+              <Spinner className="size-3.5" /> {regenerating || draft ? "Regenerating mail…" : "Generating draft…"}
             </span>
           )}
           {ready && !job && <span className="text-success">Draft ready</span>}
@@ -172,10 +182,36 @@ export function MailAssistantPanel({ initial, prospectStatus }: { initial: Assis
           </div>
         )}
 
-        {showDraft && !draft.stale.outdated && <DraftEditor key={draft.id} draft={draft} prospectId={prospectId} prospectStatus={prospectStatus} onChanged={refresh} setError={setError} />}
+        {showDraft && !draft.stale.outdated && <DraftEditor key={draft.id} draft={draft} prospectId={prospectId} prospectStatus={prospectStatus} onChanged={refresh} setError={setError} onRegenerate={gen?.enabled && !job ? () => setShowRegen((v) => !v) : undefined} regenOpen={showRegen} />}
+
+        {showRegen && showDraft && !draft.stale.outdated && !job && (
+          <fieldset className="space-y-3 rounded-card border border-line bg-surface p-4" disabled={pending}>
+            <legend className="px-1 text-sm font-medium">Regenerate mail</legend>
+            <div>
+              <p className="text-xs text-muted">Tone</p>
+              <div role="radiogroup" aria-label="Tone" className="mt-1.5 flex flex-wrap gap-2">
+                {([...TONE_PRESETS, "custom"] as const).map((t) => (
+                  <button key={t} type="button" role="radio" aria-checked={choice === t} onClick={() => setChoice(t)} className={cn("rounded-full border px-3 py-1 text-sm transition-colors", choice === t ? "border-accent bg-accent/15 text-ink" : "border-line text-muted hover:border-line-strong hover:text-ink")}>
+                    {t === "custom" ? "Custom" : TONE_LABELS[t]}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label htmlFor="mail-custom" className="text-xs text-muted">
+                Custom instruction {choice === "custom" ? "" : "(optional)"}
+              </label>
+              <input id="mail-custom" type="text" value={custom} maxLength={CUSTOM_INSTRUCTION_MAX} onChange={(e) => setCustom(e.target.value)} placeholder="e.g. Make it less AI-like. More Flemish. Shorter." className={cn(adminInput, "mt-1 h-10")} />
+              <p className="mt-1 text-xs text-subtle">Wording only: it cannot change the kind of message, the language or the rules.</p>
+            </div>
+            <Button size="sm" icon="none" variant="primary" disabled={customMissing} pending={pending} pendingLabel="Regenerating mail…" onClick={regenerate}>
+              Regenerate
+            </Button>
+          </fieldset>
+        )}
 
         <div className="flex flex-wrap items-center gap-3">
-          {gen && (
+          {gen && gen.label !== "Regenerate" && (
             <Button size="sm" icon="none" variant={gen.label === "Generate draft" || gen.label === "Refresh recommendation" ? "primary" : "secondary"} disabled={!gen.enabled || Boolean(job)} pending={pending && !job} pendingLabel="Queuing…" onClick={() => void generate()}>
               {gen.label}
             </Button>
@@ -192,7 +228,7 @@ export function MailAssistantPanel({ initial, prospectStatus }: { initial: Assis
   );
 }
 
-function DraftEditor({ draft, prospectId, prospectStatus, onChanged, setError }: { draft: NonNullable<AssistantView["draft"]>; prospectId: string; prospectStatus: ProspectStatus; onChanged: () => Promise<void>; setError: (e: string | null) => void }) {
+function DraftEditor({ draft, prospectId, prospectStatus, onChanged, setError, onRegenerate, regenOpen }: { draft: NonNullable<AssistantView["draft"]>; prospectId: string; prospectStatus: ProspectStatus; onChanged: () => Promise<void>; setError: (e: string | null) => void; onRegenerate?: () => void; regenOpen: boolean }) {
   const P = useAppPaths();
   // Editing happens here only. Polling replaces the view, never these fields: they reset only when a different draft arrives (the key).
   const [subject, setSubject] = useState(draft.subject);
@@ -234,6 +270,7 @@ function DraftEditor({ draft, prospectId, prospectStatus, onChanged, setError }:
         <p className="text-sm font-medium">{draft.used ? "Draft (marked as used)" : "Draft"}</p>
         <span className="flex flex-wrap items-center gap-2 text-xs text-subtle">
           {draft.language && <Badge>{draft.language === "nl" ? "Dutch" : "English"}</Badge>}
+          <Badge>Tone: {draft.toneLabel}</Badge>
           <span>You can edit before copying. Your edits are not saved.</span>
         </span>
       </div>
@@ -270,6 +307,11 @@ function DraftEditor({ draft, prospectId, prospectStatus, onChanged, setError }:
         {!draft.used && (
           <Button size="sm" icon="none" variant="secondary" pending={pending} pendingLabel="Saving…" onClick={() => void markUsed()}>
             Mark as used
+          </Button>
+        )}
+        {onRegenerate && (
+          <Button size="sm" icon="none" variant={regenOpen ? "primary" : "secondary"} aria-expanded={regenOpen} onClick={onRegenerate}>
+            Regenerate mail
           </Button>
         )}
         <Button size="sm" icon="none" variant="ghost" disabled={pending} onClick={() => void dismiss()}>

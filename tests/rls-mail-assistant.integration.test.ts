@@ -317,4 +317,37 @@ describe.skipIf(!enabled)("mail assistant (queue, token, lease, RLS)", () => {
     expect((await claimed())?.id).toBe(r.jobId);
     await dismiss(admin as never, r.jobId);
   });
+  it("tone is stored with each request; an unknown preset or an over-long instruction is refused by the database; regenerating supersedes and keeps each draft's own tone", async () => {
+    await service.from("prospect_mail_recommendations").delete().in("status", ["queued", "generating"]);
+    const id = await newProspect();
+    const plain = await requestRecommendation(admin as never, adminId, id, new Date(), ENV);
+    if (!plain.ok) throw new Error(plain.error);
+    expect(await rowOf(plain.jobId)).toMatchObject({ tone_preset: "casual", custom_instruction: null });
+    const j1 = (await claimed())!;
+    expect(j1.context).toMatchObject({ tone: { preset: "casual", custom_instruction: null } });
+    expect((j1.plan as unknown as { tone: string }).tone).toBe("casual");
+    expect((await call("mail_result", { jobId: j1.id, result: answer() })).status).toBe(200);
+
+    const bad = await requestRecommendation(admin as never, adminId, id, new Date(), ENV, { preset: "sarcastic" });
+    expect(bad).toMatchObject({ ok: false });
+    const direct = await admin.from("prospect_mail_recommendations").insert({ prospect_id: id, plan: {}, context: {}, context_fingerprint: "d".repeat(64), tone_preset: "sarcastic" } as never);
+    expect(direct.error).not.toBeNull();
+    const long = await admin.from("prospect_mail_recommendations").insert({ prospect_id: id, plan: {}, context: {}, context_fingerprint: "e".repeat(64), custom_instruction: "x".repeat(201) } as never);
+    expect(long.error).not.toBeNull();
+
+    const regen = await requestRecommendation(admin as never, adminId, id, new Date(), ENV, { preset: "very_short", customInstruction: "  More Flemish.  " });
+    if (!regen.ok) throw new Error(regen.error);
+    expect(await rowOf(regen.jobId)).toMatchObject({ tone_preset: "very_short", custom_instruction: "More Flemish." });
+    const j2 = (await claimed())!;
+    expect(j2.context).toMatchObject({ tone: { preset: "very_short", custom_instruction: "More Flemish." }, action: { type: "first_outreach" } });
+    // The action does not depend on the tone.
+    expect(j2.plan.action).toBe(j1.plan.action);
+    expect((await call("mail_result", { jobId: j2.id, result: answer({ subject: "Kort" }) })).status).toBe(200);
+    expect(await rowOf(j1.id)).toMatchObject({ status: "superseded", tone_preset: "casual" });
+    expect(await rowOf(j2.id)).toMatchObject({ status: "current", tone_preset: "very_short" });
+    const view = await getAssistantView(admin as never, id, new Date(), ENV);
+    expect(view?.draft).toMatchObject({ toneLabel: "Very short", customInstruction: "More Flemish.", used: false });
+    expect((await service.from("prospects").select("status").eq("id", id).single()).data?.status).toBe("ready_to_contact");
+    expect((await service.from("prospect_activities").select("id").eq("prospect_id", id).eq("type", "mail_assistant_used")).data).toHaveLength(0);
+  });
 });

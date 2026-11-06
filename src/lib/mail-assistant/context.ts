@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { DEFAULT_TONE, type ToneChoice } from "./tone";
 import { brusselsDayOf, calendarDaysBetween } from "./timing";
 import type { ActionType, AssistantInputs, Facts, Plan, Step } from "./types";
 
@@ -11,6 +12,8 @@ export type HistoryItem = { kind: "email_sent" | "email_received" | "concept_sen
 export type MailContext = {
   sender: { name: string; role: string };
   action: { type: ActionType; step: Step; is_final: boolean };
+  /** How to word it. Style only: it never changes the action, the language, the facts or any rule. */
+  tone: ToneChoice;
   language: "nl" | "en";
   prospect: { company: string; contact_name: string | null; sector: string | null; city: string | null; website: string | null; crm_status: string; priority: string };
   /** What the Prospect Finder noticed, as plain observations about the business. Never a score. */
@@ -61,12 +64,13 @@ export function buildHistory(input: AssistantInputs): HistoryItem[] {
     .map(({ at, ...rest }) => (void at, rest));
 }
 
-export function buildContext(input: AssistantInputs, facts: Facts, plan: Plan): MailContext {
+export function buildContext(input: AssistantInputs, facts: Facts, plan: Plan, tone: ToneChoice = { preset: DEFAULT_TONE, custom_instruction: null }): MailContext {
   const p = input.prospect;
   const action = plan.action === "wait" && plan.then ? plan.then : plan.action;
   return {
     sender: { ...SENDER },
     action: { type: action, step: plan.step, is_final: plan.is_final },
+    tone,
     language: plan.language,
     prospect: { company: p.company_name, contact_name: clip(p.contact_name, 80), sector: clip(p.sector, 80), city: clip(p.city, 80), website: host(p.website_url), crm_status: p.status, priority: p.priority },
     observations: input.insight && (input.insight.summary || input.insight.opportunity || input.insight.observations.length > 0)

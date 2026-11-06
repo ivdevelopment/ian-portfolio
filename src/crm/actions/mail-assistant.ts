@@ -22,11 +22,11 @@ export async function getMailAssistantViewAction(prospectId: unknown): Promise<V
 export type RequestActionResult = { ok: true; alreadyOpen: boolean } | { ok: false; error: string };
 
 /** Generate / Regenerate / Refresh: queue one draft. A second click while one is open finds the open one instead of queueing another. */
-export async function requestMailRecommendationAction(prospectId: unknown): Promise<RequestActionResult> {
+export async function requestMailRecommendationAction(prospectId: unknown, tone?: unknown): Promise<RequestActionResult> {
   const { supabase, userId } = await requireAdmin();
   const id = idSchema.safeParse(prospectId);
   if (!id.success) return { ok: false, error: "Prospect not found." };
-  const r = await requestRecommendation(supabase, userId, id.data);
+  const r = await requestRecommendation(supabase, userId, id.data, new Date(), process.env, tone);
   return r.ok ? { ok: true, alreadyOpen: r.alreadyOpen } : { ok: false, error: r.error };
 }
 

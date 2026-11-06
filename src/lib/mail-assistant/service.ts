@@ -8,13 +8,14 @@ import { computeFacts } from "./facts";
 import { insightFromCandidate } from "./insight";
 import { decidePlan } from "./plan";
 import { brusselsDayOf } from "./timing";
+import { parseToneChoice, type ToneChoice } from "./tone";
 import type { AssistantInputs, Facts, Plan, ProspectInput } from "./types";
 import { buildAssistantView, type AgentInfo, type AssistantView, type RecommendationRow } from "./view";
 
 type Db = SupabaseClient<Database>;
 
 const PROSPECT_COLUMNS = "id, company_name, contact_name, sector, city, website_url, email, status, priority, source, first_contact_on, last_contact_on, next_follow_up_on, linked_preview_id, linked_project_id";
-const ROW_COLUMNS = "id, status, action_type, recommended_send_at, subject, body, reason_summary, language, context_fingerprint, fingerprint_parts, requested_at, generated_at, used_at, failure_kind, attempts";
+const ROW_COLUMNS = "id, status, tone_preset, custom_instruction, action_type, recommended_send_at, subject, body, reason_summary, language, context_fingerprint, fingerprint_parts, requested_at, generated_at, used_at, failure_kind, attempts";
 
 export type LoadedAssistant = { inputs: AssistantInputs; facts: Facts; plan: Plan; fingerprint: Fingerprint };
 
@@ -74,7 +75,10 @@ export type RequestResult = { ok: true; jobId: string; alreadyOpen: boolean } | 
  * Queues ONE draft for the local agent. Only an explicit person action calls this (Generate, Regenerate, Refresh): opening the page never does.
  * The plan and the minimal context are fixed here, on the server, from the CRM: the agent cannot choose what is sent to Codex or what is allowed.
  */
-export async function requestRecommendation(db: Db, userId: string, prospectId: string, now = new Date(), env: Record<string, string | undefined> = process.env): Promise<RequestResult> {
+export async function requestRecommendation(db: Db, userId: string, prospectId: string, now = new Date(), env: Record<string, string | undefined> = process.env, toneInput?: unknown): Promise<RequestResult> {
+  const parsed = parseToneChoice(toneInput);
+  if (!parsed.ok) return { ok: false, error: parsed.error, code: "failed" };
+  const tone: ToneChoice = parsed.tone;
   const loaded = await loadAssistant(db, prospectId, now);
   if (!loaded) return { ok: false, error: "Prospect not found.", code: "not_found" };
   if (!loaded.plan.needs_ai) return { ok: false, error: loaded.plan.reason, code: "no_draft_needed" };
@@ -83,10 +87,10 @@ export async function requestRecommendation(db: Db, userId: string, prospectId: 
   const view = buildAssistantView({ prospectId, plan: loaded.plan, fingerprint: loaded.fingerprint, today: brusselsDayOf(now), now, rows: [], agent, providerIsLocalCodex: local });
   if (view.availability.state !== "ready") return { ok: false, error: view.availability.message ?? "Mail Assistant unavailable.", code: "unavailable" };
 
-  const context = buildContext(loaded.inputs, loaded.facts, loaded.plan);
+  const context = buildContext(loaded.inputs, loaded.facts, loaded.plan, tone);
   const { data, error } = await db
     .from("prospect_mail_recommendations")
-    .insert({ prospect_id: prospectId, plan: loaded.plan as never, context: context as never, context_fingerprint: loaded.fingerprint.fingerprint, fingerprint_parts: loaded.fingerprint.parts as never, language: loaded.plan.language, requested_by: userId })
+    .insert({ prospect_id: prospectId, tone_preset: tone.preset, custom_instruction: tone.custom_instruction, plan: { ...loaded.plan, tone: tone.preset } as never, context: context as never, context_fingerprint: loaded.fingerprint.fingerprint, fingerprint_parts: loaded.fingerprint.parts as never, language: loaded.plan.language, requested_by: userId })
     .select("id")
     .single();
   if (error) {

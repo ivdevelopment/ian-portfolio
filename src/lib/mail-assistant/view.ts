@@ -1,4 +1,5 @@
 import { ACTION_LABELS, type ActionType, type Plan } from "./types";
+import { TONE_LABELS, isTonePreset, type TonePreset } from "./tone";
 import { changedParts, type Fingerprint, type StaleReason } from "./context";
 import { formatDayLabel, relativeDayLabel, type Day } from "./timing";
 
@@ -10,6 +11,8 @@ export type RecommendationRow = {
   id: string;
   status: "queued" | "generating" | "current" | "used" | "superseded" | "dismissed" | "failed";
   action_type: ActionType | null;
+  tone_preset?: TonePreset | null;
+  custom_instruction?: string | null;
   recommended_send_at: string | null;
   subject: string | null;
   body: string | null;
@@ -88,7 +91,7 @@ export type AssistantView = {
   };
   availability: Availability;
   /** The draft to show, if there is one. */
-  draft: null | { id: string; used: boolean; usedAt: string | null; subject: string; body: string; reasonSummary: string | null; generatedAt: string | null; actionLabel: string; language: "nl" | "en" | null; stale: StaleInfo };
+  draft: null | { id: string; used: boolean; usedAt: string | null; subject: string; body: string; reasonSummary: string | null; generatedAt: string | null; actionLabel: string; language: "nl" | "en" | null; toneLabel: string; customInstruction: string | null; stale: StaleInfo };
   /** A request that is being worked on. */
   job: null | { id: string; stage: "waiting_agent" | "generating"; stuck: boolean };
   failure: null | { message: string; kind: string | null };
@@ -138,7 +141,7 @@ export function buildAssistantView(o: {
     },
     availability: avail,
     draft: shown && shown.subject !== null && shown.body !== null
-      ? { id: shown.id, used: shown.status === "used", usedAt: shown.used_at, subject: shown.subject, body: shown.body, reasonSummary: shown.reason_summary, generatedAt: shown.generated_at, actionLabel: ACTION_LABELS[shown.action_type ?? "no_action"], language: shown.language, stale: stale! }
+      ? { id: shown.id, used: shown.status === "used", usedAt: shown.used_at, subject: shown.subject, body: shown.body, reasonSummary: shown.reason_summary, generatedAt: shown.generated_at, actionLabel: ACTION_LABELS[shown.action_type ?? "no_action"], language: shown.language, toneLabel: TONE_LABELS[isTonePreset(shown.tone_preset) ? shown.tone_preset : "casual"], customInstruction: shown.custom_instruction ?? null, stale: stale! }
       : null,
     job: open ? { id: open.id, stage: open.status === "generating" ? "generating" : "waiting_agent", stuck: open.status === "queued" && o.now.getTime() - Date.parse(open.requested_at) > STUCK_AFTER_MS } : null,
     failure: !open && latestFailed && (!current || latestFailed.requested_at > (current.generated_at ?? current.requested_at)) && (!used || latestFailed.requested_at > (used.used_at ?? "")) ? { message: failureText(latestFailed.failure_kind), kind: latestFailed.failure_kind } : null,
